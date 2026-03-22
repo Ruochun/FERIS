@@ -122,11 +122,7 @@ int main() {
     // Initialise GPU data structure
     // -----------------------------------------------------------------------
     GPU_FEAT10_Data gpu_data(n_elems, n_nodes);
-
-    // Register the element data with the FEASolver manager
-    FEASolver fea;
-    fea.AddElement("beam", &gpu_data);
-    auto* beam = static_cast<GPU_FEAT10_Data*>(fea.GetElement("beam"));
+    GPU_FEAT10_Data* beam = &gpu_data;
 
     beam->Initialize();
 
@@ -184,14 +180,10 @@ int main() {
 
     LinearStaticSolver<GPU_FEAT10_Data> solver(beam, /*tol=*/1e-10, /*max_iter=*/50000);
 
-    // Register the solver with the FEASolver manager
-    fea.AddSolver("linear_static", &solver);
+    solver.Solve();
 
-    fea.GetSolver("linear_static")->Solve();
-
-    auto* lss = static_cast<LinearStaticSolver<GPU_FEAT10_Data>*>(fea.GetSolver("linear_static"));
-    std::cout << "  CG converged in " << lss->GetLastIterCount() << " iterations"
-              << "  (relative residual: " << std::scientific << std::setprecision(3) << lss->GetLastResidual() << ")\n";
+    std::cout << "  CG converged in " << solver.GetLastIterCount() << " iterations"
+              << "  (relative residual: " << std::scientific << std::setprecision(3) << solver.GetLastResidual() << ")\n";
 
     // -----------------------------------------------------------------------
     // Retrieve displaced positions and compute nodal displacements
