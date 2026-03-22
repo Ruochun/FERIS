@@ -112,11 +112,7 @@ int main() {
     // ==========================================================================
 
     GPU_FEAT10_Data gpu_t10_data(n_elems, n_nodes);
-
-    // Register the element data with the FEASolver manager
-    FEASolver fea;
-    fea.AddElement("beam", &gpu_t10_data);
-    auto* beam = static_cast<GPU_FEAT10_Data*>(fea.GetElement("beam"));
+    GPU_FEAT10_Data* beam = &gpu_t10_data;
 
     beam->Initialize();
 
@@ -227,11 +223,8 @@ int main() {
 
     SyncedAdamWSolver solver(beam, beam->get_n_constraint());
 
-    // Register the solver with the FEASolver manager
-    fea.AddSolver("adamw", &solver);
-
-    static_cast<SyncedAdamWSolver*>(fea.GetSolver("adamw"))->Setup();
-    fea.GetSolver("adamw")->SetParameters(&params);
+    solver.Setup();
+    solver.SetParameters(&params);
 
     std::cout << "Solver initialized: SyncedAdamW with h=" << std::scientific << params.time_step << std::defaultfloat
               << std::endl;
@@ -280,7 +273,7 @@ int main() {
             beam->RetrievePositionToCPU(x_before, y_before, z_before);
         }
 
-        fea.GetSolver("adamw")->Solve();
+        solver.Solve();
 
         // Output at specified frequency
         if (output_this_step) {

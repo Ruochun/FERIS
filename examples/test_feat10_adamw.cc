@@ -50,11 +50,7 @@ int main() {
     std::cout << elements << std::endl;
 
     GPU_FEAT10_Data gpu_t10_data(n_elems, n_nodes);
-
-    // Register the element data with the FEASolver manager
-    FEASolver fea;
-    fea.AddElement("cube", &gpu_t10_data);
-    auto* cube = static_cast<GPU_FEAT10_Data*>(fea.GetElement("cube"));
+    GPU_FEAT10_Data* cube = &gpu_t10_data;
 
     MOPHI_INFO("gpu_t10_data created");
 
@@ -189,13 +185,10 @@ int main() {
     SyncedAdamWParams params = {2e-4, 0.9, 0.999, 1e-8, 1e-4, 0.995, 1e-1, 1e-6, 1e14, 5, 500, 1e-3, 10, 0.0};
     SyncedAdamWSolver solver(cube, cube->get_n_constraint());
 
-    // Register the solver with the FEASolver manager
-    fea.AddSolver("adamw", &solver);
-
-    static_cast<SyncedAdamWSolver*>(fea.GetSolver("adamw"))->Setup();
-    fea.GetSolver("adamw")->SetParameters(&params);
+    solver.Setup();
+    solver.SetParameters(&params);
     for (int i = 0; i < 50; i++) {
-        fea.GetSolver("adamw")->Solve();
+        solver.Solve();
     }
 
     // // Set highest precision for cout

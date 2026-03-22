@@ -50,11 +50,7 @@ int main() {
     std::cout << elements << std::endl;
 
     GPU_FEAT10_Data gpu_t10_data(n_elems, n_nodes);
-
-    // Register the element data with the FEASolver manager
-    FEASolver fea;
-    fea.AddElement("cube", &gpu_t10_data);
-    auto* cube = static_cast<GPU_FEAT10_Data*>(fea.GetElement("cube"));
+    GPU_FEAT10_Data* cube = &gpu_t10_data;
 
     MOPHI_INFO("gpu_t10_data created");
 
@@ -189,13 +185,10 @@ int main() {
     SyncedNesterovParams params = {1.0e-8, 1e14, 1.0e-6, 1.0e-6, 5, 300, 1.0e-3};
     SyncedNesterovSolver solver(cube, cube->get_n_constraint());
 
-    // Register the solver with the FEASolver manager
-    fea.AddSolver("nesterov", &solver);
-
-    static_cast<SyncedNesterovSolver*>(fea.GetSolver("nesterov"))->Setup();
-    fea.GetSolver("nesterov")->SetParameters(&params);
+    solver.Setup();
+    solver.SetParameters(&params);
     for (int i = 0; i < 50; i++) {
-        fea.GetSolver("nesterov")->Solve();
+        solver.Solve();
     }
 
     // // Set highest precision for cout
