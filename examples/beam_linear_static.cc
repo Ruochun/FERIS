@@ -183,7 +183,8 @@ int main() {
     solver.Solve();
 
     std::cout << "  CG converged in " << solver.GetLastIterCount() << " iterations"
-              << "  (relative residual: " << std::scientific << std::setprecision(3) << solver.GetLastResidual() << ")\n";
+              << "  (relative residual: " << std::scientific << std::setprecision(3) << solver.GetLastResidual()
+              << ")\n";
 
     // -----------------------------------------------------------------------
     // Retrieve displaced positions and compute nodal displacements
