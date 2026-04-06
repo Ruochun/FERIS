@@ -86,6 +86,27 @@ set_target_properties(beam_linear_static PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
+# Add the TET4 leapfrog dynamic example
+add_executable(test_leapfrog_t4
+    test_leapfrog_t4.cc
+)
+
+target_link_libraries(test_leapfrog_t4
+    tlfea_lib
+    Eigen3::Eigen
+    CUDA::cudart
+    mophi_essentials
+)
+
+target_include_directories(test_leapfrog_t4 PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/external/MoPhiEssentials/src
+)
+
+set_target_properties(test_leapfrog_t4 PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
 # Add the TET4 linear static beam example
 add_executable(beam_linear_static_t4
     beam_linear_static_t4.cc
