@@ -376,7 +376,11 @@ void GPU_LDPM4_Data::CalcMassMatrix() {
     }
 
     // ── Compute Voronoi volumes on host ───────────────────────────────────────
-    // Each TET4 contributes V_tet / 4 to each of its four nodes (equal share).
+    // Distribute each tetrahedron's volume equally to its four nodes (V_tet/4).
+    // This is the standard equal-lumping approximation used in particle methods:
+    // it is equivalent to assuming each particle occupies the intersection of
+    // its Voronoi cell with the tetrahedra that contain it, and approximating
+    // that intersection as V_tet / 4.
     const Real* hx = da_x12.host();
     const Real* hy = da_y12.host();
     const Real* hz = da_z12.host();

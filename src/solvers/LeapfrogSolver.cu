@@ -6,11 +6,11 @@
  * File:    LeapfrogSolver.cu
  * Brief:   Implements the explicit central-difference (leapfrog) time
  *          integrator. Defines GPU kernels that compute the lumped mass
- *          from the CSR consistent mass matrix, evaluate element stress,
- *          assemble internal forces, update half-step nodal velocities,
- *          enforce fixed-node boundary conditions, and advance nodal
- *          positions. Supports ANCF3243, ANCF3443, FEAT10, and FEAT4
- *          element types; primary focus on TET4 for LDPM applications.
+ *          from the CSR consistent mass matrix, evaluate element stress /
+ *          facet tractions, assemble internal forces, update half-step nodal
+ *          velocities, enforce fixed-node boundary conditions, and advance
+ *          nodal positions. Supports ANCF3243, ANCF3443, FEAT10, FEAT4, and
+ *          LDPM4 element types.
  *==============================================================
  *==============================================================*/
 
