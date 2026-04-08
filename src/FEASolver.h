@@ -18,6 +18,7 @@
 #include "elements/ANCF3443Data.cuh"
 #include "elements/FEAT10Data.cuh"
 #include "elements/FEAT4Data.cuh"
+#include "elements/LDPM4Data.cuh"
 
 // Solvers
 #include "solvers/LeapfrogSolver.cuh"

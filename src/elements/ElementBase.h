@@ -19,7 +19,7 @@
 
 namespace tlfea {
 
-enum ElementType { TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4 };
+enum ElementType { TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4, TYPE_LDPM4 };
 
 class ElementBase {
   public:

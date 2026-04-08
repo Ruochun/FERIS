@@ -8,8 +8,8 @@
  *          central-difference (leapfrog) time integrator for solid
  *          mechanics simulations. Owns GPU buffers for half-step nodal
  *          velocities and a lumped (row-summed) mass vector. Supports
- *          ANCF3243, ANCF3443, FEAT10, and FEAT4 element types, with
- *          primary focus on TET4 elements for use with the LDPM model.
+ *          ANCF3243, ANCF3443, FEAT10, FEAT4, and LDPM4 element types,
+ *          with primary focus on LDPM4 for particle-scale simulations.
  *==============================================================
  *==============================================================*/
 
@@ -22,6 +22,7 @@
 #include "../elements/ElementBase.h"
 #include "../elements/FEAT10Data.cuh"
 #include "../elements/FEAT4Data.cuh"
+#include "../elements/LDPM4Data.cuh"
 #include "../types.h"
 #include "../utils/cuda_utils.h"
 #include "../utils/quadrature_utils.h"
@@ -79,6 +80,13 @@ class LeapfrogSolver : public SolverBase {
             d_data_ = typed_data->d_data;
             n_total_qp_ = Quadrature::N_QP_T4_1;
             n_shape_ = Quadrature::N_NODE_T4_4;
+        } else if (data->type == TYPE_LDPM4) {
+            type_ = TYPE_LDPM4;
+            auto* typed_data = static_cast<GPU_LDPM4_Data*>(data);
+            d_data_ = typed_data->d_data;
+            // One facet per edge (one "QP"), two endpoint nodes per edge.
+            n_total_qp_ = 1;
+            n_shape_ = 2;
         } else {
             d_data_ = nullptr;
             MOPHI_ERROR("Unknown element type in LeapfrogSolver!");

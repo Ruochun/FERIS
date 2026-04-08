@@ -129,3 +129,24 @@ target_include_directories(beam_linear_static_t4 PRIVATE
 set_target_properties(beam_linear_static_t4 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+
+# Add the LDPM4 leapfrog dynamic example
+add_executable(test_ldpm_t4
+    test_ldpm_t4.cc
+)
+
+target_link_libraries(test_ldpm_t4
+    tlfea_lib
+    Eigen3::Eigen
+    CUDA::cudart
+    mophi_essentials
+)
+
+target_include_directories(test_ldpm_t4 PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/external/MoPhiEssentials/src
+)
+
+set_target_properties(test_ldpm_t4 PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
