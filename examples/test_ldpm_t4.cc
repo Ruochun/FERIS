@@ -152,8 +152,8 @@ int main() {
 
     element_data.SetNodalFixed(h_fixed);
 
-    // External force: 1 kN downward distributed across all tip-face particles
-    const Real F_total = -1000.0;  // N, in -z direction
+    // External force: 100 N downward distributed across all tip-face particles
+    const Real F_total = -100.0;  // N, in -z direction
     const Real F_per_node = F_total / static_cast<Real>(load_idx.size());
     VectorXR h_f_ext(n_nodes * 3);
     h_f_ext.setZero();
@@ -215,7 +215,7 @@ int main() {
     // ──────────────────────────────────────────────────────────────────────────
     // 8. Time-march and write VTK snapshots
     // ──────────────────────────────────────────────────────────────────────────
-    const int n_steps = 2000;
+    const int n_steps = 5000;
     const int output_interval = 50;  // write one VTK frame every N steps
 
     // Reference node matrix needed by WriteFEAT4ToVTK (initial positions).
