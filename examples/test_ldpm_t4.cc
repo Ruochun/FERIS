@@ -13,7 +13,7 @@
  *   2. Create GPU_LDPM4_Data from the mesh (edges are extracted automatically).
  *   3. Set LDPM material parameters (E_N, E_T) and particle density.
  *   4. Fix nodes on the x = x_min face (cantilever).
- *   5. Apply a downward point load at the first node on the x = x_max face.
+ *   5. Apply a downward distributed load across all nodes on the x = x_max face.
  *   6. Build the diagonal lumped-mass matrix (CalcMassMatrix).
  *   7. Create LeapfrogSolver, set parameters, call Setup.
  *   8. Time-march with Solve() and write VTK snapshots every N steps.
@@ -120,20 +120,25 @@ int main() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 3. Identify loaded node (first particle at x = x_max)
+    // 3. Identify loaded nodes (all particles on x = x_max face)
+    //
+    // Note: a single arbitrary corner node would carry a disproportionately
+    // small lumped mass (few connected elements), turning the same applied
+    // force into a much higher acceleration than the surrounding nodes.
+    // Distributing the resultant evenly across the entire free-end face
+    // gives a physically correct distributed tip load and avoids the spike.
     // ──────────────────────────────────────────────────────────────────────────
-    int load_node = -1;
+    std::vector<int> load_idx;
     for (int i = 0; i < n_nodes; i++) {
         if (std::abs(h_x(i) - x_max) < tol_BC) {
-            load_node = i;
-            break;
+            load_idx.push_back(i);
         }
     }
-    if (load_node < 0) {
-        MOPHI_ERROR("Could not find a particle at x = x_max for load application.");
+    if (load_idx.empty()) {
+        MOPHI_ERROR("Could not find any particle at x = x_max for load application.");
         return 1;
     }
-    MOPHI_INFO("Load particle: %d  (x = %.4f)", load_node, x_max);
+    MOPHI_INFO("Load particles (x = x_max = %.4f): %zu nodes", x_max, load_idx.size());
 
     // ──────────────────────────────────────────────────────────────────────────
     // 4. Build and configure GPU_LDPM4_Data
@@ -147,10 +152,14 @@ int main() {
 
     element_data.SetNodalFixed(h_fixed);
 
-    // External force: 1 kN downward at tip
+    // External force: 1 kN downward distributed across all tip-face particles
+    const Real F_total = -1000.0;  // N, in -z direction
+    const Real F_per_node = F_total / static_cast<Real>(load_idx.size());
     VectorXR h_f_ext(n_nodes * 3);
     h_f_ext.setZero();
-    h_f_ext(load_node * 3 + 2) = -1000.0;  // -z direction
+    for (int i : load_idx) {
+        h_f_ext(i * 3 + 2) = F_per_node;
+    }
     element_data.SetExternalForce(h_f_ext);
 
     element_data.SetMaterial(E_N_val, E_T_val);
@@ -239,11 +248,13 @@ int main() {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-            // Console progress: tip displacement
-            std::cout << "Step " << step + 1 << " | load node displacement:"
-                      << "  dx = " << (x_cur(load_node) - h_x(load_node))
-                      << "  dy = " << (y_cur(load_node) - h_y(load_node))
-                      << "  dz = " << (z_cur(load_node) - h_z(load_node)) << "\n";
+            // Console progress: mean tip-face displacement
+            Real dz_sum = Real(0);
+            for (int i : load_idx) {
+                dz_sum += z_cur(i) - h_z(i);
+            }
+            const Real dz_mean = dz_sum / static_cast<Real>(load_idx.size());
+            std::cout << "Step " << step + 1 << " | mean tip displacement (z): " << dz_mean << "\n";
 
             // VTK snapshot
             std::ostringstream fname;
