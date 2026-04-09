@@ -59,6 +59,9 @@ const Real alpha_t = 0.25;
 const Real E_T_val = alpha_t * E_N_val;
 const Real rho_val = 2700.0;  // kg/m³
 
+// Fraction of beam length used as tolerance for detecting end nodes.
+static constexpr Real BOUNDARY_TOLERANCE_FRACTION = 0.0005;
+
 int main() {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
 
@@ -101,10 +104,11 @@ int main() {
     // ──────────────────────────────────────────────────────────────────────────
     const Real x_min = h_x.minCoeff();
     const Real x_max = h_x.maxCoeff();
+    const Real tol_BC = BOUNDARY_TOLERANCE_FRACTION * (x_max - x_min);
 
     std::vector<int> fixed_idx;
     for (int i = 0; i < n_nodes; i++) {
-        if (std::abs(h_x(i) - x_min) < 1e-8) {
+        if (std::abs(h_x(i) - x_min) < tol_BC) {
             fixed_idx.push_back(i);
         }
     }
@@ -120,7 +124,7 @@ int main() {
     // ──────────────────────────────────────────────────────────────────────────
     int load_node = -1;
     for (int i = 0; i < n_nodes; i++) {
-        if (std::abs(h_x(i) - x_max) < 1e-8) {
+        if (std::abs(h_x(i) - x_max) < tol_BC) {
             load_node = i;
             break;
         }
@@ -202,7 +206,7 @@ int main() {
     // ──────────────────────────────────────────────────────────────────────────
     // 8. Time-march and write VTK snapshots
     // ──────────────────────────────────────────────────────────────────────────
-    const int n_steps = 200;
+    const int n_steps = 2000;
     const int output_interval = 50;  // write one VTK frame every N steps
 
     // Reference node matrix needed by WriteFEAT4ToVTK (initial positions).

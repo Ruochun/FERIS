@@ -1,8 +1,8 @@
 /**
  * TET4 Leapfrog Dynamic Simulation Example
  *
- * Author: Json Zhou
- * Email:  zzhou292@wisc.edu
+ * Author: Ruochun Zhang
+ * Email:  ruochunz@gmail.com
  *
  * This driver loads a TET4 beam mesh, clamps nodes on the x = x_min plane,
  * applies a downward point load on one node, and advances the simulation

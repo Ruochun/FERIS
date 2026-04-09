@@ -1,8 +1,8 @@
 /*==============================================================
  *==============================================================
  * Project: TLFEA
- * Author:  Json Zhou
- * Email:   zzhou292@wisc.edu
+ * Author: Ruochun Zhang
+ * Email:  ruochunz@gmail.com
  * File:    LeapfrogSolver.cuh
  * Brief:   Declares the LeapfrogSolver, a second-order explicit
  *          central-difference (leapfrog) time integrator for solid
@@ -52,8 +52,7 @@ struct LeapfrogParams {
 // Each call to Solve() advances the simulation by one time step.
 class LeapfrogSolver : public SolverBase {
   public:
-    LeapfrogSolver(ElementBase* data)
-        : n_coef_(data->get_n_coef()), n_beam_(data->get_n_beam()) {
+    LeapfrogSolver(ElementBase* data) : n_coef_(data->get_n_coef()), n_beam_(data->get_n_beam()) {
         if (data->type == TYPE_3243) {
             type_ = TYPE_3243;
             auto* typed_data = static_cast<GPU_ANCF3243_Data*>(data);

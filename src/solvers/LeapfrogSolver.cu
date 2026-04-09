@@ -1,8 +1,8 @@
 /*==============================================================
  *==============================================================
  * Project: TLFEA
- * Author:  Json Zhou
- * Email:   zzhou292@wisc.edu
+ * Author: Ruochun Zhang
+ * Email:  ruochunz@gmail.com
  * File:    LeapfrogSolver.cu
  * Brief:   Implements the explicit central-difference (leapfrog) time
  *          integrator. Defines GPU kernels that compute the lumped mass
@@ -41,7 +41,8 @@ namespace tlfea {
 template <typename ElemType>
 __global__ void leapfrog_compute_lumped_mass_kernel(ElemType* d_data, LeapfrogSolver* d_solver) {
     int node_i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (node_i >= d_solver->get_n_coef()) return;
+    if (node_i >= d_solver->get_n_coef())
+        return;
 
     const int* __restrict__ offsets = d_data->csr_offsets();
     const Real* __restrict__ values = d_data->csr_values();
@@ -115,13 +116,15 @@ __global__ void leapfrog_compute_f_int_kernel(ElemType* d_data, LeapfrogSolver* 
 template <typename ElemType>
 __global__ void leapfrog_update_velocity_kernel(ElemType* d_data, LeapfrogSolver* d_solver) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= d_solver->get_n_coef() * 3) return;
+    if (tid >= d_solver->get_n_coef() * 3)
+        return;
 
     int node_i = tid / 3;
     Real dt = d_solver->solver_time_step();
     Real mass_val = d_solver->mass_lump()(node_i);
     // Guard against orphan nodes (zero lumped mass) – they contribute no dynamics.
-    if (mass_val <= Real(0)) return;
+    if (mass_val <= Real(0))
+        return;
     Real inv_mass = Real(1) / mass_val;
     Real net_force = d_data->f_ext()(tid) - d_data->f_int()(tid);
 
@@ -139,7 +142,8 @@ template <typename ElemType>
 __global__ void leapfrog_apply_bc_kernel(ElemType* d_data, LeapfrogSolver* d_solver) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int n_fixed = d_data->gpu_n_constraint() / 3;
-    if (tid >= n_fixed) return;
+    if (tid >= n_fixed)
+        return;
 
     int node_idx = d_data->fixed_nodes()(tid);
     d_solver->v()(node_idx * 3 + 0) = 0.0;
@@ -158,7 +162,8 @@ __global__ void leapfrog_apply_bc_kernel(ElemType* d_data, LeapfrogSolver* d_sol
 template <typename ElemType>
 __global__ void leapfrog_update_position_kernel(ElemType* d_data, LeapfrogSolver* d_solver) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= d_solver->get_n_coef()) return;
+    if (tid >= d_solver->get_n_coef())
+        return;
 
     Real dt = d_solver->solver_time_step();
     d_data->x12()(tid) += dt * d_solver->v()(tid * 3 + 0);
@@ -183,20 +188,20 @@ void LeapfrogSolver::Setup() {
     int blocks_coef = (n_coef_ + threadsPerBlock - 1) / threadsPerBlock;
 
     if (type_ == TYPE_T4) {
-        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(
-            static_cast<GPU_FEAT4_Data*>(d_data_), d_leapfrog_solver_);
+        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_FEAT4_Data*>(d_data_),
+                                                                              d_leapfrog_solver_);
     } else if (type_ == TYPE_T10) {
-        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(
-            static_cast<GPU_FEAT10_Data*>(d_data_), d_leapfrog_solver_);
+        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_FEAT10_Data*>(d_data_),
+                                                                              d_leapfrog_solver_);
     } else if (type_ == TYPE_3243) {
-        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(
-            static_cast<GPU_ANCF3243_Data*>(d_data_), d_leapfrog_solver_);
+        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_ANCF3243_Data*>(d_data_),
+                                                                              d_leapfrog_solver_);
     } else if (type_ == TYPE_3443) {
-        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(
-            static_cast<GPU_ANCF3443_Data*>(d_data_), d_leapfrog_solver_);
+        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_ANCF3443_Data*>(d_data_),
+                                                                              d_leapfrog_solver_);
     } else if (type_ == TYPE_LDPM4) {
-        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(
-            static_cast<GPU_LDPM4_Data*>(d_data_), d_leapfrog_solver_);
+        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_LDPM4_Data*>(d_data_),
+                                                                              d_leapfrog_solver_);
     }
 
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
@@ -226,10 +231,10 @@ void LeapfrogSolver::OneStepLeapfrog() {
     MOPHI_GPU_CALL(cudaGetDeviceProperties(&props, 0));
     const int max_grid_stride_blocks = 32 * props.multiProcessorCount;
 
-    int blocks_p = std::max(1, std::min((n_beam_ * n_total_qp_ + threadsPerBlock - 1) / threadsPerBlock,
-                                        max_grid_stride_blocks));
-    int blocks_if = std::max(1, std::min((n_beam_ * n_shape_ + threadsPerBlock - 1) / threadsPerBlock,
-                                         max_grid_stride_blocks));
+    int blocks_p =
+        std::max(1, std::min((n_beam_ * n_total_qp_ + threadsPerBlock - 1) / threadsPerBlock, max_grid_stride_blocks));
+    int blocks_if =
+        std::max(1, std::min((n_beam_ * n_shape_ + threadsPerBlock - 1) / threadsPerBlock, max_grid_stride_blocks));
 
     auto one_step_typed = [&](auto* typed_data) {
         // Step 1: Compute stress P at all quadrature points.
@@ -279,10 +284,8 @@ void LeapfrogSolver::OneStepLeapfrog() {
 // Explicit template instantiations for all supported element types
 // ---------------------------------------------------------------------------
 
-template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*,
-                                                                                LeapfrogSolver*);
-template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*,
-                                                                                LeapfrogSolver*);
+template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*);
+template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);

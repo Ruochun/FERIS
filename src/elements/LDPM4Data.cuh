@@ -210,10 +210,7 @@ struct GPU_LDPM4_Data : public ElementBase {
     // Allocates GPU buffers, extracts unique edges from the TET4 connectivity,
     // computes reference geometry (l0, n, m, l_vec, facet area), and copies
     // everything to device.  Must be called first.
-    void Setup(const VectorXR& h_x,
-               const VectorXR& h_y,
-               const VectorXR& h_z,
-               const MatrixXi& tet_connectivity);
+    void Setup(const VectorXR& h_x, const VectorXR& h_y, const VectorXR& h_z, const MatrixXi& tet_connectivity);
 
     // Set LDPM normal and shear moduli.  Must be called after Setup().
     void SetMaterial(Real E_N_val, Real E_T_val);
@@ -270,12 +267,12 @@ struct GPU_LDPM4_Data : public ElementBase {
     std::vector<int> h_tet_conn_vec;  // host copy: n_elem × 4 (row-major)
 
     // ── Edge geometry (precomputed in Setup, read-only during time-stepping) ──
-    mophi::DualArray<int> da_edge_nodes;    // [n_edge * 2]
-    mophi::DualArray<Real> da_l0;           // [n_edge]
-    mophi::DualArray<Real> da_facet_area;   // [n_edge]
-    mophi::DualArray<Real> da_edge_n;       // [n_edge * 3]
-    mophi::DualArray<Real> da_edge_m;       // [n_edge * 3]
-    mophi::DualArray<Real> da_edge_lv;      // [n_edge * 3]
+    mophi::DualArray<int> da_edge_nodes;   // [n_edge * 2]
+    mophi::DualArray<Real> da_l0;          // [n_edge]
+    mophi::DualArray<Real> da_facet_area;  // [n_edge]
+    mophi::DualArray<Real> da_edge_n;      // [n_edge * 3]
+    mophi::DualArray<Real> da_edge_m;      // [n_edge * 3]
+    mophi::DualArray<Real> da_edge_lv;     // [n_edge * 3]
     int* d_edge_nodes;
     Real* d_l0;
     Real* d_facet_area;

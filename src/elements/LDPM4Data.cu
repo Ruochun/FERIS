@@ -61,8 +61,7 @@ __global__ void compute_f_int_ldpm4_kernel(GPU_LDPM4_Data* d_data) {
 static inline Real triangle_area(const Real* a, const Real* b, const Real* c) {
     Real v1[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
     Real v2[3] = {c[0] - a[0], c[1] - a[1], c[2] - a[2]};
-    Real cross[3] = {v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2],
-                     v1[0] * v2[1] - v1[1] * v2[0]};
+    Real cross[3] = {v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2], v1[0] * v2[1] - v1[1] * v2[0]};
     return Real(0.5) * std::sqrt(cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]);
 }
 
@@ -239,12 +238,10 @@ void GPU_LDPM4_Data::Setup(const VectorXR& h_x,
             const Real xl = h_x(nl), yl = h_y(nl), zl = h_z(nl);
 
             // Centroid of face (ni, nj, nk)
-            const Real c_ijk[3] = {(xi + xj + xk) / Real(3), (yi + yj + yk) / Real(3),
-                                   (zi + zj + zk) / Real(3)};
+            const Real c_ijk[3] = {(xi + xj + xk) / Real(3), (yi + yj + yk) / Real(3), (zi + zj + zk) / Real(3)};
 
             // Centroid of face (ni, nj, nl)
-            const Real c_ijl[3] = {(xi + xj + xl) / Real(3), (yi + yj + yl) / Real(3),
-                                   (zi + zj + zl) / Real(3)};
+            const Real c_ijl[3] = {(xi + xj + xl) / Real(3), (yi + yj + yl) / Real(3), (zi + zj + zl) / Real(3)};
 
             // Centroid of tetrahedron
             const Real c_tet[3] = {(xi + xj + xk + xl) / Real(4), (yi + yj + yk + yl) / Real(4),
@@ -399,8 +396,7 @@ void GPU_LDPM4_Data::CalcMassMatrix() {
         const Real c[3] = {hx[n3] - hx[n0], hy[n3] - hy[n0], hz[n3] - hz[n0]};
 
         // V_tet = |a · (b × c)| / 6
-        const Real cross_bc[3] = {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2],
-                                   b[0] * c[1] - b[1] * c[0]};
+        const Real cross_bc[3] = {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2], b[0] * c[1] - b[1] * c[0]};
         const Real vol = std::abs(a[0] * cross_bc[0] + a[1] * cross_bc[1] + a[2] * cross_bc[2]) / Real(6);
 
         node_volumes[n0] += vol / Real(4);
@@ -430,8 +426,8 @@ void GPU_LDPM4_Data::CalcMassMatrix() {
         is_csr_setup = true;
     }
 
-    MOPHI_GPU_CALL(
-        cudaMemcpy(d_csr_offsets, h_offsets.data(), static_cast<size_t>(n_coef + 1) * sizeof(int), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_csr_offsets, h_offsets.data(), static_cast<size_t>(n_coef + 1) * sizeof(int),
+                              cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(
         cudaMemcpy(d_csr_columns, h_columns.data(), static_cast<size_t>(n_coef) * sizeof(int), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(
