@@ -1,8 +1,8 @@
 /**
  * LDPM4 Leapfrog Dynamic Simulation Example
  *
- * Author: Json Zhou
- * Email:  zzhou292@wisc.edu
+ * Author: Ruochun Zhang
+ * Email:  ruochunz@gmail.com
  *
  * Demonstrates the 3-DOF translational LDPM element (GPU_LDPM4_Data) driven
  * by the explicit leapfrog (central-difference) solver on a TET4 Delaunay
@@ -16,7 +16,13 @@
  *   5. Apply a downward point load at the first node on the x = x_max face.
  *   6. Build the diagonal lumped-mass matrix (CalcMassMatrix).
  *   7. Create LeapfrogSolver, set parameters, call Setup.
- *   8. Time-march with Solve() and print tip displacement every N steps.
+ *   8. Time-march with Solve() and write VTK snapshots every N steps.
+ *
+ * VTK output
+ * ──────────
+ *   Each snapshot is written as output_ldpm_<frame>.vtk (legacy ASCII VTK).
+ *   Load the series in ParaView with File → Open, select the group, and use
+ *   the Animation View to step through frames.
  *
  * CFL stability note
  * ──────────────────
@@ -32,12 +38,14 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <MoPhiEssentials.h>
 
 #include "../src/FEASolver.h"
 #include "../src/elements/LDPM4Data.cuh"
 #include "../src/solvers/LeapfrogSolver.cuh"
 #include "../src/types.h"
+#include "../src/utils/mesh_utils.h"
 #include "../src/utils/quadrature_utils.h"
 
 using namespace tlfea;
@@ -192,47 +200,58 @@ int main() {
     MOPHI_INFO("LeapfrogSolver configured (dt = %.2e s)", dt);
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 8. Time-march
+    // 8. Time-march and write VTK snapshots
     // ──────────────────────────────────────────────────────────────────────────
     const int n_steps = 200;
-    const int print_interval = 50;
+    const int output_interval = 50;  // write one VTK frame every N steps
+
+    // Reference node matrix needed by WriteFEAT4ToVTK (initial positions).
+    MatrixXR nodes_ref(n_nodes, 3);
+    for (int i = 0; i < n_nodes; i++) {
+        nodes_ref(i, 0) = h_x(i);
+        nodes_ref(i, 1) = h_y(i);
+        nodes_ref(i, 2) = h_z(i);
+    }
 
     std::cout << std::fixed << std::setprecision(6);
     std::cout << "Starting LDPM4 leapfrog time integration for " << n_steps << " steps...\n";
+    std::cout << "VTK snapshots will be written every " << output_interval << " steps.\n";
+
+    int frame = 0;
+
+    // Write initial (undeformed) state as frame 0.
+    {
+        std::ostringstream fname;
+        fname << "output_ldpm_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+        ANCFCPUUtils::WriteFEAT4ToVTK(fname.str(), nodes_ref, elements, h_x, h_y, h_z);
+        std::cout << "Wrote: " << fname.str() << "  (initial configuration)\n";
+        ++frame;
+    }
 
     for (int step = 0; step < n_steps; step++) {
         solver.Solve();
 
-        if ((step + 1) % print_interval == 0) {
+        if ((step + 1) % output_interval == 0) {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
+
+            // Console progress: tip displacement
             std::cout << "Step " << step + 1 << " | load node displacement:"
                       << "  dx = " << (x_cur(load_node) - h_x(load_node))
                       << "  dy = " << (y_cur(load_node) - h_y(load_node))
                       << "  dz = " << (z_cur(load_node) - h_z(load_node)) << "\n";
+
+            // VTK snapshot
+            std::ostringstream fname;
+            fname << "output_ldpm_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+            ANCFCPUUtils::WriteFEAT4ToVTK(fname.str(), nodes_ref, elements, x_cur, y_cur, z_cur);
+            std::cout << "Wrote: " << fname.str() << "\n";
+            ++frame;
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // 9. Print final nodal positions
-    // ──────────────────────────────────────────────────────────────────────────
-    VectorXR x_final, y_final, z_final;
-    element_data.RetrievePositionToCPU(x_final, y_final, z_final);
-
-    std::cout << std::fixed << std::setprecision(17);
-    std::cout << "\nFinal x:\n";
-    for (int i = 0; i < x_final.size(); i++) {
-        std::cout << x_final(i) << " ";
-    }
-    std::cout << "\n\nFinal y:\n";
-    for (int i = 0; i < y_final.size(); i++) {
-        std::cout << y_final(i) << " ";
-    }
-    std::cout << "\n\nFinal z:\n";
-    for (int i = 0; i < z_final.size(); i++) {
-        std::cout << z_final(i) << " ";
-    }
-    std::cout << "\n";
+    std::cout << "\nSimulation complete.  " << frame << " VTK file(s) written.\n";
+    std::cout << "Open output_ldpm_*.vtk in ParaView to visualize the deformed configuration.\n";
 
     element_data.Destroy();
     MOPHI_INFO("Done");
