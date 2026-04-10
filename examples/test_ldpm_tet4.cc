@@ -62,7 +62,7 @@ using namespace tlfea;
 
 // ── Material and simulation parameters ────────────────────────────────────────
 // Normal modulus (Pa)
-const Real E_N_val = 7e7;
+const Real E_N_val = 7e10;
 // Shear modulus: alpha = 0.25 gives quasi-isotropic translational response.
 const Real alpha_t = Real(0.25);
 const Real E_T_val = alpha_t * E_N_val;
@@ -71,7 +71,7 @@ const Real E_T_val = alpha_t * E_N_val;
 // The actual values are E_k* = beta * E_N * l_min^2; we set a characteristic
 // l_ref below and compute E_k* from it.  If l_ref is the minimum edge length,
 // this gives the same scale as the CFL-relevant rotational wave speed.
-const Real rho_val = 2700.0;   // kg/m³
+const Real rho_val = 2700.0;     // kg/m³
 const Real beta_k = Real(0.25);  // dimensionless rotational coupling factor
 
 static constexpr Real BOUNDARY_TOLERANCE_FRACTION = 0.0005;
@@ -185,8 +185,8 @@ int main() {
 
     element_data.SetNodalFixed(h_fixed);
 
-    // External force: 100 N downward distributed across all tip-face particles
-    const Real F_total = -100.0;  // N, in -z direction
+    // External force: 1000 N downward distributed across all tip-face particles
+    const Real F_total = -1000.0;  // N, in -z direction
     const Real F_per_node = F_total / static_cast<Real>(load_idx.size());
     VectorXR h_f_ext(n_nodes * 3);
     h_f_ext.setZero();

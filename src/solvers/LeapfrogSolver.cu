@@ -181,8 +181,7 @@ __global__ void leapfrog_update_position_kernel(ElemType* d_data, LeapfrogSolver
 // also copies the per-node rotational inertia from the element data into
 // the second half of the solver's mass array (mass_inertia slot).
 // ---------------------------------------------------------------------------
-__global__ void leapfrog_compute_lumped_mass_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data,
-                                                               LeapfrogSolver* d_solver) {
+__global__ void leapfrog_compute_lumped_mass_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data, LeapfrogSolver* d_solver) {
     int node_i = blockIdx.x * blockDim.x + threadIdx.x;
     if (node_i >= d_solver->get_n_coef())
         return;

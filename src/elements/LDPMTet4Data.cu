@@ -68,9 +68,9 @@ static inline Real triangle_area(const Real* a, const Real* b, const Real* c) {
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
-                               const VectorXR& h_y,
-                               const VectorXR& h_z,
-                               const MatrixXi& tet_connectivity) {
+                              const VectorXR& h_y,
+                              const VectorXR& h_z,
+                              const MatrixXi& tet_connectivity) {
     if (is_setup) {
         MOPHI_ERROR("GPU_LDPMTet4_Data is already set up.");
         return;

@@ -107,8 +107,8 @@ class LeapfrogSolver : public SolverBase {
         // rotational half-step velocities:
         //   [v_trans (3*n_coef_) | v_rot (3*n_coef_)]
         // All other types use the standard 3*n_coef_ translational layout.
-        const size_t v_size = (type_ == TYPE_LDPM_TET4) ? static_cast<size_t>(n_coef_) * 6
-                                                         : static_cast<size_t>(n_coef_) * 3;
+        const size_t v_size =
+            (type_ == TYPE_LDPM_TET4) ? static_cast<size_t>(n_coef_) * 6 : static_cast<size_t>(n_coef_) * 3;
         da_v_.resize(v_size);
         da_v_.BindDevicePointer(&d_v_);
 

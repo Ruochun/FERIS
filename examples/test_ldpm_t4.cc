@@ -54,7 +54,7 @@ using namespace tlfea;
 // Normal modulus (Pa):  E_N drives axial stiffness of each interaction facet.
 // Shear modulus (Pa):   E_T = alpha * E_N controls shear / bending stiffness.
 // alpha = 0.25 is a typical value for quasi-isotropic LDPM response.
-const Real E_N_val = 7e7;
+const Real E_N_val = 7e10;
 const Real alpha_t = 0.25;
 const Real E_T_val = alpha_t * E_N_val;
 const Real rho_val = 2700.0;  // kg/m³
@@ -152,8 +152,8 @@ int main() {
 
     element_data.SetNodalFixed(h_fixed);
 
-    // External force: 100 N downward distributed across all tip-face particles
-    const Real F_total = -100.0;  // N, in -z direction
+    // External force: 1000 N downward distributed across all tip-face particles
+    const Real F_total = -1000.0;  // N, in -z direction
     const Real F_per_node = F_total / static_cast<Real>(load_idx.size());
     VectorXR h_f_ext(n_nodes * 3);
     h_f_ext.setZero();
