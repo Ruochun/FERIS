@@ -81,8 +81,8 @@ class LeapfrogSolver : public SolverBase {
             d_data_ = typed_data->d_data;
             n_total_qp_ = Quadrature::N_QP_T4_1;
             n_shape_ = Quadrature::N_NODE_T4_4;
-        } else if (data->type == TYPE_LDPM4) {
-            type_ = TYPE_LDPM4;
+        } else if (data->type == TYPE_LDPM4_DEPRECATED) {
+            type_ = TYPE_LDPM4_DEPRECATED;
             auto* typed_data = static_cast<GPU_LDPM4_Data*>(data);
             d_data_ = typed_data->d_data;
             // One facet per edge (one "QP"), two endpoint nodes per edge.

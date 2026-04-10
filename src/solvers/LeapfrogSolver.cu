@@ -296,7 +296,7 @@ void LeapfrogSolver::Setup() {
     } else if (type_ == TYPE_3443) {
         leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_ANCF3443_Data*>(d_data_),
                                                                               d_leapfrog_solver_);
-    } else if (type_ == TYPE_LDPM4) {
+    } else if (type_ == TYPE_LDPM4_DEPRECATED) {
         leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_LDPM4_Data*>(d_data_),
                                                                               d_leapfrog_solver_);
     } else if (type_ == TYPE_LDPM_TET4) {
@@ -365,7 +365,7 @@ void LeapfrogSolver::OneStepLeapfrog() {
         one_step_typed(static_cast<GPU_ANCF3243_Data*>(d_data_));
     } else if (type_ == TYPE_3443) {
         one_step_typed(static_cast<GPU_ANCF3443_Data*>(d_data_));
-    } else if (type_ == TYPE_LDPM4) {
+    } else if (type_ == TYPE_LDPM4_DEPRECATED) {
         one_step_typed(static_cast<GPU_LDPM4_Data*>(d_data_));
     } else if (type_ == TYPE_LDPM_TET4) {
         auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);

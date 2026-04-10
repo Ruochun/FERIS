@@ -12,6 +12,13 @@
 // GPU data structure for the 3-DOF translational Lattice Discrete Particle
 // Model (LDPM) built on a TET4 Delaunay triangulation.
 //
+// DEPRECATED: This element type (TYPE_LDPM4_DEPRECATED / GPU_LDPM4_Data) is
+// the original translational-only LDPM formulation.  It is superseded by the
+// 6-DOF element GPU_LDPMTet4_Data (TYPE_LDPM_TET4) which adds linearised
+// rotational DOFs (θ_x, θ_y, θ_z) per particle and is the recommended choice
+// for new work.  GPU_LDPM4_Data is retained for backward-compatibility only
+// and may be removed in a future release.
+//
 // Interaction model summary
 // ─────────────────────────
 //  • Every unique edge (i, j) of the TET4 mesh is one interaction "strut".
@@ -199,10 +206,13 @@ struct GPU_LDPM4_Data : public ElementBase {
     void RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>&) override {}
 
     // ── Constructor ──────────────────────────────────────────────────────────
+    // NOTE: GPU_LDPM4_Data / TYPE_LDPM4_DEPRECATED is the legacy 3-DOF (trans-
+    // lational-only) LDPM element.  Prefer GPU_LDPMTet4_Data / TYPE_LDPM_TET4
+    // (6-DOF, translational + linearised-rotational) for new work.
 
     GPU_LDPM4_Data(int num_nodes, int num_elems)
         : n_coef(num_nodes), n_elem(num_elems), n_edge(0), n_constraint(0), h_rho(0) {
-        type = TYPE_LDPM4;
+        type = TYPE_LDPM4_DEPRECATED;
     }
 
     // ── Setup / configuration ─────────────────────────────────────────────────

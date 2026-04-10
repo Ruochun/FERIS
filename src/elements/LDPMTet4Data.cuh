@@ -39,7 +39,7 @@
 //      [v_trans (3*n_coef) | v_rot (3*n_coef)]
 //  • Lumped mass array is 2*n_coef:
 //      [m_trans (n_coef)   | I_rot  (n_coef)]
-//  • n_total_qp_ = 1 and n_shape_ = 2 (same as TYPE_LDPM4).
+//  • n_total_qp_ = 1 and n_shape_ = 2 (same as TYPE_LDPM4_DEPRECATED).
 //  • Rotational inertia: I_lump = ALPHA_ROT * m_lump * l_min_node^2
 //    with ALPHA_ROT = 0.25.
 

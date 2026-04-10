@@ -1,8 +1,16 @@
 /**
- * LDPM4 Leapfrog Dynamic Simulation Example
+ * LDPM4 Leapfrog Dynamic Simulation Example  [DEPRECATED ELEMENT]
  *
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
+ *
+ * *** DEPRECATION NOTICE ***
+ * This example uses the legacy GPU_LDPM4_Data element (TYPE_LDPM4_DEPRECATED),
+ * which supports only 3 translational DOFs per particle (no rotations).
+ * It is retained as a migration reference only.  For new work, please use
+ * the 6-DOF element: see examples/beam_simulations/test_ldpm_tet4.cc and
+ * GPU_LDPMTet4_Data / TYPE_LDPM_TET4.
+ * *** END DEPRECATION NOTICE ***
  *
  * Demonstrates the 3-DOF translational LDPM element (GPU_LDPM4_Data) driven
  * by the explicit leapfrog (central-difference) solver on a TET4 Delaunay
