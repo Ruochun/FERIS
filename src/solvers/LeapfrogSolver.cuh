@@ -8,8 +8,9 @@
  *          central-difference (leapfrog) time integrator for solid
  *          mechanics simulations. Owns GPU buffers for half-step nodal
  *          velocities and a lumped (row-summed) mass vector. Supports
- *          ANCF3243, ANCF3443, FEAT10, FEAT4, and LDPM4 element types,
- *          with primary focus on LDPM4 for particle-scale simulations.
+ *          ANCF3243, ANCF3443, FEAT10, FEAT4, LDPM4, and LDPM_TET4
+ *          element types, with primary focus on LDPM_TET4 for
+ *          particle-scale simulations with 6 DOFs per particle.
  *==============================================================
  *==============================================================*/
 
@@ -23,6 +24,7 @@
 #include "../elements/FEAT10Data.cuh"
 #include "../elements/FEAT4Data.cuh"
 #include "../elements/LDPM4Data.cuh"
+#include "../elements/LDPMTet4Data.cuh"
 #include "../types.h"
 #include "../utils/cuda_utils.h"
 #include "../utils/quadrature_utils.h"
@@ -86,6 +88,13 @@ class LeapfrogSolver : public SolverBase {
             // One facet per edge (one "QP"), two endpoint nodes per edge.
             n_total_qp_ = 1;
             n_shape_ = 2;
+        } else if (data->type == TYPE_LDPM_TET4) {
+            type_ = TYPE_LDPM_TET4;
+            auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(data);
+            d_data_ = typed_data->d_data;
+            // One facet per edge (one "QP"), two endpoint nodes per edge.
+            n_total_qp_ = 1;
+            n_shape_ = 2;
         } else {
             d_data_ = nullptr;
             MOPHI_ERROR("Unknown element type in LeapfrogSolver!");
@@ -94,12 +103,21 @@ class LeapfrogSolver : public SolverBase {
         cudaMalloc(&d_time_step_, sizeof(Real));
         cudaMalloc(&d_leapfrog_solver_, sizeof(LeapfrogSolver));
 
-        // Half-step nodal velocities: layout [vx0, vy0, vz0, vx1, vy1, vz1, ...]
-        da_v_.resize(static_cast<size_t>(n_coef_) * 3);
+        // For TYPE_LDPM_TET4 the velocity array holds both translational and
+        // rotational half-step velocities:
+        //   [v_trans (3*n_coef_) | v_rot (3*n_coef_)]
+        // All other types use the standard 3*n_coef_ translational layout.
+        const size_t v_size = (type_ == TYPE_LDPM_TET4) ? static_cast<size_t>(n_coef_) * 6
+                                                         : static_cast<size_t>(n_coef_) * 3;
+        da_v_.resize(v_size);
         da_v_.BindDevicePointer(&d_v_);
 
-        // Lumped (row-sum) nodal mass: one scalar per node.
-        da_mass_lump_.resize(static_cast<size_t>(n_coef_));
+        // For TYPE_LDPM_TET4 the mass array holds both translational lumped
+        // mass and rotational inertia:
+        //   [m_trans (n_coef_) | I_rot (n_coef_)]
+        const size_t m_size =
+            (type_ == TYPE_LDPM_TET4) ? static_cast<size_t>(n_coef_) * 2 : static_cast<size_t>(n_coef_);
+        da_mass_lump_.resize(m_size);
         da_mass_lump_.BindDevicePointer(&d_mass_lump_);
     }
 
@@ -135,6 +153,18 @@ class LeapfrogSolver : public SolverBase {
     // Lumped nodal mass vector (length n_coef_).
     __device__ Map<VectorXR> mass_lump() {
         return Map<VectorXR>(d_mass_lump_, n_coef_);
+    }
+
+    // Half-step rotational velocity vector for TYPE_LDPM_TET4 (length 3*n_coef_).
+    // Stored immediately after the translational velocities in da_v_.
+    __device__ Map<VectorXR> v_rot() {
+        return Map<VectorXR>(d_v_ + n_coef_ * 3, n_coef_ * 3);
+    }
+
+    // Per-node rotational inertia for TYPE_LDPM_TET4 (length n_coef_).
+    // Stored immediately after the translational masses in da_mass_lump_.
+    __device__ Map<VectorXR> mass_inertia() {
+        return Map<VectorXR>(d_mass_lump_ + n_coef_, n_coef_);
     }
 
     __device__ Real solver_time_step() const {
