@@ -246,7 +246,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     void Setup(const VectorXR& h_x, const VectorXR& h_y, const VectorXR& h_z, const MatrixXi& tet_connectivity);
 
-    // Convenience overload: initialise from a pre-parsed LDPMTet4Mesh.
+    // Convenience overload: initialize from a pre-parsed LDPMTet4Mesh.
     // Calls Setup() with the particle positions and TET connectivity from the
     // mesh, then stores all additional file-loaded data fields
     // (particle diameters, sub-facet geometry, face facets, facet vertices).

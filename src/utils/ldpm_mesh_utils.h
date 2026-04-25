@@ -26,7 +26,7 @@
  *        std::cerr << err << "\n";
  *    }
  *    // mesh now holds all six files' data.
- *    // Pass to GPU_LDPMTet4_Data::SetupFromMesh(mesh) to initialise the
+ *    // Pass to GPU_LDPMTet4_Data::SetupFromMesh(mesh) to initialize the
  *    // element and store the extra precomputed fields.
  *==============================================================
  *==============================================================*/
