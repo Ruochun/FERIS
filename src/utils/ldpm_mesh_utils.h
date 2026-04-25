@@ -156,4 +156,39 @@ bool ReadLDPMTet4FacetVerticesFile(const std::string& path,
                                    LDPMTet4Mesh& out,
                                    std::string* error = nullptr);
 
+// ============================================================
+// VTK writers for visual validation
+// ============================================================
+
+/**
+ * Write the TET4 mesh from a parsed LDPMTet4Mesh to a VTK legacy ASCII file.
+ *
+ * POINTS   — particle positions (particle_x/y/z)
+ * CELLS    — TET4 elements (tet_connectivity), VTK_TETRA (type 10)
+ * POINT_DATA:
+ *   "diameter" (scalar) — aggregate diameter per particle (0 for boundary nodes)
+ *
+ * @param filename  Output path (e.g. "ldpm_tet4_tets.vtk")
+ * @param mesh      Populated LDPMTet4Mesh (particles.dat + tets.dat required)
+ * @return true on success
+ */
+bool WriteLDPMTet4TetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh);
+
+/**
+ * Write the Voronoi sub-facet triangle mesh from a parsed LDPMTet4Mesh to a
+ * VTK legacy ASCII file.
+ *
+ * POINTS   — exact facet-vertex positions (facet_vertex_x/y/z)
+ * CELLS    — one VTK_TRIANGLE (type 5) per sub-facet, indexed by
+ *            subfacet_vertex_ids
+ * CELL_DATA:
+ *   "pArea"   (scalar) — projected (triangle) area of each sub-facet
+ *   "matflag" (scalar) — material zone flag (0 = mortar; >0 = aggregate/ITZ)
+ *
+ * @param filename  Output path (e.g. "ldpm_tet4_subfacets.vtk")
+ * @param mesh      Populated LDPMTet4Mesh (facets.dat + facetsVertices.dat required)
+ * @return true on success
+ */
+bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh);
+
 }  // namespace tlfea

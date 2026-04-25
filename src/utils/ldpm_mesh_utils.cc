@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 
@@ -550,6 +551,136 @@ bool ReadLDPMTet4MeshFromFiles(const std::string& prefix, LDPMTet4Mesh& out, std
     if (!ReadLDPMTet4FacetVerticesFile(prefix + "-data-facetsVertices.dat", out, error))
         return false;
 
+    return true;
+}
+
+// ============================================================
+// WriteLDPMTet4TetMeshToVTK
+//
+// POINTS   — particle positions (n_particles)
+// CELLS    — TET4 elements (n_tets), VTK_TETRA (type 10)
+// POINT_DATA:
+//   "diameter" — aggregate diameter per particle (0 = boundary node)
+// ============================================================
+bool WriteLDPMTet4TetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh) {
+    if (mesh.n_particles <= 0 || mesh.n_tets <= 0) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: mesh has no particles or tets\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    const int np = mesh.n_particles;
+    const int nt = mesh.n_tets;
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM TET4 Mesh\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points ───────────────────────────────────────────────────────────────
+    file << "\nPOINTS " << np << " double\n";
+    for (int i = 0; i < np; ++i) {
+        file << mesh.particle_x(i) << " " << mesh.particle_y(i) << " " << mesh.particle_z(i) << "\n";
+    }
+
+    // ── Cells (VTK_TETRA = 10, 4 nodes each, 5 integers per cell row) ────────
+    file << "\nCELLS " << nt << " " << (nt * 5) << "\n";
+    for (int e = 0; e < nt; ++e) {
+        file << "4 " << mesh.tet_connectivity(e, 0) << " " << mesh.tet_connectivity(e, 1) << " "
+             << mesh.tet_connectivity(e, 2) << " " << mesh.tet_connectivity(e, 3) << "\n";
+    }
+
+    file << "\nCELL_TYPES " << nt << "\n";
+    for (int e = 0; e < nt; ++e) {
+        file << "10\n";  // VTK_TETRA
+    }
+
+    // ── Point data: aggregate diameter ───────────────────────────────────────
+    file << "\nPOINT_DATA " << np << "\n";
+    file << "SCALARS diameter double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < np; ++i) {
+        file << (mesh.particle_d.size() > 0 ? mesh.particle_d(i) : 0.0) << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
+// ============================================================
+// WriteLDPMTet4SubfacetMeshToVTK
+//
+// POINTS   — exact facet vertex positions (n_facet_vertices)
+// CELLS    — sub-facet triangles (n_subfacets), VTK_TRIANGLE (type 5)
+// CELL_DATA:
+//   "pArea"   — projected (triangle) area
+//   "matflag" — material zone flag (0 = mortar; >0 = aggregate/ITZ)
+// ============================================================
+bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh) {
+    if (mesh.n_subfacets <= 0 || mesh.n_facet_vertices <= 0) {
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: mesh has no sub-facets or facet vertices\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    const int nv = mesh.n_facet_vertices;
+    const int nf = mesh.n_subfacets;
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM Sub-facet Mesh\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points ───────────────────────────────────────────────────────────────
+    file << "\nPOINTS " << nv << " double\n";
+    for (int i = 0; i < nv; ++i) {
+        file << mesh.facet_vertex_x(i) << " " << mesh.facet_vertex_y(i) << " "
+             << mesh.facet_vertex_z(i) << "\n";
+    }
+
+    // ── Cells (VTK_TRIANGLE = 5, 3 nodes each, 4 integers per cell row) ──────
+    file << "\nCELLS " << nf << " " << (nf * 4) << "\n";
+    for (int i = 0; i < nf; ++i) {
+        file << "3 " << mesh.subfacet_vertex_ids(3 * i + 0) << " "
+             << mesh.subfacet_vertex_ids(3 * i + 1) << " " << mesh.subfacet_vertex_ids(3 * i + 2)
+             << "\n";
+    }
+
+    file << "\nCELL_TYPES " << nf << "\n";
+    for (int i = 0; i < nf; ++i) {
+        file << "5\n";  // VTK_TRIANGLE
+    }
+
+    // ── Cell data ────────────────────────────────────────────────────────────
+    file << "\nCELL_DATA " << nf << "\n";
+
+    // pArea
+    file << "SCALARS pArea double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < nf; ++i) {
+        file << mesh.subfacet_parea(i) << "\n";
+    }
+
+    // matflag
+    file << "\nSCALARS matflag int 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < nf; ++i) {
+        file << mesh.subfacet_matflag(i) << "\n";
+    }
+
+    file.close();
     return true;
 }
 
