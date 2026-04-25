@@ -1,7 +1,7 @@
 /**
- * test_ldpm_tet4_vtk.cc
+ * dogbone_vtk.cc
  *
- * LDPM-TET4 Mesh VTK Export Demo
+ * Dogbone — LDPM-TET4 Mesh VTK Export Demo
  *
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
@@ -24,6 +24,11 @@
  * during the simulation.  This is the geometrically-linear Total Lagrangian
  * formulation: strains are computed relative to these fixed reference facets.
  *
+ * Importantly, the sub-facet volumes do NOT limit how far particles can move.
+ * They are purely a geometric ruler for measuring strain relative to the
+ * reference state.  The constitutive law (softening / fracture / damage)
+ * governs the material response when strains become large.
+ *
  * VTK output
  * ──────────
  * ldpm_tet4_tets.vtk
@@ -41,11 +46,11 @@
  * ────────
  *   mkdir -p build && cd build
  *   cmake ..
- *   make test_ldpm_tet4_vtk
+ *   make dogbone_vtk
  *
  * Running (from the build directory)
  * ───────────────────────────────────
- *   ./bin/test_ldpm_tet4_vtk
+ *   ./bin/dogbone_vtk
  *
  * Then open the two .vtk files in ParaView to inspect the meshes.
  */

@@ -60,12 +60,3 @@ add_executable(test_ldpm_tet4 test_ldpm_tet4.cc)
 target_link_libraries(test_ldpm_tet4 tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(test_ldpm_tet4 PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(test_ldpm_tet4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-# ── LDPM-TET4 mesh VTK export demo (CPU-only, visual validation) ─────────────
-# Reads all six Chrono Workbench LDPM data files and writes two VTK meshes:
-#   ldpm_tet4_tets.vtk      — TET4 mesh with per-particle diameter
-#   ldpm_tet4_subfacets.vtk — Voronoi sub-facet triangles with pArea / matflag
-add_executable(test_ldpm_tet4_vtk test_ldpm_tet4_vtk.cc)
-target_link_libraries(test_ldpm_tet4_vtk tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
-target_include_directories(test_ldpm_tet4_vtk PRIVATE ${BEAM_INCLUDE_DIRS})
-set_target_properties(test_ldpm_tet4_vtk PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
