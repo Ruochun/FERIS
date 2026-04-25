@@ -340,6 +340,65 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     MOPHI_INFO("GPU_LDPMTet4_Data: %d nodes, %d TET4 elements, %d unique edges", n_coef, n_elem, n_edge);
 }
 
+// ─── SetupFromMesh ────────────────────────────────────────────────────────────
+//
+// Calls Setup() with particle positions and TET connectivity from the mesh,
+// then stores all additional file-loaded data fields.
+
+void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
+    if (mesh.n_particles <= 0) {
+        MOPHI_ERROR("SetupFromMesh: mesh has no particles (particles.dat not loaded?).");
+        return;
+    }
+    if (mesh.n_tets <= 0) {
+        MOPHI_ERROR("SetupFromMesh: mesh has no TET elements (tets.dat not loaded?).");
+        return;
+    }
+
+    // Update element counts to match what the mesh actually provides.
+    n_coef = mesh.n_particles;
+    n_elem = mesh.n_tets;
+
+    Setup(mesh.particle_x, mesh.particle_y, mesh.particle_z, mesh.tet_connectivity);
+
+    // ── Particle diameters ───────────────────────────────────────────────────
+    if (mesh.particle_d.size() == mesh.n_particles) {
+        h_particle_d = mesh.particle_d;
+    }
+
+    // ── Sub-facet geometry ───────────────────────────────────────────────────
+    if (mesh.n_subfacets > 0) {
+        n_subfacet = mesh.n_subfacets;
+        h_subfacet_tet = mesh.subfacet_tet;
+        h_subfacet_vertex_ids = mesh.subfacet_vertex_ids;
+        h_subfacet_vol = mesh.subfacet_vol;
+        h_subfacet_parea = mesh.subfacet_parea;
+        h_subfacet_centroid = mesh.subfacet_centroid;
+        h_subfacet_normal = mesh.subfacet_normal;
+        h_subfacet_tangent_q = mesh.subfacet_tangent_q;
+        h_subfacet_tangent_s = mesh.subfacet_tangent_s;
+        h_subfacet_matflag = mesh.subfacet_matflag;
+    }
+
+    // ── Surface boundary triangles ───────────────────────────────────────────
+    if (mesh.n_face_facets > 0) {
+        n_face_facet = mesh.n_face_facets;
+        h_face_facet_node = mesh.face_facet_node;
+        h_face_facet_vertices = mesh.face_facet_vertices;
+    }
+
+    // ── Facet vertex coordinates ─────────────────────────────────────────────
+    if (mesh.n_facet_vertices > 0) {
+        n_facet_vertex = mesh.n_facet_vertices;
+        h_facet_vertex_x = mesh.facet_vertex_x;
+        h_facet_vertex_y = mesh.facet_vertex_y;
+        h_facet_vertex_z = mesh.facet_vertex_z;
+    }
+
+    MOPHI_INFO("SetupFromMesh: stored %d sub-facets, %d face-facets, %d facet vertices",
+               n_subfacet, n_face_facet, n_facet_vertex);
+}
+
 // ─── Material / parameter setters ────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::SetMaterial(Real E_N_val, Real E_T_val, Real E_kT_val, Real E_kM_val, Real E_kL_val) {

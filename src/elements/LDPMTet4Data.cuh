@@ -8,6 +8,7 @@
 
 #include "../types.h"
 #include "../utils/cuda_utils.h"
+#include "../utils/ldpm_mesh_utils.h"
 #include "ElementBase.h"
 #include <MoPhiEssentials.h>
 
@@ -245,6 +246,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     void Setup(const VectorXR& h_x, const VectorXR& h_y, const VectorXR& h_z, const MatrixXi& tet_connectivity);
 
+    // Convenience overload: initialise from a pre-parsed LDPMTet4Mesh.
+    // Calls Setup() with the particle positions and TET connectivity from the
+    // mesh, then stores all additional file-loaded data fields
+    // (particle diameters, sub-facet geometry, face facets, facet vertices).
+    // The mesh must have been populated by ReadLDPMTet4MeshFromFiles() or the
+    // individual file readers.
+    void SetupFromMesh(const LDPMTet4Mesh& mesh);
+
     // Set LDPM-TET4 material moduli.  Must be called after Setup().
     // E_N  – normal translational modulus (Pa)
     // E_T  – shear translational modulus (Pa)
@@ -282,6 +291,38 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     int n_elem;        // Number of TET4 elements
     int n_edge;        // Number of unique edges (set by Setup)
     int n_constraint;  // 3 * number of fixed nodes
+
+    // ── File-loaded mesh data (host-side; filled by SetupFromMesh) ────────────
+    // These fields mirror the six LDPM Chrono Workbench output files.
+    // They are stored for reference and future use; not all are required by
+    // the current linear-elastic simulation kernel.
+
+    // From particles.dat — aggregate diameter per particle (0 = boundary node).
+    // Size: n_coef.
+    VectorXR h_particle_d;
+
+    // From facets.dat — precomputed Voronoi sub-facet geometry.
+    // n_subfacet == 12 * n_elem (12 sub-facets per TET).
+    int n_subfacet = 0;
+    VectorXi h_subfacet_tet;          // owning TET index, size n_subfacet
+    VectorXi h_subfacet_vertex_ids;   // 3 vertex indices (flat, size 3*n_subfacet)
+    VectorXR h_subfacet_vol;          // sub-cell volume, size n_subfacet
+    VectorXR h_subfacet_parea;        // projected (triangle) area, size n_subfacet
+    VectorXR h_subfacet_centroid;     // centroid (cx,cy,cz) flat, size 3*n_subfacet
+    VectorXR h_subfacet_normal;       // unit normal p (px,py,pz) flat, size 3*n_subfacet
+    VectorXR h_subfacet_tangent_q;    // first tangent q (qx,qy,qz) flat, size 3*n_subfacet
+    VectorXR h_subfacet_tangent_s;    // second tangent s (sx,sy,sz) flat, size 3*n_subfacet
+    VectorXi h_subfacet_matflag;      // material zone flag, size n_subfacet
+
+    // From faceFacets.dat — surface boundary triangles for traction BCs.
+    int n_face_facet = 0;
+    VectorXi h_face_facet_node;       // particle node index, size n_face_facet
+    VectorXR h_face_facet_vertices;   // 9 coords per triangle (flat, size 9*n_face_facet)
+
+    // From facetsVertices.dat — exact triangle corner positions.
+    // n_facet_vertex == 3 * n_subfacet.
+    int n_facet_vertex = 0;
+    VectorXR h_facet_vertex_x, h_facet_vertex_y, h_facet_vertex_z;  // size n_facet_vertex each
 
   private:
     // ── Translational position arrays ────────────────────────────────────────
