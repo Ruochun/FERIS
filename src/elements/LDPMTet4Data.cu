@@ -343,7 +343,26 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 // ─── SetupFromMesh ────────────────────────────────────────────────────────────
 //
 // Calls Setup() with particle positions and TET connectivity from the mesh,
-// then stores all additional file-loaded data fields.
+// stores all additional file-loaded data fields, and — when facets.dat data
+// is present — overrides the tet4-derived edge geometry (facet areas and
+// tangent frame vectors m / l) with the richer file-based values.
+//
+// Facets.dat override
+// ───────────────────
+// Each row in facets.dat carries a Voronoi sub-facet for one edge of one TET:
+//   Tet  IDx IDy IDz  Vol  pArea  cx cy cz  px py pz  qx qy qz  sx sy sz  mF
+// where p is the unit normal (= edge direction), q the first tangent, and
+// s = p × q the second tangent.  12 sub-facets appear per TET (6 edges × 2).
+//
+// For each global unique edge the override:
+//   facet_area  ← sum of pArea over all its sub-facets
+//   edge_m      ← q from the first sub-facet (sign-adjusted for canonical dir)
+//   edge_lv     ← s from the first sub-facet  (sign is unchanged; see below)
+//
+// Sign adjustment: the canonical edge direction stored in edge_n[] points from
+// the lower-index node to the higher-index one.  If a sub-facet's p points in
+// the opposite direction the tangent q must be negated so that l = n × m = s
+// still holds for the canonical frame.
 
 void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     if (mesh.n_particles <= 0) {
@@ -397,6 +416,144 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
 
     MOPHI_INFO("SetupFromMesh: stored %d sub-facets, %d face-facets, %d facet vertices",
                n_subfacet, n_face_facet, n_facet_vertex);
+
+    // ── Override edge geometry from sub-facet file data ──────────────────────
+    // Only performed when sub-facet data was actually loaded.
+    if (n_subfacet <= 0) {
+        return;
+    }
+
+    static const int LOCAL_EDGES_SF[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+
+    // Build a fast lookup: sorted node pair → global edge index.
+    std::map<std::pair<int, int>, int> edge_index_map;
+    for (int e = 0; e < n_edge; e++) {
+        const int ni = h_edge_nodes_vec[e * 2 + 0];
+        const int nj = h_edge_nodes_vec[e * 2 + 1];
+        edge_index_map[{std::min(ni, nj), std::max(ni, nj)}] = e;
+    }
+
+    // Per-edge accumulators.
+    std::vector<Real> new_area(n_edge, Real(0));
+    std::vector<Real> new_m(n_edge * 3, Real(0));
+    std::vector<Real> new_l(n_edge * 3, Real(0));
+    std::vector<bool> frame_set(n_edge, false);
+
+    const Real* hx = da_x12.host();
+    const Real* hy = da_y12.host();
+    const Real* hz = da_z12.host();
+
+    int n_unmatched = 0;
+
+    for (int sf = 0; sf < n_subfacet; sf++) {
+        const int t = h_subfacet_tet(sf);
+
+        const Real px = h_subfacet_normal(sf * 3 + 0);
+        const Real py = h_subfacet_normal(sf * 3 + 1);
+        const Real pz = h_subfacet_normal(sf * 3 + 2);
+        const Real parea = h_subfacet_parea(sf);
+
+        // Find the local edge of TET t whose unit direction best matches p.
+        int best_le = -1;
+        Real best_abs_dot = Real(0);
+        Real best_sign = Real(1);
+
+        for (int le = 0; le < 6; le++) {
+            const int na = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[le][0]];
+            const int nb = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[le][1]];
+
+            const Real dx = hx[nb] - hx[na];
+            const Real dy = hy[nb] - hy[na];
+            const Real dz = hz[nb] - hz[na];
+            const Real len = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (len <= Real(0))
+                continue;
+            const Real inv_len = Real(1) / len;
+
+            const Real d = (px * dx + py * dy + pz * dz) * inv_len;
+            const Real abs_d = std::abs(d);
+            if (abs_d > best_abs_dot) {
+                best_abs_dot = abs_d;
+                best_le = le;
+                // sign = dot(p, canonical direction na→nb)
+                // canonical direction is ni→nj where ni = min(na,nb)
+                // so sign relative to canonical = d if na < nb, else -d
+                best_sign = (na < nb) ? d : -d;
+            }
+        }
+
+        if (best_le < 0 || best_abs_dot < Real(0.99)) {
+            ++n_unmatched;
+            continue;
+        }
+
+        // Resolve global edge index.
+        const int na = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[best_le][0]];
+        const int nb = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[best_le][1]];
+        const int ni = std::min(na, nb);
+        const int nj = std::max(na, nb);
+
+        auto it = edge_index_map.find({ni, nj});
+        if (it == edge_index_map.end()) {
+            ++n_unmatched;
+            continue;
+        }
+        const int eidx = it->second;
+
+        // Accumulate projected area.
+        new_area[eidx] += parea;
+
+        // Store the tangent frame from the first matching sub-facet.
+        // Sign adjustment for m (q): if p is anti-parallel to the canonical
+        // edge direction, negate q so that l = n_canonical × m = s still holds.
+        // l (s) requires no adjustment regardless of sign (derived above).
+        if (!frame_set[eidx]) {
+            const Real q0 = h_subfacet_tangent_q(sf * 3 + 0);
+            const Real q1 = h_subfacet_tangent_q(sf * 3 + 1);
+            const Real q2 = h_subfacet_tangent_q(sf * 3 + 2);
+            const Real s0 = h_subfacet_tangent_s(sf * 3 + 0);
+            const Real s1 = h_subfacet_tangent_s(sf * 3 + 1);
+            const Real s2 = h_subfacet_tangent_s(sf * 3 + 2);
+
+            const Real sign_m = (best_sign > Real(0)) ? Real(1) : Real(-1);
+            new_m[eidx * 3 + 0] = sign_m * q0;
+            new_m[eidx * 3 + 1] = sign_m * q1;
+            new_m[eidx * 3 + 2] = sign_m * q2;
+            new_l[eidx * 3 + 0] = s0;
+            new_l[eidx * 3 + 1] = s1;
+            new_l[eidx * 3 + 2] = s2;
+            frame_set[eidx] = true;
+        }
+    }
+
+    if (n_unmatched > 0) {
+        MOPHI_WARNING("SetupFromMesh: %d sub-facet(s) could not be matched to a global edge.", n_unmatched);
+    }
+
+    // Count edges whose frame was set; edges with no sub-facet match keep the
+    // tet4-derived geometry (unlikely but handled gracefully).
+    int n_frame_set = 0;
+    for (int e = 0; e < n_edge; e++) {
+        if (frame_set[e])
+            ++n_frame_set;
+    }
+
+    // Write updated arrays back to device.
+    std::copy(new_area.begin(), new_area.end(), da_facet_area.host());
+    da_facet_area.ToDevice();
+
+    std::copy(new_m.begin(), new_m.end(), da_edge_m.host());
+    da_edge_m.ToDevice();
+
+    std::copy(new_l.begin(), new_l.end(), da_edge_lv.host());
+    da_edge_lv.ToDevice();
+
+    // Sync device struct mirror so kernels see updated pointers.
+    MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
+
+    MOPHI_INFO(
+        "SetupFromMesh: overrode facet area and tangent frame for %d/%d edges from sub-facet file data.",
+        n_frame_set, n_edge);
 }
 
 // ─── Material / parameter setters ────────────────────────────────────────────

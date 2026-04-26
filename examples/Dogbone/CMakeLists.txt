@@ -2,12 +2,16 @@
 #
 # Dogbone specimen demos using the LDPM-TET4 element.
 #
-# ┌──────────────────────┬──────────────────────────────────────────────────┐
-# │ Target               │ Purpose                                          │
-# ├──────────────────────┼──────────────────────────────────────────────────┤
-# │ dogbone_vtk          │ Load LDPM mesh files; export two VTK meshes for  │
-# │                      │ visual validation in ParaView (CPU-only)         │
-# └──────────────────────┴──────────────────────────────────────────────────┘
+# ┌───────────────────────┬────────────────────────────────────────────────────┐
+# │ Target                │ Purpose                                            │
+# ├───────────────────────┼────────────────────────────────────────────────────┤
+# │ dogbone_vtk           │ Load LDPM mesh files; export two VTK meshes for    │
+# │                       │ visual validation in ParaView (CPU-only)           │
+# ├───────────────────────┼────────────────────────────────────────────────────┤
+# │ dogbone_leapfrog      │ Load LDPM mesh via SetupFromMesh (file-based       │
+# │                       │ sub-facet geometry); run tensile simulation with   │
+# │                       │ LeapfrogSolver for verification                    │
+# └───────────────────────┴────────────────────────────────────────────────────┘
 
 set(DOGBONE_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/src
@@ -22,3 +26,13 @@ add_executable(dogbone_vtk dogbone_vtk.cc)
 target_link_libraries(dogbone_vtk tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(dogbone_vtk PRIVATE ${DOGBONE_INCLUDE_DIRS})
 set_target_properties(dogbone_vtk PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# ── LDPM-TET4 Dogbone leapfrog simulation (file-based sub-facet geometry) ─────
+# Loads all six LDPM data files, initialises GPU_LDPMTet4_Data via
+# SetupFromMesh() (which overrides tet4-derived facet areas and tangent frame
+# vectors with the richer file-provided values), and runs a short tensile
+# simulation with LeapfrogSolver for verification.
+add_executable(dogbone_leapfrog dogbone_leapfrog.cc)
+target_link_libraries(dogbone_leapfrog tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_include_directories(dogbone_leapfrog PRIVATE ${DOGBONE_INCLUDE_DIRS})
+set_target_properties(dogbone_leapfrog PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
