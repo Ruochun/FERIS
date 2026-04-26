@@ -506,7 +506,15 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         // Store the tangent frame from the first matching sub-facet.
         // Sign adjustment for m (q): if p is anti-parallel to the canonical
         // edge direction, negate q so that l = n_canonical × m = s still holds.
-        // l (s) requires no adjustment regardless of sign (derived above).
+        //
+        // Why l (= s from file) needs no sign adjustment:
+        //   File convention: s = p × q
+        //   sign > 0  (p ≈ +n_canonical):
+        //     m = q,   l = n_canonical × q = p × q = s ✓
+        //   sign < 0  (p ≈ −n_canonical):
+        //     m = −q,  l = n_canonical × (−q) = −(n_canonical × q)
+        //              = −((−p) × q) = p × q = s ✓
+        //   In both cases l = s, so s is copied without negation.
         if (!frame_set[eidx]) {
             const Real q0 = h_subfacet_tangent_q(sf * 3 + 0);
             const Real q1 = h_subfacet_tangent_q(sf * 3 + 1);

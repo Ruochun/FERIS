@@ -59,16 +59,12 @@ using namespace tlfea;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Concrete-like LDPM material (SI units, coordinates assumed to be in mm → need
-// to work in consistent mm/N/s units or scale to SI).
-// The mesh coordinates are in mm; we keep mm and derive a consistent set:
-//   length  [mm], force [N], mass [kg], time [s]
-//   stress  [N/mm² = MPa]
-//
-// E_N   = 60 GPa = 60,000 MPa = 60000 N/mm²
-// E_T   = alpha * E_N  (alpha = 0.25)
-// rho   = 2400 kg/m³ = 2.4e-6 kg/mm³   (so that rho * mm³ = kg)
-// The rotational moduli are set proportional to E_N * l_min²  (mm² units).
+// Concrete-like LDPM material parameters.
+// Mesh coordinates are in mm, so we use the consistent mm/N/s unit system:
+//   length [mm], force [N], mass [kg], time [s], stress [N/mm² = MPa].
+//   E_N   = 60 GPa  = 60 000 MPa  = 60 000 N/mm²
+//   rho   = 2400 kg/m³ = 2.4e-6 kg/mm³
+//   The rotational moduli (N·mm²) are derived below from E_N and l_min.
 
 static constexpr Real E_N_VAL  = Real(60000.0);   // N/mm²  (60 GPa)
 static constexpr Real ALPHA_T  = Real(0.25);
@@ -260,7 +256,7 @@ int main() {
     //    delta_elastic ≈ F * L / (E_N * A_cross)
     //    We use L = z_max - z_min and a rough cross-section area.
     //    At early times (before reflections) the wave front hasn't reached the
-    //    fixed end yet, so the displacement grows as c_N * t; at quasi-static
+    //    fixed end yet, so the displacement grows as c_N × t; at quasi-static
     //    equilibrium it converges to the analytic delta.  Even without full
     //    convergence the sign and order of magnitude should be correct.
     // ──────────────────────────────────────────────────────────────────────────
