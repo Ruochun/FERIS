@@ -106,20 +106,25 @@ using namespace tlfea;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Concrete-like LDPM-Cusatis material parameters.
-// Mesh coordinates are in mm, so we use the consistent mm/N/s unit system:
-//   length [mm], force [N], mass [kg], time [s], stress [N/mm² = MPa].
+// Concrete-like LDPM-Cusatis material parameters from Cusatis et al. (2011)
+// dogbone tensile test benchmark.
+//
+// Unit system: mm-tonne-s (consistent set used by Cusatis):
+//   length [mm], force [N], mass [tonne], time [s], stress [N/mm² = MPa].
+//   Note: 1 N = 1 tonne·mm/s², so density must be in tonne/mm³.
 //
 // Elastic parameters
-//   E_N   = 60 GPa  = 60 000 N/mm²   normal modulus
-//   alpha = E_T/E_N = 0.25            shear-to-normal ratio
-//   beta  = E_k*/E_N/l² = 0.25        rotational coupling (N·mm² = N/mm² × mm²)
-//   rho   = 2400 kg/m³ = 2.4e-6 kg/mm³
+//   E_N   = E₀ = 60 273 N/mm²           normal modulus
+//   alpha = E_T/E_N = 0.25              shear-to-normal ratio
+//   beta  = E_k*/E_N/l² = 0.25          rotational coupling (N·mm² = N/mm² × mm²)
+//   rho   = 2.338e-9 tonne/mm³          (= 2338 kg/m³)
 //
 // Cusatis damage parameters
-//   sigma_t = 4 N/mm²  mesoscale tensile strength
-//   H_t     ≈ l_ch * sigma_t / G_ft  where l_ch ≈ l_min and G_ft = 0.05 N/mm
-//             For l_min ≈ 10 mm: H_t = 10 * 4 / 0.05 = 800  [per unit strain]
+//   sigma_t = 3.44 N/mm²   mesoscale tensile strength
+//   G_ft    = 0.0491 N/mm  mode-I fracture energy
+//             (consistent with tensile characteristic length l_t = 500 mm,
+//              i.e. G_ft = l_t * sigma_t² / (2*E_N) = 500*3.44²/(2*60273) ≈ 0.0491)
+//   H_t     ≈ l_ch * sigma_t / G_ft  where l_ch ≈ l_min (per-edge characteristic length)
 //   The demo sets H_t from these two inputs at runtime (after l_min is known).
 //
 // Applied load
@@ -127,12 +132,12 @@ using namespace tlfea;
 //   elastic failure load F_fail = sigma_t * A_cross_approx so that visible
 //   damage appears within the simulation window.
 
-static constexpr Real E_N_VAL = Real(60000.0);   // N/mm²  (60 GPa)
-static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N
-static constexpr Real BETA_K = Real(0.25);       // rotational coupling
-static constexpr Real RHO_VAL = Real(2.4e-6);    // kg/mm³
-static constexpr Real SIGMA_T_VAL = Real(4.0);   // N/mm²  tensile strength
-static constexpr Real G_FT_VAL = Real(0.05);     // N/mm   mode-I fracture energy
+static constexpr Real E_N_VAL = Real(60273.0);    // N/mm²  normal modulus (E₀)
+static constexpr Real ALPHA_T = Real(0.25);       // E_T / E_N  (shear-to-normal ratio α)
+static constexpr Real BETA_K = Real(0.25);        // rotational coupling
+static constexpr Real RHO_VAL = Real(2.338e-9);   // tonne/mm³  (= 2338 kg/m³)
+static constexpr Real SIGMA_T_VAL = Real(3.44);   // N/mm²  mesoscale tensile strength σ_t
+static constexpr Real G_FT_VAL = Real(0.0491);    // N/mm   mode-I fracture energy G_t
 static constexpr Real OVERLOAD_FAC = Real(0.3);  // multiplier on F_fail
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
