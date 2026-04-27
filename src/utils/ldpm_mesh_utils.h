@@ -219,4 +219,38 @@ bool WriteLDPMTet4TetMeshToVTK(const std::string& filename,
  */
 bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh);
 
+/**
+ * Write a VTK line-segment mesh showing the LDPM edge lattice coloured by
+ * the per-edge Cusatis damage variable ω.
+ *
+ * This is the primary visualization for LDPM fracture/damage: each unique
+ * particle-to-particle strut is drawn as a VTK_LINE (type 3), coloured by
+ * ω ∈ [0, 1].  Blue (0) = undamaged; red (1) = fully fractured.
+ *
+ * POINTS   — current (possibly deformed) particle positions
+ *            (x_cur / y_cur / z_cur, size n_particles)
+ * CELLS    — one VTK_LINE per unique edge (2 endpoint indices)
+ * CELL_DATA:
+ *   "damage" (scalar) — per-edge damage ω ∈ [0, 1]
+ *
+ * @param filename      Output path (e.g. "dogbone_damage_00001.vtk")
+ * @param n_particles   Number of particles (= size of x_cur/y_cur/z_cur)
+ * @param n_edges       Number of unique edges
+ * @param edge_nodes    Edge connectivity (flat, size 2*n_edges):
+ *                      edge_nodes[2*e+0] = node i, [2*e+1] = node j
+ * @param x_cur         Current x coordinates for all particles
+ * @param y_cur         Current y coordinates for all particles
+ * @param z_cur         Current z coordinates for all particles
+ * @param edge_damage   Per-edge damage values ω (size n_edges)
+ * @return true on success
+ */
+bool WriteLDPMTet4EdgeDamageToVTK(const std::string& filename,
+                                   int n_particles,
+                                   int n_edges,
+                                   const std::vector<int>& edge_nodes,
+                                   const VectorXR& x_cur,
+                                   const VectorXR& y_cur,
+                                   const VectorXR& z_cur,
+                                   const VectorXR& edge_damage);
+
 }  // namespace tlfea

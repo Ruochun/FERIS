@@ -765,4 +765,80 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4M
     return true;
 }
 
+// ============================================================
+// WriteLDPMTet4EdgeDamageToVTK
+//
+// POINTS   — current particle positions (n_particles)
+// CELLS    — one VTK_LINE per unique edge (n_edges), 3 ints per row
+// CELL_DATA:
+//   "damage" — per-edge Cusatis damage variable ω ∈ [0, 1]
+// ============================================================
+bool WriteLDPMTet4EdgeDamageToVTK(const std::string& filename,
+                                   int n_particles,
+                                   int n_edges,
+                                   const std::vector<int>& edge_nodes,
+                                   const VectorXR& x_cur,
+                                   const VectorXR& y_cur,
+                                   const VectorXR& z_cur,
+                                   const VectorXR& edge_damage) {
+    if (n_particles <= 0 || n_edges <= 0) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: no particles or edges\n";
+        return false;
+    }
+    if (static_cast<int>(edge_nodes.size()) != 2 * n_edges) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: edge_nodes size mismatch\n";
+        return false;
+    }
+    if (static_cast<int>(edge_damage.size()) != n_edges) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: edge_damage size mismatch\n";
+        return false;
+    }
+    if (static_cast<int>(x_cur.size()) != n_particles ||
+        static_cast<int>(y_cur.size()) != n_particles ||
+        static_cast<int>(z_cur.size()) != n_particles) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: position vector size mismatch\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM Edge Damage (omega)\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points (current / deformed particle positions) ────────────────────────
+    file << "\nPOINTS " << n_particles << " double\n";
+    for (int i = 0; i < n_particles; ++i) {
+        file << x_cur(i) << " " << y_cur(i) << " " << z_cur(i) << "\n";
+    }
+
+    // ── Cells (VTK_LINE = 3, 2 nodes each, 3 integers per row) ───────────────
+    file << "\nCELLS " << n_edges << " " << (n_edges * 3) << "\n";
+    for (int e = 0; e < n_edges; ++e) {
+        file << "2 " << edge_nodes[2 * e + 0] << " " << edge_nodes[2 * e + 1] << "\n";
+    }
+
+    file << "\nCELL_TYPES " << n_edges << "\n";
+    for (int e = 0; e < n_edges; ++e) {
+        file << "3\n";  // VTK_LINE
+    }
+
+    // ── Cell data: damage variable ω ─────────────────────────────────────────
+    file << "\nCELL_DATA " << n_edges << "\n";
+    file << "SCALARS damage double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int e = 0; e < n_edges; ++e) {
+        file << edge_damage(e) << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
 }  // namespace tlfea

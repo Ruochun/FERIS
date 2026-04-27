@@ -306,6 +306,18 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_facet_t.SetVal(Real(0));
     da_facet_t.MakeReadyDevice();
 
+    // ── Per-edge damage state (initialised to zero / undamaged) ──────────────
+
+    da_kappa.resize(n_edge);
+    da_kappa.BindDevicePointer(&d_kappa);
+    da_kappa.SetVal(Real(0));
+    da_kappa.MakeReadyDevice();
+
+    da_omega.resize(n_edge);
+    da_omega.BindDevicePointer(&d_omega);
+    da_omega.SetVal(Real(0));
+    da_omega.MakeReadyDevice();
+
     // ── 9. Allocate device material scalars with safe defaults ────────────────
 
     MOPHI_GPU_CALL(cudaMalloc(&d_E_N, sizeof(Real)));
@@ -314,14 +326,18 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     MOPHI_GPU_CALL(cudaMalloc(&d_E_kM, sizeof(Real)));
     MOPHI_GPU_CALL(cudaMalloc(&d_E_kL, sizeof(Real)));
     MOPHI_GPU_CALL(cudaMalloc(&d_rho, sizeof(Real)));
+    MOPHI_GPU_CALL(cudaMalloc(&d_sigma_t, sizeof(Real)));
+    MOPHI_GPU_CALL(cudaMalloc(&d_H_t, sizeof(Real)));
 
     const Real default_val = Real(0);
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_N, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_T, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_kT, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_kM, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_kL, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_rho, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_N,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_T,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kT,    &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kM,    &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kL,    &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_rho,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_H_t,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
 
     // ── 10. Allocate per-node rotational inertia (filled in CalcMassMatrix) ───
 
@@ -589,6 +605,16 @@ void GPU_LDPMTet4_Data::SetDensity(Real rho_val) {
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 }
 
+void GPU_LDPMTet4_Data::SetDamageParams(Real sigma_t_val, Real H_t_val) {
+    if (!is_setup) {
+        MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting damage parameters.");
+        return;
+    }
+    MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &sigma_t_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_H_t,     &H_t_val,     sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
+}
+
 void GPU_LDPMTet4_Data::SetExternalForce(const VectorXR& h_f_ext) {
     if (!is_setup) {
         MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting external force.");
@@ -786,6 +812,12 @@ void GPU_LDPMTet4_Data::RetrieveExternalForceToCPU(VectorXR& f_out) {
     std::copy(da_f_ext_t.host(), da_f_ext_t.host() + n_coef * 3, f_out.data());
 }
 
+void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
+    omega_out.resize(n_edge);
+    da_omega.ToHost();
+    std::copy(da_omega.host(), da_omega.host() + n_edge, omega_out.data());
+}
+
 // ─── Destroy ─────────────────────────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::Destroy() {
@@ -806,6 +838,8 @@ void GPU_LDPMTet4_Data::Destroy() {
     da_edge_m.free();
     da_edge_lv.free();
     da_facet_t.free();
+    da_kappa.free();
+    da_omega.free();
     da_fixed_nodes.free();
     da_I_lump.free();
 
@@ -821,6 +855,8 @@ void GPU_LDPMTet4_Data::Destroy() {
     MOPHI_GPU_CALL(cudaFree(d_E_kM));
     MOPHI_GPU_CALL(cudaFree(d_E_kL));
     MOPHI_GPU_CALL(cudaFree(d_rho));
+    MOPHI_GPU_CALL(cudaFree(d_sigma_t));
+    MOPHI_GPU_CALL(cudaFree(d_H_t));
     MOPHI_GPU_CALL(cudaFree(d_data));
 }
 

@@ -1,31 +1,45 @@
 /**
  * dogbone_leapfrog.cc
  *
- * Dogbone — LDPM-TET4 Leapfrog Simulation Demo (file-based sub-facet geometry)
+ * Dogbone — LDPM-TET4 Leapfrog Simulation Demo with Cusatis Damage Model
  *
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  *
- * Demonstrates the upgraded LDPMTet4 element with file-based sub-facet info:
+ * Demonstrates the full Cusatis LDPM physics on a dogbone tensile specimen:
  *
  *   1. Read all six Chrono Workbench LDPM mesh data files (nodes, particles,
  *      tets, facets, faceFacets, facetsVertices).
  *   2. Initialise GPU_LDPMTet4_Data via SetupFromMesh(), which overrides the
  *      tet4-derived facet areas and tangent frame vectors (m, l) with the
  *      richer, precomputed values from the facets.dat file.
- *   3. Fix particles on the z = z_min face (one end of the dogbone).
- *   4. Apply a uniform tensile load on the z = z_max face (opposite end).
- *   5. Time-march with LeapfrogSolver for a small number of steps.
- *   6. Print tip-face mean displacement and write VTK snapshots.
+ *   3. Set elastic moduli (E_N, E_T, rotational) AND the Cusatis tensile
+ *      damage parameters (σ_t, H_t).
+ *   4. Fix particles on the z = z_min face (one end of the dogbone).
+ *   5. Apply a tensile load on the z = z_max face scaled to exceed the
+ *      elastic strength (σ_t * A_cross) so that visible damage occurs.
+ *   6. Time-march with LeapfrogSolver; at each output interval retrieve the
+ *      per-edge damage state and write three VTK files.
  *
- * The demo is intentionally kept simple (linear-elastic, small strain) so
- * that the output can be compared to an analytic estimate:
+ * Physics: Cusatis LDPM (2011)
+ * ────────────────────────────
+ * The constitutive model is NOT classical FEA elasticity but the full
+ * mesoscale LDPM damage model:
  *
- *   delta ≈ F * L / (E_N * A_cross)
- *
- * where L is the gauge length, A_cross the cross-section area, and F the
- * total applied force.  Agreement at early times (before wave reflections
- * contaminate the result) confirms correctness.
+ *   • Each unique Voronoi edge (particle i ↔ particle j) is one interaction
+ *     strut with its own facet area, normal, and tangent frame.
+ *   • Strains (e_N, e_M, e_L) are resolved on the facet frame from the
+ *     relative translational displacement between i and j.
+ *   • A characteristic damage strain:
+ *       e_D = sqrt( max(e_N, 0)²  +  (E_T/E_N) * (e_M² + e_L²) )
+ *     drives tensile-shear coupled damage.
+ *   • History variable κ = max(κ_old, e_D) records the maximum e_D
+ *     ever reached (irreversible damage).
+ *   • Exponential softening:  ω = 1 - (e_t0/κ) * exp(-H_t*(κ - e_t0))
+ *     where e_t0 = σ_t / E_N is the damage threshold strain.
+ *   • Tractions: t_N = E_N * e_N * (1-ω)  [tension only],
+ *                t_M = E_T * e_M * (1-ω),  t_L = E_T * e_L * (1-ω).
+ *   • Rotational moments remain linear-elastic (standard first-order LDPM).
  *
  * VTK output
  * ──────────
@@ -43,6 +57,22 @@
  *   - POINT_DATA "diameter"     : aggregate diameter
  *   - POINT_DATA "displacement" : Euclidean displacement magnitude |u|
  *
+ * dogbone_damage_<frame>.vtk   ← KEY OUTPUT FOR LDPM CRACK VISUALIZATION
+ *   Written every vtk_interval steps (frame 0 = initial, all zeros):
+ *   - POINTS  : current (deformed) particle positions
+ *   - CELLS   : VTK_LINE, one per unique LDPM edge (particle pair)
+ *   - CELL_DATA "damage" : per-edge damage ω ∈ [0, 1]
+ *                          ω = 0 → undamaged / elastic
+ *                          ω = 1 → fully fractured (zero traction capacity)
+ *
+ * ParaView workflow
+ * ─────────────────
+ *   1. dogbone_subfacets.vtk   → color by "matflag" or "pArea"
+ *   2. dogbone_tet4_*.vtk      → load as series, color by "displacement"
+ *   3. dogbone_damage_*.vtk    → load as series, color by "damage"
+ *                                use threshold filter (damage > 0.5) to
+ *                                show only significantly cracked struts
+ *
  * Building
  * ────────
  *   mkdir -p build && cd build
@@ -52,10 +82,6 @@
  * Running (from the build directory)
  * ───────────────────────────────────
  *   ./bin/dogbone_leapfrog
- *
- * Then open in ParaView:
- *   dogbone_subfacets.vtk   — static sub-facet mesh (color by matflag / pArea)
- *   dogbone_tet4_*.vtk      — animated TET4 mesh    (color by displacement)
  */
 
 #include <cuda_runtime.h>
@@ -80,18 +106,34 @@ using namespace tlfea;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Concrete-like LDPM material parameters.
+// Concrete-like LDPM-Cusatis material parameters.
 // Mesh coordinates are in mm, so we use the consistent mm/N/s unit system:
 //   length [mm], force [N], mass [kg], time [s], stress [N/mm² = MPa].
-//   E_N   = 60 GPa  = 60 000 MPa  = 60 000 N/mm²
+//
+// Elastic parameters
+//   E_N   = 60 GPa  = 60 000 N/mm²   normal modulus
+//   alpha = E_T/E_N = 0.25            shear-to-normal ratio
+//   beta  = E_k*/E_N/l² = 0.25        rotational coupling (N·mm² = N/mm² × mm²)
 //   rho   = 2400 kg/m³ = 2.4e-6 kg/mm³
-//   The rotational moduli (N·mm²) are derived below from E_N and l_min.
+//
+// Cusatis damage parameters
+//   sigma_t = 4 N/mm²  mesoscale tensile strength
+//   H_t     ≈ l_ch * sigma_t / G_ft  where l_ch ≈ l_min and G_ft = 0.05 N/mm
+//             For l_min ≈ 10 mm: H_t = 10 * 4 / 0.05 = 800  [per unit strain]
+//   The demo sets H_t from these two inputs at runtime (after l_min is known).
+//
+// Applied load
+//   The total tensile force is set to OVERLOAD_FACTOR times the quasi-static
+//   elastic failure load F_fail = sigma_t * A_cross_approx so that visible
+//   damage appears within the simulation window.
 
-static constexpr Real E_N_VAL  = Real(60000.0);   // N/mm²  (60 GPa)
-static constexpr Real ALPHA_T  = Real(0.25);
-static constexpr Real BETA_K   = Real(0.25);       // rotational coupling
-static constexpr Real RHO_VAL  = Real(2.4e-6);     // kg/mm³
-static constexpr Real F_TOTAL  = Real(1000.0);     // total tensile load [N]
+static constexpr Real E_N_VAL       = Real(60000.0);   // N/mm²  (60 GPa)
+static constexpr Real ALPHA_T       = Real(0.25);       // E_T / E_N
+static constexpr Real BETA_K        = Real(0.25);       // rotational coupling
+static constexpr Real RHO_VAL       = Real(2.4e-6);     // kg/mm³
+static constexpr Real SIGMA_T_VAL   = Real(4.0);        // N/mm²  tensile strength
+static constexpr Real G_FT_VAL      = Real(0.05);       // N/mm   mode-I fracture energy
+static constexpr Real OVERLOAD_FAC  = Real(3.0);        // multiplier on F_fail
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
 // particles (nodes on the min/max face of the specimen).
@@ -162,6 +204,11 @@ int main() {
     const Real E_kM_VAL = E_kT_VAL;
     const Real E_kL_VAL = E_kT_VAL;
 
+    // Cusatis softening modulus:  H_t ≈ l_min * sigma_t / G_ft  [1/strain]
+    const Real H_T_VAL = l_min * SIGMA_T_VAL / G_FT_VAL;
+    std::cout << "  Damage threshold strain e_t0 = " << SIGMA_T_VAL / E_N_VAL << "\n";
+    std::cout << "  Cusatis softening modulus H_t = " << H_T_VAL << " (per unit strain)\n";
+
     // ──────────────────────────────────────────────────────────────────────────
     // 3. Identify fixed and loaded particles
     //    Fixed  : z ≈ z_min  (clamped end)
@@ -193,6 +240,18 @@ int main() {
     for (int i = 0; i < static_cast<int>(fixed_idx.size()); ++i)
         h_fixed(i) = fixed_idx[i];
 
+    // Scale applied load so the average cross-section sees OVERLOAD_FAC × σ_t.
+    //   F_fail ≈ σ_t * A_cross  (quasi-static elastic limit)
+    //   F_TOTAL = OVERLOAD_FAC * F_fail  (ensures visible damage in the neck)
+    const Real A_cross_approx = (x_max - x_min) * (y_max - y_min);
+    const Real F_fail  = SIGMA_T_VAL * A_cross_approx;
+    const Real F_TOTAL = OVERLOAD_FAC * F_fail;
+
+    std::cout << "  Approx cross-section area: " << A_cross_approx << " mm²\n";
+    std::cout << "  Static elastic limit:  F_fail = " << F_fail  << " N\n";
+    std::cout << "  Applied tensile force: F_TOTAL = " << F_TOTAL << " N  ("
+              << OVERLOAD_FAC << "× elastic limit)\n";
+
     // External force: F_TOTAL distributed equally as tensile (+z) load.
     const Real F_per_node = F_TOTAL / static_cast<Real>(load_idx.size());
     VectorXR h_f_ext(mesh.n_particles * 3);
@@ -212,6 +271,14 @@ int main() {
     std::cout << "  Unique edges: " << element_data.n_edge << "\n";
 
     element_data.SetMaterial(E_N_VAL, E_T_VAL, E_kT_VAL, E_kM_VAL, E_kL_VAL);
+
+    // Cusatis LDPM damage parameters (tensile-shear coupled).
+    // sigma_t : mesoscale tensile strength [N/mm²]
+    // H_t     : softening modulus [1/strain]; derived from G_ft and l_min above.
+    //   Physical meaning: the larger H_t, the more brittle the softening.
+    //   Reduce sigma_t or H_t to slow down / soften the damage response.
+    element_data.SetDamageParams(SIGMA_T_VAL, H_T_VAL);
+
     element_data.SetDensity(RHO_VAL);
     element_data.SetExternalForce(h_f_ext);
     element_data.SetNodalFixed(h_fixed);
@@ -242,9 +309,9 @@ int main() {
     solver.SetParameters(&params);
     solver.Setup();
 
-    const int n_steps        = 200;
-    const int print_interval = 20;   // console output every N steps
-    const int vtk_interval   = 20;   // VTK snapshot every N steps
+    const int n_steps        = 500;
+    const int print_interval = 50;   // console output every N steps
+    const int vtk_interval   = 50;   // VTK snapshot every N steps
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
     std::cout << std::fixed << std::setprecision(6);
@@ -261,31 +328,55 @@ int main() {
         }
     }
 
-    // Helper: build a TET4 VTK filename for the given frame number.
+    // Helpers: build numbered VTK filenames for TET4 and damage outputs.
     auto tet4_vtk_name = [](int f) {
         std::ostringstream s;
         s << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
+    auto damage_vtk_name = [](int f) {
+        std::ostringstream s;
+        s << "dogbone_damage_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        return s.str();
+    };
 
-    // ── Write frame 0: initial (undeformed) TET4 mesh ────────────────────────
+    // Retrieve the edge connectivity once (does not change during simulation).
+    const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
+    const int n_edge = element_data.n_edge;
+
+    // ── Write frame 0: initial (undeformed) TET4 and damage (all zeros) ──────
     int frame = 0;
     {
-        const std::string fname = tet4_vtk_name(frame);
-        if (!WriteLDPMTet4TetMeshToVTK(fname, mesh,
+        // TET4 mesh
+        const std::string fname_t4 = tet4_vtk_name(frame);
+        if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh,
                                         mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
             std::cerr << "Warning: failed to write initial TET4 VTK.\n";
         } else {
-            std::cout << "Wrote: " << fname << "  (initial configuration)\n";
+            std::cout << "Wrote: " << fname_t4 << "  (initial configuration)\n";
         }
+
+        // Edge damage (all zeros at t=0)
+        VectorXR omega0(n_edge);
+        omega0.setZero();
+        const std::string fname_dm = damage_vtk_name(frame);
+        if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes,
+                                           mesh.particle_x, mesh.particle_y, mesh.particle_z,
+                                           omega0)) {
+            std::cerr << "Warning: failed to write initial damage VTK.\n";
+        } else {
+            std::cout << "Wrote: " << fname_dm << "  (initial, all omega=0)\n";
+        }
+
         ++frame;
     }
 
     // Print column header.
-    std::cout << "\n" << std::setw(8) << "Step"
+    std::cout << "\n" << std::setw(8)  << "Step"
               << std::setw(22) << "mean dz (loaded) [mm]"
+              << std::setw(18) << "max omega (damage)"
               << "\n";
-    std::cout << std::string(30, '-') << "\n";
+    std::cout << std::string(50, '-') << "\n";
 
     for (int step = 0; step < n_steps; ++step) {
         solver.Solve();
@@ -294,59 +385,82 @@ int main() {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-            // Console progress: mean tip-face displacement in z.
+            VectorXR omega;
+            element_data.RetrieveFacetDamageToCPU(omega);
+
+            // Console progress.
             if ((step + 1) % print_interval == 0) {
                 Real dz_sum = Real(0);
                 for (int i : load_idx)
                     dz_sum += z_cur(i) - mesh.particle_z(i);
                 const Real dz_mean = dz_sum / static_cast<Real>(load_idx.size());
-                std::cout << std::setw(8) << (step + 1)
+
+                // Maximum damage across all edges at this time step.
+                Real omega_max = Real(0);
+                for (int e = 0; e < n_edge; ++e)
+                    if (omega(e) > omega_max) omega_max = omega(e);
+
+                std::cout << std::setw(8)  << (step + 1)
                           << std::setw(22) << dz_mean
+                          << std::setw(18) << omega_max
                           << "\n";
             }
 
-            // VTK snapshot.
+            // VTK snapshot: TET4 displacement + edge damage.
             if ((step + 1) % vtk_interval == 0) {
-                const std::string fname = tet4_vtk_name(frame);
-                if (!WriteLDPMTet4TetMeshToVTK(fname, mesh, x_cur, y_cur, z_cur)) {
+                const std::string fname_t4 = tet4_vtk_name(frame);
+                if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh, x_cur, y_cur, z_cur)) {
                     std::cerr << "Warning: failed to write TET4 VTK at step " << (step + 1) << ".\n";
                 } else {
-                    std::cout << "Wrote: " << fname << "\n";
+                    std::cout << "Wrote: " << fname_t4 << "\n";
                 }
+
+                const std::string fname_dm = damage_vtk_name(frame);
+                if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes,
+                                                   x_cur, y_cur, z_cur, omega)) {
+                    std::cerr << "Warning: failed to write damage VTK at step " << (step + 1) << ".\n";
+                } else {
+                    std::cout << "Wrote: " << fname_dm << "\n";
+                }
+
                 ++frame;
             }
         }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 8. Verify against simple analytic estimate
-    //    delta_elastic ≈ F * L / (E_N * A_cross)
-    //    We use L = z_max - z_min and a rough cross-section area.
-    //    At early times (before reflections) the wave front hasn't reached the
-    //    fixed end yet, so the displacement grows as c_N × t; at quasi-static
-    //    equilibrium it converges to the analytic delta.  Even without full
-    //    convergence the sign and order of magnitude should be correct.
+    // 8. Final damage statistics and analytic displacement estimate
     // ──────────────────────────────────────────────────────────────────────────
     {
         VectorXR x_final, y_final, z_final;
         element_data.RetrievePositionToCPU(x_final, y_final, z_final);
+
+        VectorXR omega_final;
+        element_data.RetrieveFacetDamageToCPU(omega_final);
 
         Real dz_sum = Real(0);
         for (int i : load_idx)
             dz_sum += z_final(i) - mesh.particle_z(i);
         const Real dz_final = dz_sum / static_cast<Real>(load_idx.size());
 
-        // Rough cross-section (rectangular approximation)
-        const Real A_cross_approx = (x_max - x_min) * (y_max - y_min);
+        Real omega_max = Real(0);
+        int n_damaged = 0;
+        for (int e = 0; e < n_edge; ++e) {
+            if (omega_final(e) > omega_max) omega_max = omega_final(e);
+            if (omega_final(e) > Real(0.5)) ++n_damaged;
+        }
+
         const Real L = z_max - z_min;
         const Real delta_analytic = F_TOTAL * L / (E_N_VAL * A_cross_approx);
         const Real t_final = n_steps * dt;
 
-        std::cout << "\nAnalytic (quasi-static) estimate: "
-                  << delta_analytic << " mm\n";
-        std::cout << "Simulation mean tip displacement at t=" << t_final
-                  << " s: " << dz_final << " mm\n";
-        std::cout << "(Agreement improves as the wave converges to static equilibrium.)\n";
+        std::cout << "\n── Final state at t=" << t_final << " s ───\n";
+        std::cout << "  Analytic quasi-static tip displacement: " << delta_analytic << " mm\n";
+        std::cout << "  Simulated mean tip displacement: " << dz_final << " mm\n";
+        std::cout << "  Maximum edge damage omega_max  : " << omega_max << "\n";
+        std::cout << "  Edges with omega > 0.5         : " << n_damaged
+                  << " / " << n_edge << "\n";
+        std::cout << "(Non-zero damage indicates Cusatis LDPM fracture is active.)\n";
     }
 
     element_data.Destroy();

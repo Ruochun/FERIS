@@ -170,6 +170,23 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         return d_facet_t[edge_idx * 6 + comp];
     }
 
+    // ── Per-edge damage state ─────────────────────────────────────────────────
+    // kappa : max effective damage-driving strain (history variable, grows only)
+    // omega : current damage variable ∈ [0, 1]
+
+    __device__ Real& edge_kappa(int edge_idx) {
+        return d_kappa[edge_idx];
+    }
+    __device__ Real edge_kappa(int edge_idx) const {
+        return d_kappa[edge_idx];
+    }
+    __device__ Real& edge_omega(int edge_idx) {
+        return d_omega[edge_idx];
+    }
+    __device__ Real edge_omega(int edge_idx) const {
+        return d_omega[edge_idx];
+    }
+
     // ── Material parameters ──────────────────────────────────────────────────
 
     __device__ Real E_N() const {
@@ -186,6 +203,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     }
     __device__ Real E_kL() const {
         return *d_E_kL;
+    }
+    __device__ Real sigma_t() const {
+        return *d_sigma_t;
+    }
+    __device__ Real H_t() const {
+        return *d_H_t;
     }
 
     // ── Per-node rotational inertia ──────────────────────────────────────────
@@ -262,11 +285,32 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // E_kL – bending modulus, l-direction (Pa·m²)
     void SetMaterial(Real E_N_val, Real E_T_val, Real E_kT_val, Real E_kM_val, Real E_kL_val);
 
+    // Set Cusatis tensile damage parameters.  Must be called after Setup().
+    // sigma_t – mesoscale tensile strength  (same units as E_N, e.g. N/mm²)
+    // H_t     – softening modulus [dimensionless, i.e. per unit strain]
+    //           Typical value: H_t ≈ l_ch * sigma_t / G_ft
+    //           where l_ch is a characteristic edge length and G_ft the
+    //           mode-I fracture energy per unit area.
+    //           If SetDamageParams is not called, sigma_t defaults to 0
+    //           and no damage is applied (falls back to linear elastic).
+    void SetDamageParams(Real sigma_t_val, Real H_t_val);
+
     void SetDensity(Real rho_val);
     void SetExternalForce(const VectorXR& h_f_ext);
     void SetNodalFixed(const VectorXi& fixed_nodes_in);
 
     void RetrieveExternalForceToCPU(VectorXR& f_ext_out);
+
+    // Retrieve per-edge damage state from GPU to host.
+    // omega_out : size n_edge, omega ∈ [0, 1] (0 = undamaged, 1 = fully failed)
+    void RetrieveFacetDamageToCPU(VectorXR& omega_out);
+
+    // Expose edge connectivity for visualization (e.g. VTK line-segment mesh).
+    // Returns a reference to the host-side edge node array (size 2 * n_edge):
+    //   h_edge_nodes_vec[2*e+0] = node i,  h_edge_nodes_vec[2*e+1] = node j.
+    const std::vector<int>& GetEdgeNodes() const {
+        return h_edge_nodes_vec;
+    }
 
     const Real* GetX12DevicePtr() const {
         return d_x12;
@@ -366,6 +410,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_facet_t;  // [n_edge * 6]
     Real* d_facet_t;
 
+    // ── Per-edge damage state ─────────────────────────────────────────────────
+    mophi::DualArray<Real> da_kappa;   // history max effective strain [n_edge]
+    mophi::DualArray<Real> da_omega;   // damage variable              [n_edge]
+    Real* d_kappa;
+    Real* d_omega;
+
     // ── Boundary conditions ───────────────────────────────────────────────────
     mophi::DualArray<int> da_fixed_nodes;
     int* d_fixed_nodes;
@@ -387,6 +437,8 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     Real* d_E_kM;
     Real* d_E_kL;
     Real* d_rho;
+    Real* d_sigma_t;  // Cusatis tensile strength
+    Real* d_H_t;      // Cusatis softening modulus
     Real h_rho;
 
     bool is_setup = false;
