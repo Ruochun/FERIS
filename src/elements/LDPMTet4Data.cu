@@ -42,6 +42,22 @@ __global__ void calc_p_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
     compute_p(tid, 0, d_data, nullptr, Real(0));
 }
 
+// ─── GPU kernel: project per-edge damage ω onto per-subfacet damage ──────────
+//
+// For each sub-facet sf, looks up its owning global edge index via
+// subfacet_edge_idx[sf] and writes omega[edge_idx] into subfacet_damage[sf].
+// Sub-facets with edge_idx == -1 (unmatched) receive a value of 0.
+__global__ void project_edge_damage_to_subfacets_kernel(int n_subfacet,
+                                                        const int* __restrict__ subfacet_edge_idx,
+                                                        const Real* __restrict__ edge_omega,
+                                                        Real* __restrict__ subfacet_damage) {
+    const int sf = blockIdx.x * blockDim.x + threadIdx.x;
+    if (sf >= n_subfacet)
+        return;
+    const int eidx = subfacet_edge_idx[sf];
+    subfacet_damage[sf] = (eidx >= 0) ? edge_omega[eidx] : Real(0);
+}
+
 __global__ void clear_f_int_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
     clear_internal_force(d_data);
 }
@@ -455,6 +471,12 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     std::vector<Real> new_l(n_edge * 3, Real(0));
     std::vector<bool> frame_set(n_edge, false);
 
+    // Allocate and initialise the subfacet→edge mapping array.
+    // Entries are set to -1 (unmatched) and filled during the loop below.
+    da_subfacet_edge_idx.resize(n_subfacet);
+    da_subfacet_edge_idx.BindDevicePointer(&d_subfacet_edge_idx);
+    std::fill(da_subfacet_edge_idx.host(), da_subfacet_edge_idx.host() + n_subfacet, -1);
+
     const Real* hx = da_x12.host();
     const Real* hy = da_y12.host();
     const Real* hz = da_z12.host();
@@ -516,6 +538,9 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         }
         const int eidx = it->second;
 
+        // Record which global edge this sub-facet belongs to.
+        da_subfacet_edge_idx.host()[sf] = eidx;
+
         // Accumulate projected area.
         new_area[eidx] += parea;
 
@@ -571,6 +596,9 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
 
     std::copy(new_l.begin(), new_l.end(), da_edge_lv.host());
     da_edge_lv.ToDevice();
+
+    // Upload subfacet→edge mapping to device.
+    da_subfacet_edge_idx.ToDevice();
 
     // Sync device struct mirror so kernels see updated pointers.
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
@@ -817,6 +845,34 @@ void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
     std::copy(da_omega.host(), da_omega.host() + n_edge, omega_out.data());
 }
 
+// ─── ProjectEdgeDamageToSubfacets ────────────────────────────────────────────
+//
+// For each sub-facet, looks up omega[subfacet_edge_idx[sf]] via a GPU scatter
+// kernel and returns a flat array of size n_subfacet.
+//
+// Requires SetupFromMesh() to have been called so that d_subfacet_edge_idx and
+// d_omega are valid device pointers.
+
+void GPU_LDPMTet4_Data::ProjectEdgeDamageToSubfacets(VectorXR& out) {
+    if (!is_setup || n_subfacet <= 0 || d_subfacet_edge_idx == nullptr) {
+        out.resize(0);
+        return;
+    }
+
+    // Temporary device output buffer.
+    Real* d_sf_dmg = nullptr;
+    MOPHI_GPU_CALL(cudaMalloc(&d_sf_dmg, static_cast<size_t>(n_subfacet) * sizeof(Real)));
+
+    constexpr int threads = 256;
+    const int blocks = (n_subfacet + threads - 1) / threads;
+    project_edge_damage_to_subfacets_kernel<<<blocks, threads>>>(n_subfacet, d_subfacet_edge_idx, d_omega, d_sf_dmg);
+    MOPHI_GPU_CALL(cudaDeviceSynchronize());
+
+    out.resize(n_subfacet);
+    MOPHI_GPU_CALL(cudaMemcpy(out.data(), d_sf_dmg, static_cast<size_t>(n_subfacet) * sizeof(Real), cudaMemcpyDeviceToHost));
+    MOPHI_GPU_CALL(cudaFree(d_sf_dmg));
+}
+
 // ─── Destroy ─────────────────────────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::Destroy() {
@@ -839,6 +895,7 @@ void GPU_LDPMTet4_Data::Destroy() {
     da_facet_t.free();
     da_kappa.free();
     da_omega.free();
+    da_subfacet_edge_idx.free();
     da_fixed_nodes.free();
     da_I_lump.free();
 

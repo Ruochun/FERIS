@@ -206,6 +206,29 @@ bool WriteLDPMTet4TetMeshToVTK(const std::string& filename,
 bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh);
 
 /**
+ * Write the Voronoi sub-facet triangle mesh with a per-subfacet failure ratio.
+ *
+ * This overload is intended for time-step snapshots: instead of the static
+ * geometric fields (pArea / matflag), it writes the projected LDPM damage
+ * variable ω (the "failure ratio") as CELL_DATA, produced by
+ * GPU_LDPMTet4_Data::ProjectEdgeDamageToSubfacets().
+ *
+ * POINTS   — exact facet-vertex positions (facet_vertex_x/y/z)
+ * CELLS    — one VTK_TRIANGLE (type 5) per sub-facet
+ * CELL_DATA:
+ *   "damage" (scalar) — per-subfacet failure ratio ω ∈ [0, 1]
+ *                       0 = undamaged / elastic,  1 = fully fractured
+ *
+ * @param filename        Output path (e.g. "dogbone_subfacets_00001.vtk")
+ * @param mesh            Populated LDPMTet4Mesh (facets.dat + facetsVertices.dat)
+ * @param subfacet_damage Per-subfacet damage values (size n_subfacets)
+ * @return true on success
+ */
+bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
+                                    const LDPMTet4Mesh& mesh,
+                                    const VectorXR& subfacet_damage);
+
+/**
  * Write a VTK line-segment mesh showing the LDPM edge lattice coloured by
  * the per-edge Cusatis damage variable ω.
  *

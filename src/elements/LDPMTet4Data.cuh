@@ -312,6 +312,19 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         return h_edge_nodes_vec;
     }
 
+    // Project per-edge damage ω onto the sub-facet mesh.
+    //
+    // Each sub-facet belongs to a unique LDPM edge (built during SetupFromMesh).
+    // This GPU kernel looks up omega[edge_idx] for each sub-facet and writes the
+    // result into a flat output array of size n_subfacet.
+    //
+    // out  — resized to n_subfacet on return.  Values ∈ [0, 1]:
+    //          0 = undamaged / elastic,  1 = fully fractured.
+    //        Sub-facets whose owning edge could not be matched during setup
+    //        receive a value of 0.
+    // Must be called after SetupFromMesh() and at least one CalcP() step.
+    void ProjectEdgeDamageToSubfacets(VectorXR& out);
+
     const Real* GetX12DevicePtr() const {
         return d_x12;
     }
@@ -415,6 +428,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_omega;  // damage variable              [n_edge]
     Real* d_kappa;
     Real* d_omega;
+
+    // ── Subfacet → global edge index (built by SetupFromMesh) ─────────────────
+    // da_subfacet_edge_idx[sf] = global edge index for sub-facet sf.
+    // Entries are -1 for sub-facets that could not be matched (fallback: 0 damage).
+    mophi::DualArray<int> da_subfacet_edge_idx;  // [n_subfacet]
+    int* d_subfacet_edge_idx = nullptr;
 
     // ── Boundary conditions ───────────────────────────────────────────────────
     mophi::DualArray<int> da_fixed_nodes;
