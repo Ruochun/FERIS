@@ -16,7 +16,7 @@
  *   3. Fix particles on the z = z_min face (one end of the dogbone).
  *   4. Apply a uniform tensile load on the z = z_max face (opposite end).
  *   5. Time-march with LeapfrogSolver for a small number of steps.
- *   6. Print tip-face mean displacement to verify the simulation runs.
+ *   6. Print tip-face mean displacement and write VTK snapshots.
  *
  * The demo is intentionally kept simple (linear-elastic, small strain) so
  * that the output can be compared to an analytic estimate:
@@ -27,6 +27,22 @@
  * total applied force.  Agreement at early times (before wave reflections
  * contaminate the result) confirms correctness.
  *
+ * VTK output
+ * ──────────
+ * dogbone_subfacets.vtk
+ *   Written once before time integration (static reference geometry):
+ *   - POINTS  : exact facet-vertex positions (facetsVertices.dat)
+ *   - CELLS   : VTK_TRIANGLE per sub-facet
+ *   - CELL_DATA "pArea"   : projected facet area
+ *   - CELL_DATA "matflag" : material zone (0=mortar, >0=aggregate/ITZ)
+ *
+ * dogbone_tet4_<frame>.vtk
+ *   Written every vtk_interval steps (frame 0 = initial undeformed state):
+ *   - POINTS  : current (deformed) particle positions
+ *   - CELLS   : VTK_TETRA from tets.dat (connectivity unchanged)
+ *   - POINT_DATA "diameter"     : aggregate diameter
+ *   - POINT_DATA "displacement" : Euclidean displacement magnitude |u|
+ *
  * Building
  * ────────
  *   mkdir -p build && cd build
@@ -36,6 +52,10 @@
  * Running (from the build directory)
  * ───────────────────────────────────
  *   ./bin/dogbone_leapfrog
+ *
+ * Then open in ParaView:
+ *   dogbone_subfacets.vtk   — static sub-facet mesh (color by matflag / pArea)
+ *   dogbone_tet4_*.vtk      — animated TET4 mesh    (color by displacement)
  */
 
 #include <cuda_runtime.h>
@@ -45,6 +65,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -221,33 +242,74 @@ int main() {
     solver.SetParameters(&params);
     solver.Setup();
 
-    const int n_steps          = 200;
-    const int print_interval   = 20;
+    const int n_steps        = 200;
+    const int print_interval = 20;   // console output every N steps
+    const int vtk_interval   = 20;   // VTK snapshot every N steps
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
     std::cout << std::fixed << std::setprecision(6);
 
+    // ── Write static sub-facet mesh (reference geometry, written once) ────────
+    {
+        const std::string sf_vtk = "dogbone_subfacets.vtk";
+        std::cout << "Writing sub-facet mesh -> " << sf_vtk << " ...\n";
+        if (!WriteLDPMTet4SubfacetMeshToVTK(sf_vtk, mesh)) {
+            std::cerr << "Warning: failed to write sub-facet VTK.\n";
+        } else {
+            std::cout << "  " << mesh.n_facet_vertices << " points, "
+                      << mesh.n_subfacets << " VTK_TRIANGLE cells.\n";
+        }
+    }
+
+    // ── Write frame 0: initial (undeformed) TET4 mesh ────────────────────────
+    int frame = 0;
+    {
+        std::ostringstream fname;
+        fname << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+        if (!WriteLDPMTet4TetMeshToVTK(fname.str(), mesh,
+                                        mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
+            std::cerr << "Warning: failed to write initial TET4 VTK.\n";
+        } else {
+            std::cout << "Wrote: " << fname.str() << "  (initial configuration)\n";
+        }
+        ++frame;
+    }
+
     // Print column header.
-    std::cout << std::setw(8) << "Step"
-              << std::setw(18) << "mean dz (loaded) [mm]"
+    std::cout << "\n" << std::setw(8) << "Step"
+              << std::setw(22) << "mean dz (loaded) [mm]"
               << "\n";
-    std::cout << std::string(26, '-') << "\n";
+    std::cout << std::string(30, '-') << "\n";
 
     for (int step = 0; step < n_steps; ++step) {
         solver.Solve();
 
-        if ((step + 1) % print_interval == 0) {
+        if ((step + 1) % print_interval == 0 || (step + 1) % vtk_interval == 0) {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-            Real dz_sum = Real(0);
-            for (int i : load_idx)
-                dz_sum += z_cur(i) - mesh.particle_z(i);
-            const Real dz_mean = dz_sum / static_cast<Real>(load_idx.size());
+            // Console progress: mean tip-face displacement in z.
+            if ((step + 1) % print_interval == 0) {
+                Real dz_sum = Real(0);
+                for (int i : load_idx)
+                    dz_sum += z_cur(i) - mesh.particle_z(i);
+                const Real dz_mean = dz_sum / static_cast<Real>(load_idx.size());
+                std::cout << std::setw(8) << (step + 1)
+                          << std::setw(22) << dz_mean
+                          << "\n";
+            }
 
-            std::cout << std::setw(8) << (step + 1)
-                      << std::setw(18) << dz_mean
-                      << "\n";
+            // VTK snapshot.
+            if ((step + 1) % vtk_interval == 0) {
+                std::ostringstream fname;
+                fname << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+                if (!WriteLDPMTet4TetMeshToVTK(fname.str(), mesh, x_cur, y_cur, z_cur)) {
+                    std::cerr << "Warning: failed to write TET4 VTK at step " << (step + 1) << ".\n";
+                } else {
+                    std::cout << "Wrote: " << fname.str() << "\n";
+                }
+                ++frame;
+            }
         }
     }
 
@@ -283,6 +345,12 @@ int main() {
     }
 
     element_data.Destroy();
-    std::cout << "\nDone.\n";
+
+    std::cout << "\nDone.  " << frame << " TET4 VTK file(s) written.\n";
+    std::cout << "  Open dogbone_subfacets.vtk in ParaView to inspect the sub-facet mesh\n";
+    std::cout << "    → Color by 'matflag' (0=mortar, >0=aggregate/ITZ) or 'pArea'.\n";
+    std::cout << "  Open dogbone_tet4_*.vtk in ParaView to see the animated deformed mesh\n";
+    std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
+    std::cout << "    → Load the series: File → Open → select group → Apply → use Animation View.\n";
     return 0;
 }

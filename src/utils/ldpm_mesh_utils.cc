@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -607,6 +608,86 @@ bool WriteLDPMTet4TetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& 
     file << "LOOKUP_TABLE default\n";
     for (int i = 0; i < np; ++i) {
         file << (mesh.particle_d.size() > 0 ? mesh.particle_d(i) : 0.0) << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
+// ============================================================
+// WriteLDPMTet4TetMeshToVTK  (deformed-position overload)
+//
+// Same structure as the reference overload, but uses the
+// caller-supplied current positions and also writes a
+// "displacement" magnitude scalar in POINT_DATA.
+// ============================================================
+bool WriteLDPMTet4TetMeshToVTK(const std::string& filename,
+                                const LDPMTet4Mesh& mesh,
+                                const VectorXR& x_cur,
+                                const VectorXR& y_cur,
+                                const VectorXR& z_cur) {
+    if (mesh.n_particles <= 0 || mesh.n_tets <= 0) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: mesh has no particles or tets\n";
+        return false;
+    }
+    if (static_cast<int>(x_cur.size()) != mesh.n_particles ||
+        static_cast<int>(y_cur.size()) != mesh.n_particles ||
+        static_cast<int>(z_cur.size()) != mesh.n_particles) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: current position vector size mismatch\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    const int np = mesh.n_particles;
+    const int nt = mesh.n_tets;
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM TET4 Mesh (deformed)\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points (current / deformed positions) ────────────────────────────────
+    file << "\nPOINTS " << np << " double\n";
+    for (int i = 0; i < np; ++i) {
+        file << x_cur(i) << " " << y_cur(i) << " " << z_cur(i) << "\n";
+    }
+
+    // ── Cells (VTK_TETRA = 10, 4 nodes each, 5 integers per cell row) ────────
+    file << "\nCELLS " << nt << " " << (nt * 5) << "\n";
+    for (int e = 0; e < nt; ++e) {
+        file << "4 " << mesh.tet_connectivity(e, 0) << " " << mesh.tet_connectivity(e, 1) << " "
+             << mesh.tet_connectivity(e, 2) << " " << mesh.tet_connectivity(e, 3) << "\n";
+    }
+
+    file << "\nCELL_TYPES " << nt << "\n";
+    for (int e = 0; e < nt; ++e) {
+        file << "10\n";  // VTK_TETRA
+    }
+
+    // ── Point data ───────────────────────────────────────────────────────────
+    file << "\nPOINT_DATA " << np << "\n";
+
+    // Aggregate diameter (unchanged from reference)
+    file << "SCALARS diameter double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < np; ++i) {
+        file << (mesh.particle_d.size() > 0 ? mesh.particle_d(i) : 0.0) << "\n";
+    }
+
+    // Displacement magnitude |u| = sqrt((x-X)² + (y-Y)² + (z-Z)²)
+    file << "\nSCALARS displacement double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < np; ++i) {
+        const double dx = x_cur(i) - mesh.particle_x(i);
+        const double dy = y_cur(i) - mesh.particle_y(i);
+        const double dz = z_cur(i) - mesh.particle_z(i);
+        file << std::sqrt(dx * dx + dy * dy + dz * dz) << "\n";
     }
 
     file.close();

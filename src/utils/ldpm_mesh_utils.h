@@ -175,6 +175,34 @@ bool ReadLDPMTet4FacetVerticesFile(const std::string& path,
 bool WriteLDPMTet4TetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& mesh);
 
 /**
+ * Write the TET4 mesh from a parsed LDPMTet4Mesh to a VTK legacy ASCII file,
+ * using the current (deformed) particle positions instead of the reference ones.
+ *
+ * This overload is intended for writing time-step snapshots during a dynamic
+ * simulation.  The TET4 connectivity is identical to the reference-configuration
+ * overload; only the POINTS block and added displacement scalar differ.
+ *
+ * POINTS   — current particle positions supplied via x_cur / y_cur / z_cur
+ * CELLS    — TET4 elements (tet_connectivity), VTK_TETRA (type 10)
+ * POINT_DATA:
+ *   "diameter"     (scalar) — aggregate diameter per particle (0 = boundary)
+ *   "displacement" (scalar) — Euclidean displacement magnitude |u| = |x_cur − x_ref|
+ *
+ * @param filename  Output path (e.g. "dogbone_tet4_00001.vtk")
+ * @param mesh      Populated LDPMTet4Mesh (particles.dat + tets.dat required;
+ *                  particle_x/y/z are used as the reference positions)
+ * @param x_cur     Current x coordinates for all particles (size n_particles)
+ * @param y_cur     Current y coordinates for all particles (size n_particles)
+ * @param z_cur     Current z coordinates for all particles (size n_particles)
+ * @return true on success
+ */
+bool WriteLDPMTet4TetMeshToVTK(const std::string& filename,
+                                const LDPMTet4Mesh& mesh,
+                                const VectorXR& x_cur,
+                                const VectorXR& y_cur,
+                                const VectorXR& z_cur);
+
+/**
  * Write the Voronoi sub-facet triangle mesh from a parsed LDPMTet4Mesh to a
  * VTK legacy ASCII file.
  *
