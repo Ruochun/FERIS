@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -124,8 +125,8 @@ bool ReadLDPMTet4NodesFile(const std::string& path, LDPMTet4Mesh& out, std::stri
         ++line_num;
         const auto t = TokenizeLDPM(line);
         if (t.size() != 3) {
-            SetErr(error, "ReadLDPMTet4NodesFile: expected 3 tokens at data line " +
-                              std::to_string(line_num) + ": \"" + line + "\"");
+            SetErr(error, "ReadLDPMTet4NodesFile: expected 3 tokens at data line " + std::to_string(line_num) + ": \"" +
+                              line + "\"");
             return false;
         }
         Real x, y, z;
@@ -187,18 +188,16 @@ bool ReadLDPMTet4ParticlesFile(const std::string& path, LDPMTet4Mesh& out, std::
         ++line_num;
         const auto t = TokenizeLDPM(line);
         if (t.size() != 5) {
-            SetErr(error, "ReadLDPMTet4ParticlesFile: expected 5 tokens at data line " +
-                              std::to_string(line_num) + ": \"" + line + "\"");
+            SetErr(error, "ReadLDPMTet4ParticlesFile: expected 5 tokens at data line " + std::to_string(line_num) +
+                              ": \"" + line + "\"");
             return false;
         }
         Row r{};
         if (!ParseInt(t[0], r.n) || r.n < 0) {
-            SetErr(error, "ReadLDPMTet4ParticlesFile: invalid particle index at data line " +
-                              std::to_string(line_num));
+            SetErr(error, "ReadLDPMTet4ParticlesFile: invalid particle index at data line " + std::to_string(line_num));
             return false;
         }
-        if (!ParseReal(t[1], r.x) || !ParseReal(t[2], r.y) || !ParseReal(t[3], r.z) ||
-            !ParseReal(t[4], r.d)) {
+        if (!ParseReal(t[1], r.x) || !ParseReal(t[2], r.y) || !ParseReal(t[3], r.z) || !ParseReal(t[4], r.d)) {
             SetErr(error, "ReadLDPMTet4ParticlesFile: parse error at data line " + std::to_string(line_num));
             return false;
         }
@@ -250,15 +249,14 @@ bool ReadLDPMTet4TetsFile(const std::string& path, LDPMTet4Mesh& out, std::strin
         ++line_num;
         const auto t = TokenizeLDPM(line);
         if (t.size() != 4) {
-            SetErr(error, "ReadLDPMTet4TetsFile: expected 4 tokens at data line " +
-                              std::to_string(line_num) + ": \"" + line + "\"");
+            SetErr(error, "ReadLDPMTet4TetsFile: expected 4 tokens at data line " + std::to_string(line_num) + ": \"" +
+                              line + "\"");
             return false;
         }
         std::array<int, 4> r{};
         for (int k = 0; k < 4; ++k) {
             if (!ParseInt(t[k], r[k]) || r[k] < 0) {
-                SetErr(error, "ReadLDPMTet4TetsFile: invalid node index at data line " +
-                                  std::to_string(line_num));
+                SetErr(error, "ReadLDPMTet4TetsFile: invalid node index at data line " + std::to_string(line_num));
                 return false;
             }
         }
@@ -300,10 +298,10 @@ bool ReadLDPMTet4FacetsFile(const std::string& path, LDPMTet4Mesh& out, std::str
     }
 
     // Temporary storage — reserve a generous initial capacity for performance.
-    std::vector<int> v_tet, v_vid;   // v_vid stores 3 ints per row
+    std::vector<int> v_tet, v_vid;  // v_vid stores 3 ints per row
     std::vector<Real> v_vol, v_area;
-    std::vector<Real> v_c;           // 3 per row
-    std::vector<Real> v_p, v_q, v_s; // 3 per row each
+    std::vector<Real> v_c;            // 3 per row
+    std::vector<Real> v_p, v_q, v_s;  // 3 per row each
     std::vector<int> v_mf;
 
     constexpr size_t kReserve = 70000;
@@ -323,15 +321,15 @@ bool ReadLDPMTet4FacetsFile(const std::string& path, LDPMTet4Mesh& out, std::str
         ++line_num;
         const auto t = TokenizeLDPM(line);
         if (t.size() != 19) {
-            SetErr(error, "ReadLDPMTet4FacetsFile: expected 19 tokens at data line " +
-                              std::to_string(line_num) + " (got " + std::to_string(t.size()) + ")");
+            SetErr(error, "ReadLDPMTet4FacetsFile: expected 19 tokens at data line " + std::to_string(line_num) +
+                              " (got " + std::to_string(t.size()) + ")");
             return false;
         }
 
         // Tet  IDx  IDy  IDz  (ints, cols 0-3)
         int tet_idx, idx, idy, idz;
-        if (!ParseInt(t[0], tet_idx) || tet_idx < 0 || !ParseInt(t[1], idx) || idx < 0 ||
-            !ParseInt(t[2], idy) || idy < 0 || !ParseInt(t[3], idz) || idz < 0) {
+        if (!ParseInt(t[0], tet_idx) || tet_idx < 0 || !ParseInt(t[1], idx) || idx < 0 || !ParseInt(t[2], idy) ||
+            idy < 0 || !ParseInt(t[3], idz) || idz < 0) {
             SetErr(error, "ReadLDPMTet4FacetsFile: invalid integer at data line " + std::to_string(line_num));
             return false;
         }
@@ -340,8 +338,8 @@ bool ReadLDPMTet4FacetsFile(const std::string& path, LDPMTet4Mesh& out, std::str
         Real vals[14];
         for (int k = 0; k < 14; ++k) {
             if (!ParseReal(t[4 + k], vals[k])) {
-                SetErr(error, "ReadLDPMTet4FacetsFile: parse error (col " + std::to_string(4 + k) +
-                                  ") at data line " + std::to_string(line_num));
+                SetErr(error, "ReadLDPMTet4FacetsFile: parse error (col " + std::to_string(4 + k) + ") at data line " +
+                                  std::to_string(line_num));
                 return false;
             }
         }
@@ -438,21 +436,19 @@ bool ReadLDPMTet4FaceFacetsFile(const std::string& path, LDPMTet4Mesh& out, std:
         ++line_num;
         const auto t = TokenizeLDPM(line);
         if (t.size() != 10) {
-            SetErr(error, "ReadLDPMTet4FaceFacetsFile: expected 10 tokens at data line " +
-                              std::to_string(line_num) + " (got " + std::to_string(t.size()) + ")");
+            SetErr(error, "ReadLDPMTet4FaceFacetsFile: expected 10 tokens at data line " + std::to_string(line_num) +
+                              " (got " + std::to_string(t.size()) + ")");
             return false;
         }
         int node_idx;
         if (!ParseInt(t[0], node_idx) || node_idx < 0) {
-            SetErr(error, "ReadLDPMTet4FaceFacetsFile: invalid node index at data line " +
-                              std::to_string(line_num));
+            SetErr(error, "ReadLDPMTet4FaceFacetsFile: invalid node index at data line " + std::to_string(line_num));
             return false;
         }
         Real coords[9];
         for (int k = 0; k < 9; ++k) {
             if (!ParseReal(t[1 + k], coords[k])) {
-                SetErr(error, "ReadLDPMTet4FaceFacetsFile: parse error at data line " +
-                                  std::to_string(line_num));
+                SetErr(error, "ReadLDPMTet4FaceFacetsFile: parse error at data line " + std::to_string(line_num));
                 return false;
             }
         }
@@ -503,14 +499,13 @@ bool ReadLDPMTet4FacetVerticesFile(const std::string& path, LDPMTet4Mesh& out, s
         ++line_num;
         const auto t = TokenizeLDPM(line);
         if (t.size() != 3) {
-            SetErr(error, "ReadLDPMTet4FacetVerticesFile: expected 3 tokens at data line " +
-                              std::to_string(line_num) + ": \"" + line + "\"");
+            SetErr(error, "ReadLDPMTet4FacetVerticesFile: expected 3 tokens at data line " + std::to_string(line_num) +
+                              ": \"" + line + "\"");
             return false;
         }
         Real x, y, z;
         if (!ParseReal(t[0], x) || !ParseReal(t[1], y) || !ParseReal(t[2], z)) {
-            SetErr(error, "ReadLDPMTet4FacetVerticesFile: parse error at data line " +
-                              std::to_string(line_num));
+            SetErr(error, "ReadLDPMTet4FacetVerticesFile: parse error at data line " + std::to_string(line_num));
             return false;
         }
         xs.push_back(x);
@@ -614,6 +609,85 @@ bool WriteLDPMTet4TetMeshToVTK(const std::string& filename, const LDPMTet4Mesh& 
 }
 
 // ============================================================
+// WriteLDPMTet4TetMeshToVTK  (deformed-position overload)
+//
+// Same structure as the reference overload, but uses the
+// caller-supplied current positions and also writes a
+// "displacement" magnitude scalar in POINT_DATA.
+// ============================================================
+bool WriteLDPMTet4TetMeshToVTK(const std::string& filename,
+                               const LDPMTet4Mesh& mesh,
+                               const VectorXR& x_cur,
+                               const VectorXR& y_cur,
+                               const VectorXR& z_cur) {
+    if (mesh.n_particles <= 0 || mesh.n_tets <= 0) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: mesh has no particles or tets\n";
+        return false;
+    }
+    if (static_cast<int>(x_cur.size()) != mesh.n_particles || static_cast<int>(y_cur.size()) != mesh.n_particles ||
+        static_cast<int>(z_cur.size()) != mesh.n_particles) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: current position vector size mismatch\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4TetMeshToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    const int np = mesh.n_particles;
+    const int nt = mesh.n_tets;
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM TET4 Mesh (deformed)\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points (current / deformed positions) ────────────────────────────────
+    file << "\nPOINTS " << np << " double\n";
+    for (int i = 0; i < np; ++i) {
+        file << x_cur(i) << " " << y_cur(i) << " " << z_cur(i) << "\n";
+    }
+
+    // ── Cells (VTK_TETRA = 10, 4 nodes each, 5 integers per cell row) ────────
+    file << "\nCELLS " << nt << " " << (nt * 5) << "\n";
+    for (int e = 0; e < nt; ++e) {
+        file << "4 " << mesh.tet_connectivity(e, 0) << " " << mesh.tet_connectivity(e, 1) << " "
+             << mesh.tet_connectivity(e, 2) << " " << mesh.tet_connectivity(e, 3) << "\n";
+    }
+
+    file << "\nCELL_TYPES " << nt << "\n";
+    for (int e = 0; e < nt; ++e) {
+        file << "10\n";  // VTK_TETRA
+    }
+
+    // ── Point data ───────────────────────────────────────────────────────────
+    file << "\nPOINT_DATA " << np << "\n";
+
+    // Aggregate diameter (unchanged from reference)
+    file << "SCALARS diameter double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < np; ++i) {
+        file << (mesh.particle_d.size() > 0 ? mesh.particle_d(i) : 0.0) << "\n";
+    }
+
+    // Displacement magnitude |u| = sqrt((x-X)² + (y-Y)² + (z-Z)²)
+    file << "\nSCALARS displacement double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < np; ++i) {
+        const double dx = x_cur(i) - mesh.particle_x(i);
+        const double dy = y_cur(i) - mesh.particle_y(i);
+        const double dz = z_cur(i) - mesh.particle_z(i);
+        file << std::sqrt(dx * dx + dy * dy + dz * dz) << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
+// ============================================================
 // WriteLDPMTet4SubfacetMeshToVTK
 //
 // POINTS   — exact facet vertex positions (n_facet_vertices)
@@ -646,16 +720,14 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4M
     // ── Points ───────────────────────────────────────────────────────────────
     file << "\nPOINTS " << nv << " double\n";
     for (int i = 0; i < nv; ++i) {
-        file << mesh.facet_vertex_x(i) << " " << mesh.facet_vertex_y(i) << " "
-             << mesh.facet_vertex_z(i) << "\n";
+        file << mesh.facet_vertex_x(i) << " " << mesh.facet_vertex_y(i) << " " << mesh.facet_vertex_z(i) << "\n";
     }
 
     // ── Cells (VTK_TRIANGLE = 5, 3 nodes each, 4 integers per cell row) ──────
     file << "\nCELLS " << nf << " " << (nf * 4) << "\n";
     for (int i = 0; i < nf; ++i) {
-        file << "3 " << mesh.subfacet_vertex_ids(3 * i + 0) << " "
-             << mesh.subfacet_vertex_ids(3 * i + 1) << " " << mesh.subfacet_vertex_ids(3 * i + 2)
-             << "\n";
+        file << "3 " << mesh.subfacet_vertex_ids(3 * i + 0) << " " << mesh.subfacet_vertex_ids(3 * i + 1) << " "
+             << mesh.subfacet_vertex_ids(3 * i + 2) << "\n";
     }
 
     file << "\nCELL_TYPES " << nf << "\n";
@@ -678,6 +750,81 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4M
     file << "LOOKUP_TABLE default\n";
     for (int i = 0; i < nf; ++i) {
         file << mesh.subfacet_matflag(i) << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
+// ============================================================
+// WriteLDPMTet4EdgeDamageToVTK
+//
+// POINTS   — current particle positions (n_particles)
+// CELLS    — one VTK_LINE per unique edge (n_edges), 3 ints per row
+// CELL_DATA:
+//   "damage" — per-edge Cusatis damage variable ω ∈ [0, 1]
+// ============================================================
+bool WriteLDPMTet4EdgeDamageToVTK(const std::string& filename,
+                                  int n_particles,
+                                  int n_edges,
+                                  const std::vector<int>& edge_nodes,
+                                  const VectorXR& x_cur,
+                                  const VectorXR& y_cur,
+                                  const VectorXR& z_cur,
+                                  const VectorXR& edge_damage) {
+    if (n_particles <= 0 || n_edges <= 0) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: no particles or edges\n";
+        return false;
+    }
+    if (static_cast<int>(edge_nodes.size()) != 2 * n_edges) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: edge_nodes size mismatch\n";
+        return false;
+    }
+    if (static_cast<int>(edge_damage.size()) != n_edges) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: edge_damage size mismatch\n";
+        return false;
+    }
+    if (static_cast<int>(x_cur.size()) != n_particles || static_cast<int>(y_cur.size()) != n_particles ||
+        static_cast<int>(z_cur.size()) != n_particles) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: position vector size mismatch\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4EdgeDamageToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM Edge Damage (omega)\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points (current / deformed particle positions) ────────────────────────
+    file << "\nPOINTS " << n_particles << " double\n";
+    for (int i = 0; i < n_particles; ++i) {
+        file << x_cur(i) << " " << y_cur(i) << " " << z_cur(i) << "\n";
+    }
+
+    // ── Cells (VTK_LINE = 3, 2 nodes each, 3 integers per row) ───────────────
+    file << "\nCELLS " << n_edges << " " << (n_edges * 3) << "\n";
+    for (int e = 0; e < n_edges; ++e) {
+        file << "2 " << edge_nodes[2 * e + 0] << " " << edge_nodes[2 * e + 1] << "\n";
+    }
+
+    file << "\nCELL_TYPES " << n_edges << "\n";
+    for (int e = 0; e < n_edges; ++e) {
+        file << "3\n";  // VTK_LINE
+    }
+
+    // ── Cell data: damage variable ω ─────────────────────────────────────────
+    file << "\nCELL_DATA " << n_edges << "\n";
+    file << "SCALARS damage double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int e = 0; e < n_edges; ++e) {
+        file << edge_damage(e) << "\n";
     }
 
     file.close();

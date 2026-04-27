@@ -20,25 +20,55 @@ integrator.  VTK snapshots are written every 50 steps.
 
 ## Setup Workflow
 
+### A. TET4-mesh-derived geometry (fast, no file data needed)
+
 ```cpp
 // 1. Build the element from a TET4 mesh
 GPU_LDPMTet4_Data element(n_nodes, n_elems);
 element.Setup(h_x, h_y, h_z, tet_connectivity);
+```
 
-// 2. Set 5 material moduli (Pa or Pa·m² for rotational ones)
+Facet areas and the tangent frame **(m, l)** are computed on-the-fly from the
+TET4 Delaunay triangulation using the Voronoi dual construction.
+
+### B. File-based sub-facet geometry (richer, uses Chrono Workbench output)
+
+```cpp
+// 1. Read all six Chrono Workbench data files
+LDPMTet4Mesh mesh;
+std::string err;
+ReadLDPMTet4MeshFromFiles("data/meshes/LDPMTet4/Dogbone/LDPMgeo000", mesh, &err);
+
+// 2. Initialise the element from the mesh (SetupFromMesh overrides the
+//    tet4-derived facet areas and tangent frame with the richer file values)
+GPU_LDPMTet4_Data element(mesh.n_particles, mesh.n_tets);
+element.SetupFromMesh(mesh);
+```
+
+`SetupFromMesh` reads the Voronoi sub-facet data from `facets.dat`:
+- **facet area** per edge ← sum of `pArea` over all its sub-facets
+- **m-vector** per edge ← first-tangent `q` from the file (sign-adjusted)
+- **l-vector** per edge ← second-tangent `s` from the file
+
+See `examples/Dogbone/dogbone_leapfrog.cc` for a complete tensile-loading demo.
+
+### Shared steps (both paths)
+
+```cpp
+// Set 5 material moduli (Pa or Pa·m² for rotational ones)
 element.SetMaterial(E_N, E_T, E_kT, E_kM, E_kL);
 
-// 3. Set density (kg/m³)
+// Set density (kg/m³)
 element.SetDensity(rho);
 
-// 4. Boundary conditions
+// Boundary conditions
 element.SetNodalFixed(fixed_nodes);     // clamp nodes
 element.SetExternalForce(h_f_ext);      // translational force [n_coef * 3]
 
-// 5. Build lumped mass + rotational inertia
+// Build lumped mass + rotational inertia
 element.CalcMassMatrix();
 
-// 6. Create and run the solver
+// Create and run the solver
 LeapfrogSolver solver(&element);
 LeapfrogParams params{dt};
 solver.SetParameters(&params);

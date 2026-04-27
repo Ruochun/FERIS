@@ -32,7 +32,7 @@
 
 #include <cmath>
 
-#include "../materials/LDPMTet4.cuh"
+#include "../materials/LDPMCusatis.cuh"
 #include "LDPMTet4Data.cuh"
 
 namespace tlfea {
@@ -44,7 +44,7 @@ namespace tlfea {
 //   edge_idx  = elem_idx   (one "element" per edge)
 //   qp_idx    = 0          (one facet per edge)
 //   v_guess   = half-step translational nodal velocity (unused here)
-//   dt        = time step  (unused for linear-elastic)
+//   dt        = time step  (unused for quasi-static constitutive law)
 //
 // Translational strains (same as LDPM4):
 //   delta_u = (x_j - x_i) - l0 * n_ref
@@ -57,6 +57,10 @@ namespace tlfea {
 //   kappa_T = (delta_theta · n) / l0
 //   kappa_M = (delta_theta · m) / l0
 //   kappa_L = (delta_theta · l) / l0
+//
+// Constitutive law: Cusatis LDPM tensile-shear damage (LDPMCusatis.cuh).
+//   History variable kappa and damage omega are read from and written
+//   to the per-edge arrays d_kappa / d_omega.
 //
 // Stores results in d_data->facet_t(edge_idx, {0..5}):
 //   comp 0 = t_N, 1 = t_M, 2 = t_L  (tractions)
@@ -113,11 +117,18 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     const Real kappa_M = (dt0 * m0 + dt1 * m1 + dt2 * m2) * inv_l0;
     const Real kappa_L = (dt0 * l_0 + dt1 * l_1 + dt2 * l_2) * inv_l0;
 
-    // ── Constitutive law ───────────────────────────────────────────────────
+    // ── Cusatis damage constitutive law ────────────────────────────────────
 
     Real t_N, t_M, t_L, m_T, m_M, m_L;
-    ldpm_tet4_compute_traction(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, d_data->E_N(), d_data->E_T(), d_data->E_kT(),
-                               d_data->E_kM(), d_data->E_kL(), t_N, t_M, t_L, m_T, m_M, m_L);
+    Real kappa_new, omega_new;
+
+    ldpm_tet4_cusatis_traction(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, d_data->E_N(), d_data->E_T(), d_data->E_kT(),
+                               d_data->E_kM(), d_data->E_kL(), d_data->sigma_t(), d_data->H_t(),
+                               d_data->edge_kappa(edge_idx), kappa_new, omega_new, t_N, t_M, t_L, m_T, m_M, m_L);
+
+    // Write back updated damage state
+    d_data->edge_kappa(edge_idx) = kappa_new;
+    d_data->edge_omega(edge_idx) = omega_new;
 
     // Store facet tractions [0..2] and moments [3..5]
     d_data->facet_t(edge_idx, 0) = t_N;
