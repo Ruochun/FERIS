@@ -111,7 +111,9 @@ using namespace tlfea;
 //
 // Unit system: mm-tonne-s (consistent set used by Cusatis):
 //   length [mm], force [N], mass [tonne], time [s], stress [N/mm² = MPa].
-//   Note: 1 N = 1 tonne·mm/s², so density must be in tonne/mm³.
+//   Dimensional check: 1 N = 1 kg·m/s² = (1e-3 tonne)·(1e3 mm)/s² = 1 tonne·mm/s²  ✓
+//   Therefore density must be in tonne/mm³, not kg/mm³.
+//   (Using kg/mm³ would make force units kg·mm/s² = milliNewtons, not Newtons.)
 //
 // Elastic parameters
 //   E_N   = E₀ = 60 273 N/mm²           normal modulus
