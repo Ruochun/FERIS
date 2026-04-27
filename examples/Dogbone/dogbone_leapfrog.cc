@@ -261,16 +261,22 @@ int main() {
         }
     }
 
+    // Helper: build a TET4 VTK filename for the given frame number.
+    auto tet4_vtk_name = [](int f) {
+        std::ostringstream s;
+        s << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        return s.str();
+    };
+
     // ── Write frame 0: initial (undeformed) TET4 mesh ────────────────────────
     int frame = 0;
     {
-        std::ostringstream fname;
-        fname << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
-        if (!WriteLDPMTet4TetMeshToVTK(fname.str(), mesh,
+        const std::string fname = tet4_vtk_name(frame);
+        if (!WriteLDPMTet4TetMeshToVTK(fname, mesh,
                                         mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
             std::cerr << "Warning: failed to write initial TET4 VTK.\n";
         } else {
-            std::cout << "Wrote: " << fname.str() << "  (initial configuration)\n";
+            std::cout << "Wrote: " << fname << "  (initial configuration)\n";
         }
         ++frame;
     }
@@ -301,12 +307,11 @@ int main() {
 
             // VTK snapshot.
             if ((step + 1) % vtk_interval == 0) {
-                std::ostringstream fname;
-                fname << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
-                if (!WriteLDPMTet4TetMeshToVTK(fname.str(), mesh, x_cur, y_cur, z_cur)) {
+                const std::string fname = tet4_vtk_name(frame);
+                if (!WriteLDPMTet4TetMeshToVTK(fname, mesh, x_cur, y_cur, z_cur)) {
                     std::cerr << "Warning: failed to write TET4 VTK at step " << (step + 1) << ".\n";
                 } else {
-                    std::cout << "Wrote: " << fname.str() << "\n";
+                    std::cout << "Wrote: " << fname << "\n";
                 }
                 ++frame;
             }
