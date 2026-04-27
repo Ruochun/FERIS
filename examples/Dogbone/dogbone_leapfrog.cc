@@ -465,11 +465,16 @@ int main() {
 
     element_data.Destroy();
 
-    std::cout << "\nDone.  " << frame << " TET4 VTK file(s) written.\n";
-    std::cout << "  Open dogbone_subfacets.vtk in ParaView to inspect the sub-facet mesh\n";
+    std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";
+    std::cout << "\nOutput files:\n";
+    std::cout << "  dogbone_subfacets.vtk       — static sub-facet mesh\n";
     std::cout << "    → Color by 'matflag' (0=mortar, >0=aggregate/ITZ) or 'pArea'.\n";
-    std::cout << "  Open dogbone_tet4_*.vtk in ParaView to see the animated deformed mesh\n";
+    std::cout << "  dogbone_tet4_NNNNN.vtk      — deformed TET4 mesh (1 per frame)\n";
     std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
-    std::cout << "    → Load the series: File → Open → select group → Apply → use Animation View.\n";
+    std::cout << "  dogbone_damage_NNNNN.vtk    — LDPM edge lattice (1 per frame)\n";
+    std::cout << "    → Color by 'damage' (omega ∈ [0,1]) to visualise fracture.\n";
+    std::cout << "    → Use Threshold filter (damage > 0.5) to show cracked struts.\n";
+    std::cout << "  Load the tet4 and damage series: "
+                 "File → Open → select group → Apply → Animation View.\n";
     return 0;
 }
