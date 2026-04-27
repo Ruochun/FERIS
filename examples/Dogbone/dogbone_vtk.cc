@@ -83,12 +83,12 @@ int main() {
 
     // Sanity checks
     if (mesh.n_subfacets != 12 * mesh.n_tets) {
-        std::cerr << "Warning: expected n_subfacets == 12 * n_tets ("
-                  << 12 * mesh.n_tets << "), got " << mesh.n_subfacets << "\n";
+        std::cerr << "Warning: expected n_subfacets == 12 * n_tets (" << 12 * mesh.n_tets << "), got "
+                  << mesh.n_subfacets << "\n";
     }
     if (mesh.n_facet_vertices != 3 * mesh.n_subfacets) {
-        std::cerr << "Warning: expected n_facet_vertices == 3 * n_subfacets ("
-                  << 3 * mesh.n_subfacets << "), got " << mesh.n_facet_vertices << "\n";
+        std::cerr << "Warning: expected n_facet_vertices == 3 * n_subfacets (" << 3 * mesh.n_subfacets << "), got "
+                  << mesh.n_facet_vertices << "\n";
     }
 
     // Count aggregate vs boundary particles
@@ -116,8 +116,7 @@ int main() {
         std::cerr << "Error writing sub-facet VTK.\n";
         return 1;
     }
-    std::cout << "  " << mesh.n_facet_vertices << " points, " << mesh.n_subfacets
-              << " VTK_TRIANGLE cells.\n";
+    std::cout << "  " << mesh.n_facet_vertices << " points, " << mesh.n_subfacets << " VTK_TRIANGLE cells.\n";
 
     // ── Summary ──────────────────────────────────────────────────────────────
     std::cout << "\nDone.\n";

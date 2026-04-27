@@ -330,14 +330,14 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     MOPHI_GPU_CALL(cudaMalloc(&d_H_t, sizeof(Real)));
 
     const Real default_val = Real(0);
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_N,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_T,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_kT,    &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_kM,    &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_E_kL,    &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_rho,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_N, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_T, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kT, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kM, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kL, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_rho, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_H_t,     &default_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_H_t, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
 
     // ── 10. Allocate per-node rotational inertia (filled in CalcMassMatrix) ───
 
@@ -430,8 +430,8 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         h_facet_vertex_z = mesh.facet_vertex_z;
     }
 
-    MOPHI_INFO("SetupFromMesh: stored %d sub-facets, %d face-facets, %d facet vertices",
-               n_subfacet, n_face_facet, n_facet_vertex);
+    MOPHI_INFO("SetupFromMesh: stored %d sub-facets, %d face-facets, %d facet vertices", n_subfacet, n_face_facet,
+               n_facet_vertex);
 
     // ── Override edge geometry from sub-facet file data ──────────────────────
     // Only performed when sub-facet data was actually loaded.
@@ -575,9 +575,8 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     // Sync device struct mirror so kernels see updated pointers.
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 
-    MOPHI_INFO(
-        "SetupFromMesh: overrode facet area and tangent frame for %d/%d edges from sub-facet file data.",
-        n_frame_set, n_edge);
+    MOPHI_INFO("SetupFromMesh: overrode facet area and tangent frame for %d/%d edges from sub-facet file data.",
+               n_frame_set, n_edge);
 }
 
 // ─── Material / parameter setters ────────────────────────────────────────────
@@ -611,7 +610,7 @@ void GPU_LDPMTet4_Data::SetDamageParams(Real sigma_t_val, Real H_t_val) {
         return;
     }
     MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &sigma_t_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_H_t,     &H_t_val,     sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_H_t, &H_t_val, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 }
 

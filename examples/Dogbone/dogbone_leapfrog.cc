@@ -127,13 +127,13 @@ using namespace tlfea;
 //   elastic failure load F_fail = sigma_t * A_cross_approx so that visible
 //   damage appears within the simulation window.
 
-static constexpr Real E_N_VAL       = Real(60000.0);   // N/mm²  (60 GPa)
-static constexpr Real ALPHA_T       = Real(0.25);       // E_T / E_N
-static constexpr Real BETA_K        = Real(0.25);       // rotational coupling
-static constexpr Real RHO_VAL       = Real(2.4e-6);     // kg/mm³
-static constexpr Real SIGMA_T_VAL   = Real(4.0);        // N/mm²  tensile strength
-static constexpr Real G_FT_VAL      = Real(0.05);       // N/mm   mode-I fracture energy
-static constexpr Real OVERLOAD_FAC  = Real(3.0);        // multiplier on F_fail
+static constexpr Real E_N_VAL = Real(60000.0);   // N/mm²  (60 GPa)
+static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N
+static constexpr Real BETA_K = Real(0.25);       // rotational coupling
+static constexpr Real RHO_VAL = Real(2.4e-6);    // kg/mm³
+static constexpr Real SIGMA_T_VAL = Real(4.0);   // N/mm²  tensile strength
+static constexpr Real G_FT_VAL = Real(0.05);     // N/mm   mode-I fracture energy
+static constexpr Real OVERLOAD_FAC = Real(0.3);  // multiplier on F_fail
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
 // particles (nodes on the min/max face of the specimen).
@@ -156,9 +156,9 @@ int main() {
         return 1;
     }
 
-    std::cout << "  Particles : " << mesh.n_particles  << "\n";
-    std::cout << "  TETs      : " << mesh.n_tets        << "\n";
-    std::cout << "  Sub-facets: " << mesh.n_subfacets   << "\n";
+    std::cout << "  Particles : " << mesh.n_particles << "\n";
+    std::cout << "  TETs      : " << mesh.n_tets << "\n";
+    std::cout << "  Sub-facets: " << mesh.n_subfacets << "\n";
 
     // ──────────────────────────────────────────────────────────────────────────
     // 2. Compute coordinate bounding box and minimum edge length
@@ -191,16 +191,17 @@ int main() {
                 const Real dx = mesh.particle_x(nb) - mesh.particle_x(na);
                 const Real dy = mesh.particle_y(nb) - mesh.particle_y(na);
                 const Real dz = mesh.particle_z(nb) - mesh.particle_z(na);
-                const Real l  = std::sqrt(dx*dx + dy*dy + dz*dz);
-                if (l < l_min) l_min = l;
+                const Real l = std::sqrt(dx * dx + dy * dy + dz * dz);
+                if (l < l_min)
+                    l_min = l;
             }
         }
     }
     std::cout << "  Min edge length: " << l_min << " mm\n";
 
     // Rotational moduli [N·mm²] = E_N [N/mm²] * l_min² [mm²]
-    const Real E_T_VAL  = ALPHA_T * E_N_VAL;
-    const Real E_kT_VAL = BETA_K  * E_N_VAL * l_min * l_min;
+    const Real E_T_VAL = ALPHA_T * E_N_VAL;
+    const Real E_kT_VAL = BETA_K * E_N_VAL * l_min * l_min;
     const Real E_kM_VAL = E_kT_VAL;
     const Real E_kL_VAL = E_kT_VAL;
 
@@ -214,14 +215,16 @@ int main() {
     //    Fixed  : z ≈ z_min  (clamped end)
     //    Loaded : z ≈ z_max  (pulled end — uniform tensile load)
     // ──────────────────────────────────────────────────────────────────────────
-    const Real z_range  = z_max - z_min;
-    const Real tol_z    = BC_TOL_FRAC * z_range;
+    const Real z_range = z_max - z_min;
+    const Real tol_z = BC_TOL_FRAC * z_range;
 
     std::vector<int> fixed_idx, load_idx;
     for (int i = 0; i < mesh.n_particles; ++i) {
         const Real z = mesh.particle_z(i);
-        if (std::abs(z - z_min) < tol_z) fixed_idx.push_back(i);
-        if (std::abs(z - z_max) < tol_z) load_idx.push_back(i);
+        if (std::abs(z - z_min) < tol_z)
+            fixed_idx.push_back(i);
+        if (std::abs(z - z_max) < tol_z)
+            load_idx.push_back(i);
     }
 
     if (fixed_idx.empty()) {
@@ -244,20 +247,19 @@ int main() {
     //   F_fail ≈ σ_t * A_cross  (quasi-static elastic limit)
     //   F_TOTAL = OVERLOAD_FAC * F_fail  (ensures visible damage in the neck)
     const Real A_cross_approx = (x_max - x_min) * (y_max - y_min);
-    const Real F_fail  = SIGMA_T_VAL * A_cross_approx;
+    const Real F_fail = SIGMA_T_VAL * A_cross_approx;
     const Real F_TOTAL = OVERLOAD_FAC * F_fail;
 
     std::cout << "  Approx cross-section area: " << A_cross_approx << " mm²\n";
-    std::cout << "  Static elastic limit:  F_fail = " << F_fail  << " N\n";
-    std::cout << "  Applied tensile force: F_TOTAL = " << F_TOTAL << " N  ("
-              << OVERLOAD_FAC << "× elastic limit)\n";
+    std::cout << "  Static elastic limit:  F_fail = " << F_fail << " N\n";
+    std::cout << "  Applied tensile force: F_TOTAL = " << F_TOTAL << " N  (" << OVERLOAD_FAC << "× elastic limit)\n";
 
     // External force: F_TOTAL distributed equally as tensile (+z) load.
     const Real F_per_node = F_TOTAL / static_cast<Real>(load_idx.size());
     VectorXR h_f_ext(mesh.n_particles * 3);
     h_f_ext.setZero();
     for (int i : load_idx)
-        h_f_ext(i * 3 + 2) = F_per_node;   // +z direction
+        h_f_ext(i * 3 + 2) = F_per_node;  // +z direction
 
     // ──────────────────────────────────────────────────────────────────────────
     // 4. Create and configure GPU_LDPMTet4_Data via SetupFromMesh
@@ -293,12 +295,11 @@ int main() {
     //   c_N = sqrt(E_N / rho)  [mm/s]
     //   dt  = safety * l_min / c_N
     // ──────────────────────────────────────────────────────────────────────────
-    const Real c_N       = std::sqrt(E_N_VAL / RHO_VAL);  // mm/s
-    const Real dt_crit   = l_min / c_N;
-    const Real dt        = Real(0.5) * dt_crit;
+    const Real c_N = std::sqrt(E_N_VAL / RHO_VAL);  // mm/s
+    const Real dt_crit = l_min / c_N;
+    const Real dt = Real(0.5) * dt_crit;
 
-    std::cout << "  c_N = " << c_N << " mm/s,  dt_crit = " << dt_crit
-              << " s,  dt = " << dt << " s\n";
+    std::cout << "  c_N = " << c_N << " mm/s,  dt_crit = " << dt_crit << " s,  dt = " << dt << " s\n";
 
     // ──────────────────────────────────────────────────────────────────────────
     // 7. Set up and run LeapfrogSolver
@@ -309,9 +310,9 @@ int main() {
     solver.SetParameters(&params);
     solver.Setup();
 
-    const int n_steps        = 500;
-    const int print_interval = 50;   // console output every N steps
-    const int vtk_interval   = 50;   // VTK snapshot every N steps
+    const int n_steps = 500;
+    const int print_interval = 50;  // console output every N steps
+    const int vtk_interval = 50;    // VTK snapshot every N steps
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
     std::cout << std::fixed << std::setprecision(6);
@@ -323,8 +324,7 @@ int main() {
         if (!WriteLDPMTet4SubfacetMeshToVTK(sf_vtk, mesh)) {
             std::cerr << "Warning: failed to write sub-facet VTK.\n";
         } else {
-            std::cout << "  " << mesh.n_facet_vertices << " points, "
-                      << mesh.n_subfacets << " VTK_TRIANGLE cells.\n";
+            std::cout << "  " << mesh.n_facet_vertices << " points, " << mesh.n_subfacets << " VTK_TRIANGLE cells.\n";
         }
     }
 
@@ -349,8 +349,7 @@ int main() {
     {
         // TET4 mesh
         const std::string fname_t4 = tet4_vtk_name(frame);
-        if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh,
-                                        mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
+        if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh, mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
             std::cerr << "Warning: failed to write initial TET4 VTK.\n";
         } else {
             std::cout << "Wrote: " << fname_t4 << "  (initial configuration)\n";
@@ -360,9 +359,8 @@ int main() {
         VectorXR omega0(n_edge);
         omega0.setZero();
         const std::string fname_dm = damage_vtk_name(frame);
-        if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes,
-                                           mesh.particle_x, mesh.particle_y, mesh.particle_z,
-                                           omega0)) {
+        if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes, mesh.particle_x,
+                                          mesh.particle_y, mesh.particle_z, omega0)) {
             std::cerr << "Warning: failed to write initial damage VTK.\n";
         } else {
             std::cout << "Wrote: " << fname_dm << "  (initial, all omega=0)\n";
@@ -372,9 +370,9 @@ int main() {
     }
 
     // Print column header.
-    std::cout << "\n" << std::setw(8)  << "Step"
-              << std::setw(22) << "mean dz (loaded) [mm]"
-              << std::setw(18) << "max omega (damage)"
+    std::cout << "\n"
+              << std::setw(8) << "Step" << std::setw(22) << "mean dz (loaded) [mm]" << std::setw(18)
+              << "max omega (damage)"
               << "\n";
     std::cout << std::string(50, '-') << "\n";
 
@@ -398,11 +396,10 @@ int main() {
                 // Maximum damage across all edges at this time step.
                 Real omega_max = Real(0);
                 for (int e = 0; e < n_edge; ++e)
-                    if (omega(e) > omega_max) omega_max = omega(e);
+                    if (omega(e) > omega_max)
+                        omega_max = omega(e);
 
-                std::cout << std::setw(8)  << (step + 1)
-                          << std::setw(22) << dz_mean
-                          << std::setw(18) << omega_max
+                std::cout << std::setw(8) << (step + 1) << std::setw(22) << dz_mean << std::setw(18) << omega_max
                           << "\n";
             }
 
@@ -416,8 +413,8 @@ int main() {
                 }
 
                 const std::string fname_dm = damage_vtk_name(frame);
-                if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes,
-                                                   x_cur, y_cur, z_cur, omega)) {
+                if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes, x_cur, y_cur, z_cur,
+                                                  omega)) {
                     std::cerr << "Warning: failed to write damage VTK at step " << (step + 1) << ".\n";
                 } else {
                     std::cout << "Wrote: " << fname_dm << "\n";
@@ -446,8 +443,10 @@ int main() {
         Real omega_max = Real(0);
         int n_damaged = 0;
         for (int e = 0; e < n_edge; ++e) {
-            if (omega_final(e) > omega_max) omega_max = omega_final(e);
-            if (omega_final(e) > Real(0.5)) ++n_damaged;
+            if (omega_final(e) > omega_max)
+                omega_max = omega_final(e);
+            if (omega_final(e) > Real(0.5))
+                ++n_damaged;
         }
 
         const Real L = z_max - z_min;
@@ -458,8 +457,7 @@ int main() {
         std::cout << "  Analytic quasi-static tip displacement: " << delta_analytic << " mm\n";
         std::cout << "  Simulated mean tip displacement: " << dz_final << " mm\n";
         std::cout << "  Maximum edge damage omega_max  : " << omega_max << "\n";
-        std::cout << "  Edges with omega > 0.5         : " << n_damaged
-                  << " / " << n_edge << "\n";
+        std::cout << "  Edges with omega > 0.5         : " << n_damaged << " / " << n_edge << "\n";
         std::cout << "(Non-zero damage indicates Cusatis LDPM fracture is active.)\n";
     }
 

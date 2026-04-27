@@ -129,8 +129,8 @@ __device__ __forceinline__ void ldpm_tet4_cusatis_traction(Real e_N,
     // ── Characteristic damage driving strain ─────────────────────────────────
     //   e_D = sqrt( <e_N>_+²  +  (E_T/E_N) * (e_M² + e_L²) )
     const Real e_N_pos = (e_N > Real(0)) ? e_N : Real(0);
-    const Real alpha   = (E_N > Real(0)) ? E_T / E_N : Real(0);
-    const Real e_D     = sqrt(e_N_pos * e_N_pos + alpha * (e_M * e_M + e_L * e_L));
+    const Real alpha = (E_N > Real(0)) ? E_T / E_N : Real(0);
+    const Real e_D = sqrt(e_N_pos * e_N_pos + alpha * (e_M * e_M + e_L * e_L));
 
     // ── History update ────────────────────────────────────────────────────────
     kappa_out = (e_D > kappa_in) ? e_D : kappa_in;

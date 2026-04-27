@@ -122,15 +122,9 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     Real t_N, t_M, t_L, m_T, m_M, m_L;
     Real kappa_new, omega_new;
 
-    ldpm_tet4_cusatis_traction(e_N, e_M, e_L,
-                               kappa_T, kappa_M, kappa_L,
-                               d_data->E_N(), d_data->E_T(),
-                               d_data->E_kT(), d_data->E_kM(), d_data->E_kL(),
-                               d_data->sigma_t(), d_data->H_t(),
-                               d_data->edge_kappa(edge_idx),
-                               kappa_new, omega_new,
-                               t_N, t_M, t_L,
-                               m_T, m_M, m_L);
+    ldpm_tet4_cusatis_traction(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, d_data->E_N(), d_data->E_T(), d_data->E_kT(),
+                               d_data->E_kM(), d_data->E_kL(), d_data->sigma_t(), d_data->H_t(),
+                               d_data->edge_kappa(edge_idx), kappa_new, omega_new, t_N, t_M, t_L, m_T, m_M, m_L);
 
     // Write back updated damage state
     d_data->edge_kappa(edge_idx) = kappa_new;
