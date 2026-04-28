@@ -398,7 +398,7 @@ void LeapfrogSolver::OneStepLeapfrog() {
 
     float milliseconds = 0;
     MOPHI_GPU_CALL(cudaEventElapsedTime(&milliseconds, start, stop));
-    MOPHI_STATUS("OneStepLeapfrog kernel time", "OneStepLeapfrog kernel time: %.3f ms", milliseconds);
+    // MOPHI_STATUS("LEAPFROG_KERNEL_TIME", "OneStepLeapfrog kernel time: %.3f ms", milliseconds);
 
     MOPHI_GPU_CALL(cudaEventDestroy(start));
     MOPHI_GPU_CALL(cudaEventDestroy(stop));

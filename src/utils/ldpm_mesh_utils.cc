@@ -771,8 +771,8 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
         return false;
     }
     if (static_cast<int>(subfacet_damage.size()) != mesh.n_subfacets) {
-        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: subfacet_damage size mismatch (expected "
-                  << mesh.n_subfacets << ", got " << subfacet_damage.size() << ")\n";
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: subfacet_damage size mismatch (expected " << mesh.n_subfacets
+                  << ", got " << subfacet_damage.size() << ")\n";
         return false;
     }
 

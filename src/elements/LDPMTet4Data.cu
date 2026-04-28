@@ -869,7 +869,8 @@ void GPU_LDPMTet4_Data::ProjectEdgeDamageToSubfacets(VectorXR& out) {
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
 
     out.resize(n_subfacet);
-    MOPHI_GPU_CALL(cudaMemcpy(out.data(), d_sf_dmg, static_cast<size_t>(n_subfacet) * sizeof(Real), cudaMemcpyDeviceToHost));
+    MOPHI_GPU_CALL(
+        cudaMemcpy(out.data(), d_sf_dmg, static_cast<size_t>(n_subfacet) * sizeof(Real), cudaMemcpyDeviceToHost));
     MOPHI_GPU_CALL(cudaFree(d_sf_dmg));
 }
 

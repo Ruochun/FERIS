@@ -130,12 +130,12 @@ using namespace tlfea;
 //   elastic failure load F_fail = sigma_t * A_cross_approx so that visible
 //   damage appears within the simulation window.
 
-static constexpr Real E_N_VAL = Real(60273.0);    // N/mm²  normal modulus (E₀)
-static constexpr Real ALPHA_T = Real(0.25);       // E_T / E_N  (shear-to-normal ratio α)
-static constexpr Real BETA_K = Real(0.25);        // rotational coupling
-static constexpr Real RHO_VAL = Real(2.338e-9);   // tonne/mm³  (= 2338 kg/m³)
-static constexpr Real SIGMA_T_VAL = Real(3.44);   // N/mm²  mesoscale tensile strength σ_t
-static constexpr Real G_FT_VAL = Real(0.0491);    // N/mm   mode-I fracture energy G_t
+static constexpr Real E_N_VAL = Real(60273.0);   // N/mm²  normal modulus (E₀)
+static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N  (shear-to-normal ratio α)
+static constexpr Real BETA_K = Real(0.25);       // rotational coupling
+static constexpr Real RHO_VAL = Real(2.338e-9);  // tonne/mm³  (= 2338 kg/m³)
+static constexpr Real SIGMA_T_VAL = Real(3.44);  // N/mm²  mesoscale tensile strength σ_t
+static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energy G_t
 static constexpr Real OVERLOAD_FAC = Real(0.3);  // multiplier on F_fail
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
