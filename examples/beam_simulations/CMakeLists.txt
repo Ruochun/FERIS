@@ -10,7 +10,6 @@
 # │ beam_linear_static          │ FEAT10 (TET10)        │ Linear (cuSPARSE)   │
 # │ beam_linear_static_t4       │ FEAT4  (TET4)         │ Linear (cuSPARSE)   │
 # │ test_leapfrog_t4            │ FEAT4  (TET4)         │ Leapfrog            │
-# │ test_ldpm_t4                │ LDPM4 (TET4, 3-DOF)   │ Leapfrog [DEPR]     │
 # │ test_ldpm_tet4              │ LDPMTet4 (TET4, 6-DOF)│ Leapfrog            │
 # └─────────────────────────────┴───────────────────────┴─────────────────────┘
 
@@ -44,14 +43,6 @@ add_executable(test_leapfrog_t4 test_leapfrog_t4.cc)
 target_link_libraries(test_leapfrog_t4 tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(test_leapfrog_t4 PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(test_leapfrog_t4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-# ── Dynamic LDPM4 beam (3-DOF, Leapfrog) — deprecated element ────────────────
-# Uses the legacy TYPE_LDPM4_DEPRECATED element. Retained as a reference for
-# migration; prefer test_ldpm_tet4 (6-DOF) for new work.
-add_executable(test_ldpm_t4 test_ldpm_t4.cc)
-target_link_libraries(test_ldpm_t4 tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
-target_include_directories(test_ldpm_t4 PRIVATE ${BEAM_INCLUDE_DIRS})
-set_target_properties(test_ldpm_t4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── Dynamic LDPM-TET4 beam (6-DOF, Leapfrog) — current element ───────────────
 # Uses TYPE_LDPM_TET4 (translational + linearised-rotational DOFs).

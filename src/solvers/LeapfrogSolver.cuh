@@ -8,8 +8,8 @@
  *          central-difference (leapfrog) time integrator for solid
  *          mechanics simulations. Owns GPU buffers for half-step nodal
  *          velocities and a lumped (row-summed) mass vector. Supports
- *          ANCF3243, ANCF3443, FEAT10, FEAT4, LDPM4, and LDPM_TET4
- *          element types, with primary focus on LDPM_TET4 for
+ *          ANCF3243, ANCF3443, FEAT10, FEAT4, and LDPM_TET4 element
+ *          types, with primary focus on LDPM_TET4 for
  *          particle-scale simulations with 6 DOFs per particle.
  *==============================================================
  *==============================================================*/
@@ -23,7 +23,6 @@
 #include "../elements/ElementBase.h"
 #include "../elements/FEAT10Data.cuh"
 #include "../elements/FEAT4Data.cuh"
-#include "../elements/LDPM4Data.cuh"
 #include "../elements/LDPMTet4Data.cuh"
 #include "../types.h"
 #include "../utils/cuda_utils.h"
@@ -81,13 +80,6 @@ class LeapfrogSolver : public SolverBase {
             d_data_ = typed_data->d_data;
             n_total_qp_ = Quadrature::N_QP_T4_1;
             n_shape_ = Quadrature::N_NODE_T4_4;
-        } else if (data->type == TYPE_LDPM4_DEPRECATED) {
-            type_ = TYPE_LDPM4_DEPRECATED;
-            auto* typed_data = static_cast<GPU_LDPM4_Data*>(data);
-            d_data_ = typed_data->d_data;
-            // One facet per edge (one "QP"), two endpoint nodes per edge.
-            n_total_qp_ = 1;
-            n_shape_ = 2;
         } else if (data->type == TYPE_LDPM_TET4) {
             type_ = TYPE_LDPM_TET4;
             auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(data);
