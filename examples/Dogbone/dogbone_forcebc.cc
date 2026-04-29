@@ -51,7 +51,7 @@
  *
  * VTK output
  * ──────────
- * Two sets of VTK files are written, one per output frame:
+ * Two sets of VTK files are written plus a stress-displacement CSV, one per output frame:
  *
  * dogbone_forcebc_tet4_<frame>.vtk
  *   Written every vtk_interval steps (frame 0 = initial undeformed state):
@@ -64,18 +64,26 @@
  *   Written every vtk_interval steps (frame 0 = initial, all zeros):
  *   - POINTS  : exact sub-facet vertex positions (fixed reference geometry)
  *   - CELLS   : VTK_TRIANGLE, one per Voronoi sub-facet
- *   - CELL_DATA "damage" : per-subfacet failure ratio ω ∈ [0, 1]
- *                          ω = 0 → undamaged / elastic
- *                          ω = 1 → fully fractured (zero traction capacity)
- *               Each sub-facet's ω is the damage of its owning LDPM edge,
- *               projected via a GPU scatter kernel (ProjectEdgeDamageToSubfacets).
+ *   - CELL_DATA "crack_distance" : per-subfacet crack opening displacement [mm]
+ *                                  = ω × κ × l₀  (inelastic facet opening)
+ *                                  0 → undamaged / elastic
+ *                                  ~0.1 mm → fully opened crack at 0.1 s simulation
+ *               Each sub-facet's value is projected from its owning LDPM edge via
+ *               GPU_LDPMTet4_Data::ProjectEdgeCrackDistanceToSubfacets().
+ *
+ * dogbone_forcebc_stress_disp.csv
+ *   Stress [N/mm² = MPa] vs displacement [mm] at every print interval.
+ *   Stress = reaction force at fixed (bottom) nodes / cross-section area.
+ *   Displacement = mean z-displacement of loaded (top) nodes.
  *
  * ParaView workflow
  * ─────────────────
  *   1. dogbone_forcebc_tet4_*.vtk        → load as series, color by "displacement"
- *   2. dogbone_forcebc_subfacets_*.vtk   → load as series, color by "damage"
- *                                          use threshold filter (damage > 0.5) to
- *                                          show only significantly cracked sub-facets
+ *   2. dogbone_forcebc_subfacets_*.vtk   → load as series, color by "crack_distance"
+ *                                          use threshold filter (crack_distance > 0) to
+ *                                          show only fractured sub-facets
+ *   3. dogbone_forcebc_stress_disp.csv   → import in any spreadsheet for the
+ *                                          stress-displacement curve
  *
  * Building
  * ────────
@@ -92,6 +100,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -358,6 +367,21 @@ int main() {
         return s.str();
     };
 
+    // Open stress-displacement CSV for writing.
+    // Columns: displacement_mm, stress_MPa
+    // Displacement = mean z-displacement of the loaded (top) nodes [mm].
+    // Stress = reaction force at fixed (bottom) nodes divided by A_cross [N/mm² = MPa].
+    std::ofstream stress_disp_csv("dogbone_forcebc_stress_disp.csv");
+    if (!stress_disp_csv.is_open()) {
+        std::cerr << "Warning: could not open dogbone_forcebc_stress_disp.csv for writing.\n";
+    } else {
+        stress_disp_csv << "# Stress-displacement output for dogbone_forcebc\n";
+        stress_disp_csv << "# Unit system: mm-tonne-s  (stress in N/mm² = MPa)\n";
+        stress_disp_csv << "# Displacement: mean z-displacement of loaded (top) nodes [mm]\n";
+        stress_disp_csv << "# Stress: reaction force at fixed (bottom) nodes / A_cross [N/mm²]\n";
+        stress_disp_csv << "displacement_mm,stress_MPa\n";
+    }
+
     // ── Write frame 0: initial (undeformed) TET4 and sub-facet (all zeros) ───
     int frame = 0;
     {
@@ -369,14 +393,14 @@ int main() {
             std::cout << "Wrote: " << fname_t4 << "  (initial configuration)\n";
         }
 
-        // Sub-facet mesh with all-zero damage (initial, undamaged state).
-        VectorXR sf_dmg0(mesh.n_subfacets);
-        sf_dmg0.setZero();
+        // Sub-facet mesh with all-zero crack distance (initial, undamaged state).
+        VectorXR sf_crack0(mesh.n_subfacets);
+        sf_crack0.setZero();
         const std::string fname_sf = subfacet_vtk_name(frame);
-        if (!WriteLDPMTet4SubfacetMeshToVTK(fname_sf, mesh, sf_dmg0)) {
+        if (!WriteLDPMTet4SubfacetMeshToVTK(fname_sf, mesh, "crack_distance", sf_crack0)) {
             std::cerr << "Warning: failed to write initial sub-facet VTK.\n";
         } else {
-            std::cout << "Wrote: " << fname_sf << "  (initial, all damage=0)\n";
+            std::cout << "Wrote: " << fname_sf << "  (initial, all crack_distance=0)\n";
         }
 
         ++frame;
@@ -386,7 +410,7 @@ int main() {
     const int n_edge = element_data.n_edge;
     std::cout << "\n"
               << std::setw(8) << "Step" << std::setw(22) << "mean dz (loaded) [mm]" << std::setw(18)
-              << "max omega (damage)"
+              << "stress [MPa]"
               << "\n";
     std::cout << std::string(50, '-') << "\n";
 
@@ -397,8 +421,9 @@ int main() {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-            VectorXR omega;
-            element_data.RetrieveFacetDamageToCPU(omega);
+            // Internal forces for stress computation.
+            VectorXR f_int;
+            element_data.RetrieveInternalForceToCPU(f_int);
 
             // Console progress.
             if ((step + 1) % print_interval == 0) {
@@ -407,17 +432,22 @@ int main() {
                     dz_sum += z_cur(i) - mesh.particle_z(i);
                 const Real dz_mean = dz_sum / static_cast<Real>(load_idx.size());
 
-                // Maximum damage across all edges at this time step.
-                Real omega_max = Real(0);
-                for (int e = 0; e < n_edge; ++e)
-                    if (omega(e) > omega_max)
-                        omega_max = omega(e);
+                // Reaction stress at the fixed (bottom) face.
+                Real f_reaction_z = Real(0);
+                for (int i : fixed_idx)
+                    f_reaction_z += f_int(i * 3 + 2);
+                const Real stress = -f_reaction_z / A_cross_approx;
 
-                std::cout << std::setw(8) << (step + 1) << std::setw(22) << dz_mean << std::setw(18) << omega_max
+                std::cout << std::setw(8) << (step + 1) << std::setw(22) << dz_mean << std::setw(18) << stress
                           << "\n";
+
+                // Write to stress-displacement CSV.
+                if (stress_disp_csv.is_open()) {
+                    stress_disp_csv << dz_mean << "," << stress << "\n";
+                }
             }
 
-            // VTK snapshot: TET4 displacement + sub-facet damage.
+            // VTK snapshot: TET4 displacement + sub-facet crack distance.
             if ((step + 1) % vtk_interval == 0) {
                 const std::string fname_t4 = tet4_vtk_name(frame);
                 if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh, x_cur, y_cur, z_cur)) {
@@ -426,10 +456,10 @@ int main() {
                     std::cout << "Wrote: " << fname_t4 << "\n";
                 }
 
-                VectorXR sf_dmg;
-                element_data.ProjectEdgeDamageToSubfacets(sf_dmg);
+                VectorXR sf_crack;
+                element_data.ProjectEdgeCrackDistanceToSubfacets(sf_crack);
                 const std::string fname_sf = subfacet_vtk_name(frame);
-                if (!WriteLDPMTet4SubfacetMeshToVTK(fname_sf, mesh, sf_dmg)) {
+                if (!WriteLDPMTet4SubfacetMeshToVTK(fname_sf, mesh, "crack_distance", sf_crack)) {
                     std::cerr << "Warning: failed to write sub-facet VTK at step " << (step + 1) << ".\n";
                 } else {
                     std::cout << "Wrote: " << fname_sf << "\n";
@@ -440,15 +470,20 @@ int main() {
         }
     }
 
+    stress_disp_csv.close();
+
     // ──────────────────────────────────────────────────────────────────────────
-    // 8. Final damage statistics and analytic displacement estimate
+    // 8. Final fracture statistics and analytic displacement estimate
     // ──────────────────────────────────────────────────────────────────────────
     {
         VectorXR x_final, y_final, z_final;
         element_data.RetrievePositionToCPU(x_final, y_final, z_final);
 
-        VectorXR omega_final;
+        VectorXR omega_final, kappa_final;
         element_data.RetrieveFacetDamageToCPU(omega_final);
+        element_data.RetrieveFacetKappaToCPU(kappa_final);
+
+        const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
 
         Real dz_sum = Real(0);
         for (int i : load_idx)
@@ -456,10 +491,20 @@ int main() {
         const Real dz_final = dz_sum / static_cast<Real>(load_idx.size());
 
         Real omega_max = Real(0);
+        Real crack_dist_max = Real(0);
         int n_damaged = 0;
         for (int e = 0; e < n_edge; ++e) {
             if (omega_final(e) > omega_max)
                 omega_max = omega_final(e);
+            const int ni = edge_nodes[2 * e + 0];
+            const int nj = edge_nodes[2 * e + 1];
+            const Real dx0 = mesh.particle_x(nj) - mesh.particle_x(ni);
+            const Real dy0 = mesh.particle_y(nj) - mesh.particle_y(ni);
+            const Real dz0 = mesh.particle_z(nj) - mesh.particle_z(ni);
+            const Real l0_e = std::sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
+            const Real cd = omega_final(e) * kappa_final(e) * l0_e;
+            if (cd > crack_dist_max)
+                crack_dist_max = cd;
             if (omega_final(e) > Real(0.5))
                 ++n_damaged;
         }
@@ -472,6 +517,7 @@ int main() {
         std::cout << "  Analytic quasi-static tip displacement: " << delta_analytic << " mm\n";
         std::cout << "  Simulated mean tip displacement: " << dz_final << " mm\n";
         std::cout << "  Maximum edge damage omega_max  : " << omega_max << "\n";
+        std::cout << "  Max crack opening (ω×κ×l₀)    : " << crack_dist_max << " mm\n";
         std::cout << "  Edges with omega > 0.5         : " << n_damaged << " / " << n_edge << "\n";
         std::cout << "(Non-zero damage indicates Cusatis LDPM fracture is active.)\n";
     }
@@ -479,12 +525,14 @@ int main() {
     element_data.Destroy();
 
     std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";
-    std::cout << "\nOutput files (two sets, one per frame):\n";
+    std::cout << "\nOutput files (two sets per frame + stress-displacement CSV):\n";
     std::cout << "  dogbone_forcebc_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
     std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
-    std::cout << "  dogbone_forcebc_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh with damage\n";
-    std::cout << "    → Color by 'damage' (omega ∈ [0,1]) to visualise fracture.\n";
-    std::cout << "    → Use Threshold filter (damage > 0.5) to show cracked facets.\n";
+    std::cout << "  dogbone_forcebc_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh\n";
+    std::cout << "    → Color by 'crack_distance' [mm] (ω×κ×l₀) to visualise fracture.\n";
+    std::cout << "    → Use Threshold filter (crack_distance > 0) to show cracked facets.\n";
+    std::cout << "  dogbone_forcebc_stress_disp.csv         — stress [MPa] vs displacement [mm]\n";
+    std::cout << "    → Plot displacement_mm vs stress_MPa for the load-displacement curve.\n";
     std::cout << "  Load each series: File → Open → select group → Apply → Animation View.\n";
     return 0;
 }

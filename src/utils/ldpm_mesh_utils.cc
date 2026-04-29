@@ -766,13 +766,26 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4M
 bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
                                     const LDPMTet4Mesh& mesh,
                                     const VectorXR& subfacet_damage) {
+    return WriteLDPMTet4SubfacetMeshToVTK(filename, mesh, "damage", subfacet_damage);
+}
+
+// ============================================================
+// WriteLDPMTet4SubfacetMeshToVTK  (generic named-field overload)
+//
+// Writes any per-subfacet scalar under the caller-supplied field_name.
+// Supports "crack_distance" [mm], "damage" [0,1], or any other quantity.
+// ============================================================
+bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
+                                    const LDPMTet4Mesh& mesh,
+                                    const std::string& field_name,
+                                    const VectorXR& subfacet_values) {
     if (mesh.n_subfacets <= 0 || mesh.n_facet_vertices <= 0) {
         std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: mesh has no sub-facets or facet vertices\n";
         return false;
     }
-    if (static_cast<int>(subfacet_damage.size()) != mesh.n_subfacets) {
-        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: subfacet_damage size mismatch (expected " << mesh.n_subfacets
-                  << ", got " << subfacet_damage.size() << ")\n";
+    if (static_cast<int>(subfacet_values.size()) != mesh.n_subfacets) {
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: subfacet_values size mismatch (expected " << mesh.n_subfacets
+                  << ", got " << subfacet_values.size() << ")\n";
         return false;
     }
 
@@ -787,7 +800,7 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
 
     // ── Header ───────────────────────────────────────────────────────────────
     file << "# vtk DataFile Version 3.0\n";
-    file << "LDPM Sub-facet Mesh (damage)\n";
+    file << "LDPM Sub-facet Mesh (" << field_name << ")\n";
     file << "ASCII\n";
     file << "DATASET UNSTRUCTURED_GRID\n";
 
@@ -809,12 +822,12 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
         file << "5\n";  // VTK_TRIANGLE
     }
 
-    // ── Cell data: per-subfacet failure ratio ω ∈ [0, 1] ────────────────────
+    // ── Cell data: named scalar field ────────────────────────────────────────
     file << "\nCELL_DATA " << nf << "\n";
-    file << "SCALARS damage double 1\n";
+    file << "SCALARS " << field_name << " double 1\n";
     file << "LOOKUP_TABLE default\n";
     for (int i = 0; i < nf; ++i) {
-        file << subfacet_damage(i) << "\n";
+        file << subfacet_values(i) << "\n";
     }
 
     file.close();

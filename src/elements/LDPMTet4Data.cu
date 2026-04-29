@@ -58,6 +58,23 @@ __global__ void project_edge_damage_to_subfacets_kernel(int n_subfacet,
     subfacet_damage[sf] = (eidx >= 0) ? edge_omega[eidx] : Real(0);
 }
 
+// ─── GPU kernel: project per-edge crack opening displacement onto subfacets ──
+//
+// crack_dist[sf] = omega[e] * kappa[e] * l0[e]  (same units as l0, e.g. mm)
+// Sub-facets with edge_idx == -1 (unmatched) receive a value of 0.
+__global__ void project_edge_crack_dist_to_subfacets_kernel(int n_subfacet,
+                                                            const int* __restrict__ subfacet_edge_idx,
+                                                            const Real* __restrict__ edge_omega,
+                                                            const Real* __restrict__ edge_kappa,
+                                                            const Real* __restrict__ edge_l0,
+                                                            Real* __restrict__ subfacet_crack_dist) {
+    const int sf = blockIdx.x * blockDim.x + threadIdx.x;
+    if (sf >= n_subfacet)
+        return;
+    const int eidx = subfacet_edge_idx[sf];
+    subfacet_crack_dist[sf] = (eidx >= 0) ? edge_omega[eidx] * edge_kappa[eidx] * edge_l0[eidx] : Real(0);
+}
+
 __global__ void clear_f_int_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
     clear_internal_force(d_data);
 }
@@ -860,6 +877,12 @@ void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
     std::copy(da_omega.host(), da_omega.host() + n_edge, omega_out.data());
 }
 
+void GPU_LDPMTet4_Data::RetrieveFacetKappaToCPU(VectorXR& kappa_out) {
+    kappa_out.resize(n_edge);
+    da_kappa.ToHost();
+    std::copy(da_kappa.host(), da_kappa.host() + n_edge, kappa_out.data());
+}
+
 // ─── ProjectEdgeDamageToSubfacets ────────────────────────────────────────────
 //
 // For each sub-facet, looks up omega[subfacet_edge_idx[sf]] via a GPU scatter
@@ -887,6 +910,33 @@ void GPU_LDPMTet4_Data::ProjectEdgeDamageToSubfacets(VectorXR& out) {
     MOPHI_GPU_CALL(
         cudaMemcpy(out.data(), d_sf_dmg, static_cast<size_t>(n_subfacet) * sizeof(Real), cudaMemcpyDeviceToHost));
     MOPHI_GPU_CALL(cudaFree(d_sf_dmg));
+}
+
+// ─── ProjectEdgeCrackDistanceToSubfacets ─────────────────────────────────────
+//
+// Computes the crack opening displacement per sub-facet as ω × κ × l₀.
+// Each entry gives the inelastic (damage) opening in the same length units as
+// the mesh (mm for the Dogbone demos).
+
+void GPU_LDPMTet4_Data::ProjectEdgeCrackDistanceToSubfacets(VectorXR& out) {
+    if (!is_setup || n_subfacet <= 0 || d_subfacet_edge_idx == nullptr) {
+        out.resize(0);
+        return;
+    }
+
+    Real* d_sf_crack = nullptr;
+    MOPHI_GPU_CALL(cudaMalloc(&d_sf_crack, static_cast<size_t>(n_subfacet) * sizeof(Real)));
+
+    constexpr int threads = 256;
+    const int blocks = (n_subfacet + threads - 1) / threads;
+    project_edge_crack_dist_to_subfacets_kernel<<<blocks, threads>>>(
+        n_subfacet, d_subfacet_edge_idx, d_omega, d_kappa, d_l0, d_sf_crack);
+    MOPHI_GPU_CALL(cudaDeviceSynchronize());
+
+    out.resize(n_subfacet);
+    MOPHI_GPU_CALL(
+        cudaMemcpy(out.data(), d_sf_crack, static_cast<size_t>(n_subfacet) * sizeof(Real), cudaMemcpyDeviceToHost));
+    MOPHI_GPU_CALL(cudaFree(d_sf_crack));
 }
 
 // ─── Velocity-driven (kinematic) BC helper ────────────────────────────────────

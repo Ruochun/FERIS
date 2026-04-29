@@ -229,6 +229,30 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
                                     const VectorXR& subfacet_damage);
 
 /**
+ * Write the Voronoi sub-facet triangle mesh with a named per-subfacet scalar.
+ *
+ * Generic overload that writes any per-subfacet scalar field under the
+ * caller-supplied name.  Use this to write "crack_distance" (physical crack
+ * opening in mm from ProjectEdgeCrackDistanceToSubfacets) or any other
+ * derived quantity alongside the standard CELL_DATA block.
+ *
+ * POINTS   — exact facet-vertex positions (facet_vertex_x/y/z)
+ * CELLS    — one VTK_TRIANGLE (type 5) per sub-facet
+ * CELL_DATA:
+ *   <field_name> (scalar double) — per-subfacet values supplied by the caller
+ *
+ * @param filename     Output path (e.g. "dogbone_crack_00001.vtk")
+ * @param mesh         Populated LDPMTet4Mesh (facets.dat + facetsVertices.dat)
+ * @param field_name   VTK scalar field name (e.g. "crack_distance", "damage")
+ * @param subfacet_values Per-subfacet scalar values (size n_subfacets)
+ * @return true on success
+ */
+bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
+                                    const LDPMTet4Mesh& mesh,
+                                    const std::string& field_name,
+                                    const VectorXR& subfacet_values);
+
+/**
  * Write a VTK line-segment mesh showing the LDPM edge lattice coloured by
  * the per-edge Cusatis damage variable ω.
  *
