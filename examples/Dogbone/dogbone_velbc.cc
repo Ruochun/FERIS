@@ -6,11 +6,12 @@
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  *
- * GPU counterpart of dogbone_cpuref.cpp (Chrono-based CPU reference).
+ * GPU velocity-driven (kinematic-BC) dogbone tensile demo.
  *
- * The CPU reference drives the top plate via a ChLinkMotorLinearPosition
- * (displacement motor) — i.e., it prescribes a velocity rather than a load.
- * This demo replicates that approach on the GPU:
+ * The top plate is driven by a prescribed velocity rather than an applied load,
+ * matching the ChLinkMotorLinearPosition approach used in Chrono-based LDPM
+ * reference implementations.  This is the kinematic-BC counterpart of
+ * dogbone_forcebc.cc (which applies an external nodal force instead).
  *
  *   1. Read all six Chrono Workbench LDPM mesh data files.
  *   2. Initialise GPU_LDPMTet4_Data via SetupFromMesh().
@@ -22,7 +23,7 @@
  *      advanced by an externally prescribed displacement increment
  *      v_prescribed(t) * dt after every solver step via
  *      GPU_LDPMTet4_Data::AdvanceDrivenNodesZ().
- *   6. Prescribed velocity profile (matching dogbone_cpuref.cpp):
+ *   6. Prescribed velocity profile (linear ramp then constant plateau):
  *        v(t) = V_PLATE * (t / T_RAMP)   for t < T_RAMP   (linear ramp)
  *        v(t) = V_PLATE                   for t >= T_RAMP  (constant)
  *   7. Time-march with LeapfrogSolver; at each output interval write VTK.
@@ -76,7 +77,7 @@ using namespace tlfea;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Material parameters — identical to dogbone_forcebc.cc and dogbone_cpuref.cpp.
+// Material parameters — identical to dogbone_forcebc.cc.
 // Unit system: mm-tonne-s (stress in N/mm² = MPa).
 static constexpr Real E_N_VAL = Real(60273.0);   // N/mm²  normal modulus (E₀)
 static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N  shear-to-normal ratio
@@ -86,14 +87,11 @@ static constexpr Real SIGMA_T_VAL = Real(3.44);  // N/mm²  mesoscale tensile st
 static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energy
 
 // Prescribed velocity of the top (driven) plate in mm/s.
-// Matches the CPU reference (dogbone_cpuref.cpp): 1 mm/s loading rate.
-// With specimen length ~150 mm and c_N ≈ 5e6 mm/s, this rate satisfies
-// V/c_N ≈ 2e-7 << 1, confirming the loading is quasi-static relative to
-// the elastic wave speed.
+// A 1 mm/s loading rate is quasi-static relative to the elastic wave speed:
+// with specimen length ~150 mm and c_N ≈ 5e6 mm/s, V/c_N ≈ 2e-7 << 1.
 static constexpr Real V_PLATE = Real(1.0);  // mm/s
 
-// Duration of the linear velocity ramp from 0 → V_PLATE, then constant.
-// Matches the ChFunctionPoly duration in dogbone_cpuref.cpp (0.001 s).
+// Duration of the linear velocity ramp from 0 → V_PLATE, then constant plateau.
 static constexpr Real T_RAMP = Real(1e-3);  // s
 
 // Total simulation time and VTK output interval.

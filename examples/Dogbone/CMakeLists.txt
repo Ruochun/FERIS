@@ -19,9 +19,9 @@ target_include_directories(dogbone_forcebc PRIVATE ${DOGBONE_INCLUDE_DIRS})
 set_target_properties(dogbone_forcebc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── LDPM-TET4 Dogbone velocity-driven (kinematic BC) simulation ───────────────
-# GPU counterpart of dogbone_cpuref.cpp: drives the top plate via a prescribed
-# velocity of 1 mm/s (matching the CPU reference) rather than an applied load,
-# replicating the ChLinkMotorLinearPosition approach.  Runs for 0.1 s with
+# Drives the top plate via a prescribed velocity of 1 mm/s (quasi-static
+# relative to the elastic wave speed) rather than an applied load, replicating
+# the ChLinkMotorLinearPosition kinematic-BC approach.  Runs for 0.1 s with
 # step count and output intervals computed from the CFL time step.
 add_executable(dogbone_velbc dogbone_velbc.cc)
 target_link_libraries(dogbone_velbc tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
