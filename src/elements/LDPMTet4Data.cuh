@@ -325,6 +325,21 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Must be called after SetupFromMesh() and at least one CalcP() step.
     void ProjectEdgeDamageToSubfacets(VectorXR& out);
 
+    // Advance a set of particles' z-coordinate by a prescribed increment.
+    //
+    // Implements velocity-driven (kinematic) boundary conditions for the top
+    // plate of a tensile test: the leapfrog solver has already zeroed the
+    // velocity of the driven nodes (they are listed in fixed_nodes); this
+    // method then adds dz = v_prescribed * dt to their z-position each step.
+    //
+    // d_driven_idx — device array of driven node indices (length n_driven)
+    // n_driven     — number of driven nodes
+    // dz           — prescribed z-displacement increment this step [same units as positions]
+    //
+    // Must be called after solver.Solve() each time step.
+    // Must be called after SetupFromMesh().
+    void AdvanceDrivenNodesZ(const int* d_driven_idx, int n_driven, Real dz);
+
     const Real* GetX12DevicePtr() const {
         return d_x12;
     }
@@ -332,6 +347,16 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         return d_y12;
     }
     const Real* GetZ12DevicePtr() const {
+        return d_z12;
+    }
+    // Non-const accessors for externally driven (kinematic BC) position updates.
+    Real* GetX12WritableDevicePtr() {
+        return d_x12;
+    }
+    Real* GetY12WritableDevicePtr() {
+        return d_y12;
+    }
+    Real* GetZ12WritableDevicePtr() {
         return d_z12;
     }
     Real* GetExternalForceDevicePtr() {
