@@ -19,7 +19,7 @@
  *      damage parameters (σ_t, H_t).
  *   4. Fix particles on the z = z_min face (one end of the dogbone).
  *   5. Apply a constant tensile force on the z = z_max face equal to
- *      LOAD_FAC × σ_t × A_cross.  With LOAD_FAC = 0.5 the average stress
+ *      LOAD_FAC × σ_t × A_cross.  With LOAD_FAC = 0.3 the average stress
  *      is half the mesoscale tensile strength, keeping the specimen below
  *      the static failure load.  Dynamic wave amplification (overshoot ≈ 2×
  *      the static displacement) drives local strains towards the damage
@@ -144,7 +144,7 @@ static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energ
 // Applied load and simulation time
 //   LOAD_FAC sets the total applied force as a fraction of the nominal
 //   quasi-static failure load F_fail = sigma_t * A_cross_approx.
-//   With LOAD_FAC = 0.5 the average cross-section stress is 0.5 × sigma_t,
+//   With LOAD_FAC = 0.3 the average cross-section stress is 0.3 × sigma_t,
 //   which is below the static failure limit.  The dynamic wave amplification
 //   (overshoot ≈ 2× the quasi-static equilibrium displacement) drives local
 //   strains towards the damage threshold at geometric stress concentrators,
@@ -156,9 +156,9 @@ static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energ
 //   computed at runtime, so the simulation always covers exactly T_SIM
 //   regardless of mesh refinement.
 
-static constexpr Real LOAD_FAC = Real(0.5);    // fraction of static failure load (0.5 = 50% of σ_t × A_cross)
-static constexpr Real T_SIM    = Real(0.1);    // s — total simulation time
-static constexpr Real T_VTK    = Real(0.005);  // s — VTK + console output interval (~20 frames)
+static constexpr Real LOAD_FAC = Real(0.3);  // fraction of static failure load (0.3 = 30% of σ_t × A_cross)
+static constexpr Real T_SIM = Real(0.1);     // s — total simulation time
+static constexpr Real T_VTK = Real(0.005);   // s — VTK + console output interval (~20 frames)
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
 // particles (nodes on the min/max face of the specimen).
@@ -337,8 +337,8 @@ int main() {
 
     // Step count and output intervals derived from CFL dt so the simulation
     // always runs for T_SIM seconds regardless of mesh refinement.
-    const int n_steps       = static_cast<int>(std::ceil(T_SIM / dt));
-    const int vtk_interval  = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
+    const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
+    const int vtk_interval = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
     const int print_interval = vtk_interval;
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";

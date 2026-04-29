@@ -99,8 +99,8 @@ static constexpr Real T_RAMP = Real(1e-3);  // s
 // Total simulation time and VTK output interval.
 // The step count and output intervals are computed from the CFL time step
 // at runtime so the simulation always covers T_SIM regardless of mesh size.
-static constexpr Real T_SIM  = Real(0.1);    // s — total simulation time
-static constexpr Real T_VTK  = Real(0.005);  // s — VTK + console output interval (~20 frames)
+static constexpr Real T_SIM = Real(0.1);    // s — total simulation time
+static constexpr Real T_VTK = Real(0.005);  // s — VTK + console output interval (~20 frames)
 
 // Fraction of bounding-box extent used as tolerance for boundary detection.
 static constexpr Real BC_TOL_FRAC = Real(1e-3);
@@ -219,8 +219,7 @@ int main() {
     // Copy driven node index list to device for use in AdvanceDrivenNodesZ().
     int* d_driven_idx = nullptr;
     MOPHI_GPU_CALL(cudaMalloc(&d_driven_idx, n_driven * sizeof(int)));
-    MOPHI_GPU_CALL(
-        cudaMemcpy(d_driven_idx, driven_idx.data(), n_driven * sizeof(int), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_driven_idx, driven_idx.data(), n_driven * sizeof(int), cudaMemcpyHostToDevice));
 
     // ──────────────────────────────────────────────────────────────────────────
     // 4. Create and configure GPU_LDPMTet4_Data
@@ -269,8 +268,8 @@ int main() {
 
     // Step count and output intervals derived from CFL dt so the simulation
     // always runs for T_SIM seconds regardless of mesh refinement.
-    const int n_steps        = static_cast<int>(std::ceil(T_SIM / dt));
-    const int vtk_interval   = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
+    const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
+    const int vtk_interval = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
     const int print_interval = vtk_interval;
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
@@ -417,8 +416,8 @@ int main() {
         std::cout << "\n── Final state at t=" << t_final << " s ───\n";
         std::cout << "  Prescribed top-plate displacement: " << prescribed_z_total << " mm\n";
         std::cout << "  Mean actual driven-node dz       : " << dz_final_mean << " mm\n";
-        std::cout << "  Nominal axial strain             : " << strain_final << " (= "
-                  << strain_final / e_t0 << " × e_t0)\n";
+        std::cout << "  Nominal axial strain             : " << strain_final << " (= " << strain_final / e_t0
+                  << " × e_t0)\n";
         std::cout << "  Maximum edge damage omega_max    : " << omega_max << "\n";
         std::cout << "  Edges with omega > 0.5           : " << n_damaged << " / " << n_edge << "\n";
         std::cout << "(Non-zero damage indicates Cusatis LDPM fracture is active.)\n";
