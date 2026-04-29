@@ -72,6 +72,21 @@ __global__ void compute_f_int_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
     compute_internal_force(edge_idx, node_local, d_data);
 }
 
+// ─── GPU kernel: advance a set of particles' z-position by a fixed increment ─
+//
+// Used to implement velocity-driven (kinematic) BCs: the solver has already
+// zeroed the velocity at these nodes; this kernel adds the prescribed
+// displacement dz = v_prescribed * dt to their z-coordinate each step.
+__global__ void advance_driven_nodes_z_kernel(Real* __restrict__ d_z,
+                                              const int* __restrict__ d_driven_idx,
+                                              int n_driven,
+                                              Real dz) {
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= n_driven)
+        return;
+    d_z[d_driven_idx[tid]] += dz;
+}
+
 // ─── Host-side helper ────────────────────────────────────────────────────────
 
 static inline Real triangle_area(const Real* a, const Real* b, const Real* c) {
@@ -872,6 +887,17 @@ void GPU_LDPMTet4_Data::ProjectEdgeDamageToSubfacets(VectorXR& out) {
     MOPHI_GPU_CALL(
         cudaMemcpy(out.data(), d_sf_dmg, static_cast<size_t>(n_subfacet) * sizeof(Real), cudaMemcpyDeviceToHost));
     MOPHI_GPU_CALL(cudaFree(d_sf_dmg));
+}
+
+// ─── Velocity-driven (kinematic) BC helper ────────────────────────────────────
+
+void GPU_LDPMTet4_Data::AdvanceDrivenNodesZ(const int* d_driven_idx, int n_driven, Real dz) {
+    if (n_driven <= 0)
+        return;
+    constexpr int threads = 256;
+    const int blocks = (n_driven + threads - 1) / threads;
+    advance_driven_nodes_z_kernel<<<blocks, threads>>>(d_z12, d_driven_idx, n_driven, dz);
+    MOPHI_GPU_CALL(cudaDeviceSynchronize());
 }
 
 // ─── Destroy ─────────────────────────────────────────────────────────────────
