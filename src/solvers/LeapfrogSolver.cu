@@ -10,7 +10,7 @@
  *          facet tractions, assemble internal forces, update half-step nodal
  *          velocities, enforce fixed-node boundary conditions, and advance
  *          nodal positions. Supports ANCF3243, ANCF3443, FEAT10, FEAT4,
- *          LDPM4, and LDPM_TET4 element types.
+ *          and LDPM_TET4 element types.
  *==============================================================
  *==============================================================*/
 
@@ -26,8 +26,6 @@
 #include "../elements/FEAT10DataFunc.cuh"
 #include "../elements/FEAT4Data.cuh"
 #include "../elements/FEAT4DataFunc.cuh"
-#include "../elements/LDPM4Data.cuh"
-#include "../elements/LDPM4DataFunc.cuh"
 #include "../elements/LDPMTet4Data.cuh"
 #include "../elements/LDPMTet4DataFunc.cuh"
 #include "LeapfrogSolver.cuh"
@@ -296,9 +294,6 @@ void LeapfrogSolver::Setup() {
     } else if (type_ == TYPE_3443) {
         leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_ANCF3443_Data*>(d_data_),
                                                                               d_leapfrog_solver_);
-    } else if (type_ == TYPE_LDPM4_DEPRECATED) {
-        leapfrog_compute_lumped_mass_kernel<<<blocks_coef, threadsPerBlock>>>(static_cast<GPU_LDPM4_Data*>(d_data_),
-                                                                              d_leapfrog_solver_);
     } else if (type_ == TYPE_LDPM_TET4) {
         leapfrog_compute_lumped_mass_ldpm_tet4_kernel<<<blocks_coef, threadsPerBlock>>>(
             static_cast<GPU_LDPMTet4_Data*>(d_data_), d_leapfrog_solver_);
@@ -365,8 +360,6 @@ void LeapfrogSolver::OneStepLeapfrog() {
         one_step_typed(static_cast<GPU_ANCF3243_Data*>(d_data_));
     } else if (type_ == TYPE_3443) {
         one_step_typed(static_cast<GPU_ANCF3443_Data*>(d_data_));
-    } else if (type_ == TYPE_LDPM4_DEPRECATED) {
-        one_step_typed(static_cast<GPU_LDPM4_Data*>(d_data_));
     } else if (type_ == TYPE_LDPM_TET4) {
         auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);
 
@@ -398,7 +391,7 @@ void LeapfrogSolver::OneStepLeapfrog() {
 
     float milliseconds = 0;
     MOPHI_GPU_CALL(cudaEventElapsedTime(&milliseconds, start, stop));
-    MOPHI_STATUS("OneStepLeapfrog kernel time", "OneStepLeapfrog kernel time: %.3f ms", milliseconds);
+    // MOPHI_STATUS("LEAPFROG_KERNEL_TIME", "OneStepLeapfrog kernel time: %.3f ms", milliseconds);
 
     MOPHI_GPU_CALL(cudaEventDestroy(start));
     MOPHI_GPU_CALL(cudaEventDestroy(stop));
@@ -412,47 +405,40 @@ template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_ANCF3243_Data>(
 template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
-template __global__ void leapfrog_compute_lumped_mass_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);
 
 template __global__ void leapfrog_compute_p_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_p_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_p_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_p_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
-template __global__ void leapfrog_compute_p_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_p_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 
 template __global__ void leapfrog_clear_f_int_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*);
 template __global__ void leapfrog_clear_f_int_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*);
 template __global__ void leapfrog_clear_f_int_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*);
 template __global__ void leapfrog_clear_f_int_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*);
-template __global__ void leapfrog_clear_f_int_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*);
 template __global__ void leapfrog_clear_f_int_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*);
 
 template __global__ void leapfrog_compute_f_int_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_f_int_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_f_int_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_f_int_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
-template __global__ void leapfrog_compute_f_int_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_compute_f_int_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 
 template __global__ void leapfrog_update_velocity_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_velocity_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_velocity_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_velocity_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
-template __global__ void leapfrog_update_velocity_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_velocity_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 
 template __global__ void leapfrog_apply_bc_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_apply_bc_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_apply_bc_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_apply_bc_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
-template __global__ void leapfrog_apply_bc_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);
 
 template __global__ void leapfrog_update_position_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_position_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_position_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_position_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*);
-template __global__ void leapfrog_update_position_kernel<GPU_LDPM4_Data>(GPU_LDPM4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_position_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 
 // Kernels exclusive to TYPE_LDPM_TET4

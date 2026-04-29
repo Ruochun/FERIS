@@ -19,10 +19,7 @@
 
 namespace tlfea {
 
-// TYPE_LDPM4_DEPRECATED: the original 3-DOF (translational-only) LDPM element.
-// Deprecated in favour of TYPE_LDPM_TET4 (6-DOF, translational + rotational).
-// Kept for backward-compatibility; will be removed in a future release.
-enum ElementType { TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4, TYPE_LDPM4_DEPRECATED, TYPE_LDPM_TET4 };
+enum ElementType { TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4, TYPE_LDPM_TET4 };
 
 class ElementBase {
   public:

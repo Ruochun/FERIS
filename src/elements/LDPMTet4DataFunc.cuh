@@ -32,7 +32,7 @@
 
 #include <cmath>
 
-#include "../materials/LDPMCusatis.cuh"
+#include "../materials/LDPM.cuh"
 #include "LDPMTet4Data.cuh"
 
 namespace tlfea {
@@ -58,7 +58,7 @@ namespace tlfea {
 //   kappa_M = (delta_theta · m) / l0
 //   kappa_L = (delta_theta · l) / l0
 //
-// Constitutive law: Cusatis LDPM tensile-shear damage (LDPMCusatis.cuh).
+// Constitutive law: Cusatis LDPM tensile-shear damage (LDPM.cuh).
 //   History variable kappa and damage omega are read from and written
 //   to the per-edge arrays d_kappa / d_omega.
 //

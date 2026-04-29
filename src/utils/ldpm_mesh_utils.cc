@@ -757,6 +757,71 @@ bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename, const LDPMTet4M
 }
 
 // ============================================================
+// WriteLDPMTet4SubfacetMeshToVTK  (failure-ratio overload)
+//
+// Same POINTS / CELLS layout as the reference overload but
+// writes the per-subfacet damage variable ω as "damage" cell
+// data instead of pArea and matflag.
+// ============================================================
+bool WriteLDPMTet4SubfacetMeshToVTK(const std::string& filename,
+                                    const LDPMTet4Mesh& mesh,
+                                    const VectorXR& subfacet_damage) {
+    if (mesh.n_subfacets <= 0 || mesh.n_facet_vertices <= 0) {
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: mesh has no sub-facets or facet vertices\n";
+        return false;
+    }
+    if (static_cast<int>(subfacet_damage.size()) != mesh.n_subfacets) {
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: subfacet_damage size mismatch (expected " << mesh.n_subfacets
+                  << ", got " << subfacet_damage.size() << ")\n";
+        return false;
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "WriteLDPMTet4SubfacetMeshToVTK: cannot open " << filename << "\n";
+        return false;
+    }
+
+    const int nv = mesh.n_facet_vertices;
+    const int nf = mesh.n_subfacets;
+
+    // ── Header ───────────────────────────────────────────────────────────────
+    file << "# vtk DataFile Version 3.0\n";
+    file << "LDPM Sub-facet Mesh (damage)\n";
+    file << "ASCII\n";
+    file << "DATASET UNSTRUCTURED_GRID\n";
+
+    // ── Points ───────────────────────────────────────────────────────────────
+    file << "\nPOINTS " << nv << " double\n";
+    for (int i = 0; i < nv; ++i) {
+        file << mesh.facet_vertex_x(i) << " " << mesh.facet_vertex_y(i) << " " << mesh.facet_vertex_z(i) << "\n";
+    }
+
+    // ── Cells (VTK_TRIANGLE = 5, 3 nodes each, 4 integers per cell row) ──────
+    file << "\nCELLS " << nf << " " << (nf * 4) << "\n";
+    for (int i = 0; i < nf; ++i) {
+        file << "3 " << mesh.subfacet_vertex_ids(3 * i + 0) << " " << mesh.subfacet_vertex_ids(3 * i + 1) << " "
+             << mesh.subfacet_vertex_ids(3 * i + 2) << "\n";
+    }
+
+    file << "\nCELL_TYPES " << nf << "\n";
+    for (int i = 0; i < nf; ++i) {
+        file << "5\n";  // VTK_TRIANGLE
+    }
+
+    // ── Cell data: per-subfacet failure ratio ω ∈ [0, 1] ────────────────────
+    file << "\nCELL_DATA " << nf << "\n";
+    file << "SCALARS damage double 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int i = 0; i < nf; ++i) {
+        file << subfacet_damage(i) << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
+// ============================================================
 // WriteLDPMTet4EdgeDamageToVTK
 //
 // POINTS   — current particle positions (n_particles)

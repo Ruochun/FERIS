@@ -43,12 +43,7 @@
  *
  * VTK output
  * ──────────
- * dogbone_subfacets.vtk
- *   Written once before time integration (static reference geometry):
- *   - POINTS  : exact facet-vertex positions (facetsVertices.dat)
- *   - CELLS   : VTK_TRIANGLE per sub-facet
- *   - CELL_DATA "pArea"   : projected facet area
- *   - CELL_DATA "matflag" : material zone (0=mortar, >0=aggregate/ITZ)
+ * Two sets of VTK files are written, one per output frame:
  *
  * dogbone_tet4_<frame>.vtk
  *   Written every vtk_interval steps (frame 0 = initial undeformed state):
@@ -57,21 +52,22 @@
  *   - POINT_DATA "diameter"     : aggregate diameter
  *   - POINT_DATA "displacement" : Euclidean displacement magnitude |u|
  *
- * dogbone_damage_<frame>.vtk   ← KEY OUTPUT FOR LDPM CRACK VISUALIZATION
+ * dogbone_subfacets_<frame>.vtk   ← KEY OUTPUT FOR LDPM CRACK VISUALIZATION
  *   Written every vtk_interval steps (frame 0 = initial, all zeros):
- *   - POINTS  : current (deformed) particle positions
- *   - CELLS   : VTK_LINE, one per unique LDPM edge (particle pair)
- *   - CELL_DATA "damage" : per-edge damage ω ∈ [0, 1]
+ *   - POINTS  : exact sub-facet vertex positions (fixed reference geometry)
+ *   - CELLS   : VTK_TRIANGLE, one per Voronoi sub-facet
+ *   - CELL_DATA "damage" : per-subfacet failure ratio ω ∈ [0, 1]
  *                          ω = 0 → undamaged / elastic
  *                          ω = 1 → fully fractured (zero traction capacity)
+ *               Each sub-facet's ω is the damage of its owning LDPM edge,
+ *               projected via a GPU scatter kernel (ProjectEdgeDamageToSubfacets).
  *
  * ParaView workflow
  * ─────────────────
- *   1. dogbone_subfacets.vtk   → color by "matflag" or "pArea"
- *   2. dogbone_tet4_*.vtk      → load as series, color by "displacement"
- *   3. dogbone_damage_*.vtk    → load as series, color by "damage"
- *                                use threshold filter (damage > 0.5) to
- *                                show only significantly cracked struts
+ *   1. dogbone_tet4_*.vtk        → load as series, color by "displacement"
+ *   2. dogbone_subfacets_*.vtk   → load as series, color by "damage"
+ *                                  use threshold filter (damage > 0.5) to
+ *                                  show only significantly cracked sub-facets
  *
  * Building
  * ────────
@@ -106,20 +102,27 @@ using namespace tlfea;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Concrete-like LDPM-Cusatis material parameters.
-// Mesh coordinates are in mm, so we use the consistent mm/N/s unit system:
-//   length [mm], force [N], mass [kg], time [s], stress [N/mm² = MPa].
+// Concrete-like LDPM-Cusatis material parameters from Cusatis et al. (2011)
+// dogbone tensile test benchmark.
+//
+// Unit system: mm-tonne-s (consistent set used by Cusatis):
+//   length [mm], force [N], mass [tonne], time [s], stress [N/mm² = MPa].
+//   Dimensional check: 1 N = 1 kg·m/s² = (1e-3 tonne)·(1e3 mm)/s² = 1 tonne·mm/s²  ✓
+//   Therefore density must be in tonne/mm³, not kg/mm³.
+//   (Using kg/mm³ would make force units kg·mm/s² = milliNewtons, not Newtons.)
 //
 // Elastic parameters
-//   E_N   = 60 GPa  = 60 000 N/mm²   normal modulus
-//   alpha = E_T/E_N = 0.25            shear-to-normal ratio
-//   beta  = E_k*/E_N/l² = 0.25        rotational coupling (N·mm² = N/mm² × mm²)
-//   rho   = 2400 kg/m³ = 2.4e-6 kg/mm³
+//   E_N   = E₀ = 60 273 N/mm²           normal modulus
+//   alpha = E_T/E_N = 0.25              shear-to-normal ratio
+//   beta  = E_k*/E_N/l² = 0.25          rotational coupling (N·mm² = N/mm² × mm²)
+//   rho   = 2.338e-9 tonne/mm³          (= 2338 kg/m³)
 //
 // Cusatis damage parameters
-//   sigma_t = 4 N/mm²  mesoscale tensile strength
-//   H_t     ≈ l_ch * sigma_t / G_ft  where l_ch ≈ l_min and G_ft = 0.05 N/mm
-//             For l_min ≈ 10 mm: H_t = 10 * 4 / 0.05 = 800  [per unit strain]
+//   sigma_t = 3.44 N/mm²   mesoscale tensile strength
+//   G_ft    = 0.0491 N/mm  mode-I fracture energy
+//             (consistent with tensile characteristic length l_t = 500 mm,
+//              i.e. G_ft = l_t * sigma_t² / (2*E_N) = 500*3.44²/(2*60273) ≈ 0.0491)
+//   H_t     ≈ l_ch * sigma_t / G_ft  where l_ch ≈ l_min (per-edge characteristic length)
 //   The demo sets H_t from these two inputs at runtime (after l_min is known).
 //
 // Applied load
@@ -127,12 +130,12 @@ using namespace tlfea;
 //   elastic failure load F_fail = sigma_t * A_cross_approx so that visible
 //   damage appears within the simulation window.
 
-static constexpr Real E_N_VAL = Real(60000.0);   // N/mm²  (60 GPa)
-static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N
+static constexpr Real E_N_VAL = Real(60273.0);   // N/mm²  normal modulus (E₀)
+static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N  (shear-to-normal ratio α)
 static constexpr Real BETA_K = Real(0.25);       // rotational coupling
-static constexpr Real RHO_VAL = Real(2.4e-6);    // kg/mm³
-static constexpr Real SIGMA_T_VAL = Real(4.0);   // N/mm²  tensile strength
-static constexpr Real G_FT_VAL = Real(0.05);     // N/mm   mode-I fracture energy
+static constexpr Real RHO_VAL = Real(2.338e-9);  // tonne/mm³  (= 2338 kg/m³)
+static constexpr Real SIGMA_T_VAL = Real(3.44);  // N/mm²  mesoscale tensile strength σ_t
+static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energy G_t
 static constexpr Real OVERLOAD_FAC = Real(0.3);  // multiplier on F_fail
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
@@ -317,34 +320,19 @@ int main() {
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
     std::cout << std::fixed << std::setprecision(6);
 
-    // ── Write static sub-facet mesh (reference geometry, written once) ────────
-    {
-        const std::string sf_vtk = "dogbone_subfacets.vtk";
-        std::cout << "Writing sub-facet mesh -> " << sf_vtk << " ...\n";
-        if (!WriteLDPMTet4SubfacetMeshToVTK(sf_vtk, mesh)) {
-            std::cerr << "Warning: failed to write sub-facet VTK.\n";
-        } else {
-            std::cout << "  " << mesh.n_facet_vertices << " points, " << mesh.n_subfacets << " VTK_TRIANGLE cells.\n";
-        }
-    }
-
-    // Helpers: build numbered VTK filenames for TET4 and damage outputs.
+    // Helpers: build numbered VTK filenames for TET4 and sub-facet outputs.
     auto tet4_vtk_name = [](int f) {
         std::ostringstream s;
         s << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
-    auto damage_vtk_name = [](int f) {
+    auto subfacet_vtk_name = [](int f) {
         std::ostringstream s;
-        s << "dogbone_damage_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << "dogbone_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
 
-    // Retrieve the edge connectivity once (does not change during simulation).
-    const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
-    const int n_edge = element_data.n_edge;
-
-    // ── Write frame 0: initial (undeformed) TET4 and damage (all zeros) ──────
+    // ── Write frame 0: initial (undeformed) TET4 and sub-facet (all zeros) ───
     int frame = 0;
     {
         // TET4 mesh
@@ -355,21 +343,21 @@ int main() {
             std::cout << "Wrote: " << fname_t4 << "  (initial configuration)\n";
         }
 
-        // Edge damage (all zeros at t=0)
-        VectorXR omega0(n_edge);
-        omega0.setZero();
-        const std::string fname_dm = damage_vtk_name(frame);
-        if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes, mesh.particle_x,
-                                          mesh.particle_y, mesh.particle_z, omega0)) {
-            std::cerr << "Warning: failed to write initial damage VTK.\n";
+        // Sub-facet mesh with all-zero damage (initial, undamaged state).
+        VectorXR sf_dmg0(mesh.n_subfacets);
+        sf_dmg0.setZero();
+        const std::string fname_sf = subfacet_vtk_name(frame);
+        if (!WriteLDPMTet4SubfacetMeshToVTK(fname_sf, mesh, sf_dmg0)) {
+            std::cerr << "Warning: failed to write initial sub-facet VTK.\n";
         } else {
-            std::cout << "Wrote: " << fname_dm << "  (initial, all omega=0)\n";
+            std::cout << "Wrote: " << fname_sf << "  (initial, all damage=0)\n";
         }
 
         ++frame;
     }
 
     // Print column header.
+    const int n_edge = element_data.n_edge;
     std::cout << "\n"
               << std::setw(8) << "Step" << std::setw(22) << "mean dz (loaded) [mm]" << std::setw(18)
               << "max omega (damage)"
@@ -403,7 +391,7 @@ int main() {
                           << "\n";
             }
 
-            // VTK snapshot: TET4 displacement + edge damage.
+            // VTK snapshot: TET4 displacement + sub-facet damage.
             if ((step + 1) % vtk_interval == 0) {
                 const std::string fname_t4 = tet4_vtk_name(frame);
                 if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh, x_cur, y_cur, z_cur)) {
@@ -412,12 +400,13 @@ int main() {
                     std::cout << "Wrote: " << fname_t4 << "\n";
                 }
 
-                const std::string fname_dm = damage_vtk_name(frame);
-                if (!WriteLDPMTet4EdgeDamageToVTK(fname_dm, mesh.n_particles, n_edge, edge_nodes, x_cur, y_cur, z_cur,
-                                                  omega)) {
-                    std::cerr << "Warning: failed to write damage VTK at step " << (step + 1) << ".\n";
+                VectorXR sf_dmg;
+                element_data.ProjectEdgeDamageToSubfacets(sf_dmg);
+                const std::string fname_sf = subfacet_vtk_name(frame);
+                if (!WriteLDPMTet4SubfacetMeshToVTK(fname_sf, mesh, sf_dmg)) {
+                    std::cerr << "Warning: failed to write sub-facet VTK at step " << (step + 1) << ".\n";
                 } else {
-                    std::cout << "Wrote: " << fname_dm << "\n";
+                    std::cout << "Wrote: " << fname_sf << "\n";
                 }
 
                 ++frame;
@@ -464,15 +453,12 @@ int main() {
     element_data.Destroy();
 
     std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";
-    std::cout << "\nOutput files:\n";
-    std::cout << "  dogbone_subfacets.vtk       — static sub-facet mesh\n";
-    std::cout << "    → Color by 'matflag' (0=mortar, >0=aggregate/ITZ) or 'pArea'.\n";
-    std::cout << "  dogbone_tet4_NNNNN.vtk      — deformed TET4 mesh (1 per frame)\n";
+    std::cout << "\nOutput files (two sets, one per frame):\n";
+    std::cout << "  dogbone_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
     std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
-    std::cout << "  dogbone_damage_NNNNN.vtk    — LDPM edge lattice (1 per frame)\n";
+    std::cout << "  dogbone_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh with damage\n";
     std::cout << "    → Color by 'damage' (omega ∈ [0,1]) to visualise fracture.\n";
-    std::cout << "    → Use Threshold filter (damage > 0.5) to show cracked struts.\n";
-    std::cout << "  Load the tet4 and damage series: "
-                 "File → Open → select group → Apply → Animation View.\n";
+    std::cout << "    → Use Threshold filter (damage > 0.5) to show cracked facets.\n";
+    std::cout << "  Load each series: File → Open → select group → Apply → Animation View.\n";
     return 0;
 }
