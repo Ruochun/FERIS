@@ -51,7 +51,7 @@
  *
  * VTK output
  * ──────────
- * Two sets of VTK files are written plus a stress-displacement CSV, one per output frame:
+ * Two sets of VTK files are written per output frame, plus a single stress-displacement CSV:
  *
  * dogbone_forcebc_tet4_<frame>.vtk
  *   Written every vtk_interval steps (frame 0 = initial undeformed state):
