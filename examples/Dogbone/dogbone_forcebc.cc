@@ -1,12 +1,14 @@
 /**
- * dogbone_leapfrog.cc
+ * dogbone_forcebc.cc
  *
- * Dogbone — LDPM-TET4 Leapfrog Simulation Demo with Cusatis Damage Model
+ * Dogbone — LDPM-TET4 Tensile Demo with Externally Applied Force (Force-BC)
  *
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  *
- * Demonstrates the full Cusatis LDPM physics on a dogbone tensile specimen:
+ * Demonstrates the full Cusatis LDPM physics on a dogbone tensile specimen
+ * driven by an applied nodal force on the top face.  This is the force-BC
+ * counterpart of dogbone_velbc.cc (velocity/kinematic-BC version).
  *
  *   1. Read all six Chrono Workbench LDPM mesh data files (nodes, particles,
  *      tets, facets, faceFacets, facetsVertices).
@@ -16,10 +18,16 @@
  *   3. Set elastic moduli (E_N, E_T, rotational) AND the Cusatis tensile
  *      damage parameters (σ_t, H_t).
  *   4. Fix particles on the z = z_min face (one end of the dogbone).
- *   5. Apply a tensile load on the z = z_max face scaled to exceed the
- *      elastic strength (σ_t * A_cross) so that visible damage occurs.
- *   6. Time-march with LeapfrogSolver; at each output interval retrieve the
- *      per-edge damage state and write three VTK files.
+ *   5. Apply a constant tensile force on the z = z_max face equal to
+ *      LOAD_FAC × σ_t × A_cross.  With LOAD_FAC = 0.5 the average stress
+ *      is half the mesoscale tensile strength, keeping the specimen below
+ *      the static failure load.  Dynamic wave amplification (overshoot ≈ 2×
+ *      the static displacement) drives local strains towards the damage
+ *      threshold at stress concentrators.
+ *   6. Time-march with LeapfrogSolver for T_SIM seconds (default 0.1 s).
+ *      The step count and output intervals are computed automatically from
+ *      the CFL time step so that the simulation always runs for T_SIM
+ *      regardless of mesh refinement.
  *
  * Physics: Cusatis LDPM (2011)
  * ────────────────────────────
@@ -45,14 +53,14 @@
  * ──────────
  * Two sets of VTK files are written, one per output frame:
  *
- * dogbone_tet4_<frame>.vtk
+ * dogbone_forcebc_tet4_<frame>.vtk
  *   Written every vtk_interval steps (frame 0 = initial undeformed state):
  *   - POINTS  : current (deformed) particle positions
  *   - CELLS   : VTK_TETRA from tets.dat (connectivity unchanged)
  *   - POINT_DATA "diameter"     : aggregate diameter
  *   - POINT_DATA "displacement" : Euclidean displacement magnitude |u|
  *
- * dogbone_subfacets_<frame>.vtk   ← KEY OUTPUT FOR LDPM CRACK VISUALIZATION
+ * dogbone_forcebc_subfacets_<frame>.vtk   ← KEY OUTPUT FOR LDPM CRACK VISUALIZATION
  *   Written every vtk_interval steps (frame 0 = initial, all zeros):
  *   - POINTS  : exact sub-facet vertex positions (fixed reference geometry)
  *   - CELLS   : VTK_TRIANGLE, one per Voronoi sub-facet
@@ -64,20 +72,20 @@
  *
  * ParaView workflow
  * ─────────────────
- *   1. dogbone_tet4_*.vtk        → load as series, color by "displacement"
- *   2. dogbone_subfacets_*.vtk   → load as series, color by "damage"
- *                                  use threshold filter (damage > 0.5) to
- *                                  show only significantly cracked sub-facets
+ *   1. dogbone_forcebc_tet4_*.vtk        → load as series, color by "displacement"
+ *   2. dogbone_forcebc_subfacets_*.vtk   → load as series, color by "damage"
+ *                                          use threshold filter (damage > 0.5) to
+ *                                          show only significantly cracked sub-facets
  *
  * Building
  * ────────
  *   mkdir -p build && cd build
  *   cmake ..
- *   make dogbone_leapfrog
+ *   make dogbone_forcebc
  *
  * Running (from the build directory)
  * ───────────────────────────────────
- *   ./bin/dogbone_leapfrog
+ *   ./bin/dogbone_forcebc
  */
 
 #include <cuda_runtime.h>
@@ -125,10 +133,7 @@ using namespace tlfea;
 //   H_t     ≈ l_ch * sigma_t / G_ft  where l_ch ≈ l_min (per-edge characteristic length)
 //   The demo sets H_t from these two inputs at runtime (after l_min is known).
 //
-// Applied load
-//   The total tensile force is set to OVERLOAD_FACTOR times the quasi-static
-//   elastic failure load F_fail = sigma_t * A_cross_approx so that visible
-//   damage appears within the simulation window.
+// Applied load (see LOAD_FAC/T_SIM/T_VTK constants below for details)
 
 static constexpr Real E_N_VAL = Real(60273.0);   // N/mm²  normal modulus (E₀)
 static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N  (shear-to-normal ratio α)
@@ -136,7 +141,24 @@ static constexpr Real BETA_K = Real(0.25);       // rotational coupling
 static constexpr Real RHO_VAL = Real(2.338e-9);  // tonne/mm³  (= 2338 kg/m³)
 static constexpr Real SIGMA_T_VAL = Real(3.44);  // N/mm²  mesoscale tensile strength σ_t
 static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energy G_t
-static constexpr Real OVERLOAD_FAC = Real(0.3);  // multiplier on F_fail
+// Applied load and simulation time
+//   LOAD_FAC sets the total applied force as a fraction of the nominal
+//   quasi-static failure load F_fail = sigma_t * A_cross_approx.
+//   With LOAD_FAC = 0.5 the average cross-section stress is 0.5 × sigma_t,
+//   which is below the static failure limit.  The dynamic wave amplification
+//   (overshoot ≈ 2× the quasi-static equilibrium displacement) drives local
+//   strains towards the damage threshold at geometric stress concentrators,
+//   activating the Cusatis softening response in the most stressed facets.
+//
+//   T_SIM  = total physical simulation time [s].
+//   T_VTK  = interval between VTK snapshots [s].
+//   The step count and output intervals are derived from the CFL time step
+//   computed at runtime, so the simulation always covers exactly T_SIM
+//   regardless of mesh refinement.
+
+static constexpr Real LOAD_FAC = Real(0.5);    // fraction of static failure load (0.5 = 50% of σ_t × A_cross)
+static constexpr Real T_SIM    = Real(0.1);    // s — total simulation time
+static constexpr Real T_VTK    = Real(0.005);  // s — VTK + console output interval (~20 frames)
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
 // particles (nodes on the min/max face of the specimen).
@@ -246,16 +268,16 @@ int main() {
     for (int i = 0; i < static_cast<int>(fixed_idx.size()); ++i)
         h_fixed(i) = fixed_idx[i];
 
-    // Scale applied load so the average cross-section sees OVERLOAD_FAC × σ_t.
-    //   F_fail ≈ σ_t * A_cross  (quasi-static elastic limit)
-    //   F_TOTAL = OVERLOAD_FAC * F_fail  (ensures visible damage in the neck)
+    // Scale applied load: F_fail = sigma_t × A_cross (quasi-static elastic limit).
+    //   F_TOTAL = LOAD_FAC × F_fail  (below static limit; overshoot from dynamic
+    //                                  wave amplification activates local damage)
     const Real A_cross_approx = (x_max - x_min) * (y_max - y_min);
     const Real F_fail = SIGMA_T_VAL * A_cross_approx;
-    const Real F_TOTAL = OVERLOAD_FAC * F_fail;
+    const Real F_TOTAL = LOAD_FAC * F_fail;
 
     std::cout << "  Approx cross-section area: " << A_cross_approx << " mm²\n";
     std::cout << "  Static elastic limit:  F_fail = " << F_fail << " N\n";
-    std::cout << "  Applied tensile force: F_TOTAL = " << F_TOTAL << " N  (" << OVERLOAD_FAC << "× elastic limit)\n";
+    std::cout << "  Applied tensile force: F_TOTAL = " << F_TOTAL << " N  (" << LOAD_FAC << "× elastic limit)\n";
 
     // External force: F_TOTAL distributed equally as tensile (+z) load.
     const Real F_per_node = F_TOTAL / static_cast<Real>(load_idx.size());
@@ -313,22 +335,26 @@ int main() {
     solver.SetParameters(&params);
     solver.Setup();
 
-    const int n_steps = 500;
-    const int print_interval = 50;  // console output every N steps
-    const int vtk_interval = 50;    // VTK snapshot every N steps
+    // Step count and output intervals derived from CFL dt so the simulation
+    // always runs for T_SIM seconds regardless of mesh refinement.
+    const int n_steps       = static_cast<int>(std::ceil(T_SIM / dt));
+    const int vtk_interval  = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
+    const int print_interval = vtk_interval;
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
+    std::cout << "  Total simulation time : " << n_steps * dt << " s\n";
+    std::cout << "  VTK output every      : " << vtk_interval << " steps (" << T_VTK << " s)\n";
     std::cout << std::fixed << std::setprecision(6);
 
     // Helpers: build numbered VTK filenames for TET4 and sub-facet outputs.
     auto tet4_vtk_name = [](int f) {
         std::ostringstream s;
-        s << "dogbone_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << "dogbone_forcebc_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
     auto subfacet_vtk_name = [](int f) {
         std::ostringstream s;
-        s << "dogbone_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << "dogbone_forcebc_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
 
@@ -454,9 +480,9 @@ int main() {
 
     std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";
     std::cout << "\nOutput files (two sets, one per frame):\n";
-    std::cout << "  dogbone_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
+    std::cout << "  dogbone_forcebc_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
     std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
-    std::cout << "  dogbone_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh with damage\n";
+    std::cout << "  dogbone_forcebc_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh with damage\n";
     std::cout << "    → Color by 'damage' (omega ∈ [0,1]) to visualise fracture.\n";
     std::cout << "    → Use Threshold filter (damage > 0.5) to show cracked facets.\n";
     std::cout << "  Load each series: File → Open → select group → Apply → Animation View.\n";

@@ -329,8 +329,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     //
     // Implements velocity-driven (kinematic) boundary conditions for the top
     // plate of a tensile test: the leapfrog solver has already zeroed the
-    // velocity of the driven nodes (they are listed in fixed_nodes); this
-    // method then adds dz = v_prescribed * dt to their z-position each step.
+    // velocity of the driven nodes (they are listed in SetNodalFixed so that
+    // the solver applies zero-velocity at each step); this method then adds
+    // dz = v_prescribed * dt to their z-position each step, producing the
+    // prescribed displacement while keeping velocity nominally zero.
+    //
+    // Note: driven nodes differ from fixed (clamped) nodes — fixed nodes have
+    // zero velocity AND zero displacement increment; driven nodes have zero
+    // velocity but receive a prescribed nonzero displacement increment here.
     //
     // d_driven_idx — device array of driven node indices (length n_driven)
     // n_driven     — number of driven nodes

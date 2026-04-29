@@ -27,9 +27,9 @@
  *        v(t) = V_PLATE                   for t >= T_RAMP  (constant)
  *   7. Time-march with LeapfrogSolver; at each output interval write VTK.
  *
- * Differences from dogbone_leapfrog.cc (load-controlled GPU demo)
+ * Differences from dogbone_forcebc.cc (force-BC GPU demo)
  * ───────────────────────────────────────────────────────────────
- *  dogbone_leapfrog.cc       │ this file
+ *  dogbone_forcebc.cc       │ this file
  *  ──────────────────────────┼────────────────────────────────────
  *  External force on top     │ No external forces
  *  Bottom nodes: fixed       │ Bottom nodes: fixed (same)
@@ -38,7 +38,7 @@
  *
  * Physics: Cusatis LDPM (2011) — same constitutive model as the load demo.
  *
- * VTK output (same format as dogbone_leapfrog.cc)
+ * VTK output (same format as dogbone_forcebc.cc)
  * ────────────────────────────────────────────────
  *   dogbone_velbc_tet4_NNNNN.vtk      — deformed TET4 mesh (displacement)
  *   dogbone_velbc_subfacets_NNNNN.vtk — sub-facet mesh with damage field
@@ -76,7 +76,7 @@ using namespace tlfea;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Material parameters — identical to dogbone_leapfrog.cc and dogbone_cpuref.cpp.
+// Material parameters — identical to dogbone_forcebc.cc and dogbone_cpuref.cpp.
 // Unit system: mm-tonne-s (stress in N/mm² = MPa).
 static constexpr Real E_N_VAL = Real(60273.0);   // N/mm²  normal modulus (E₀)
 static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N  shear-to-normal ratio
@@ -86,13 +86,21 @@ static constexpr Real SIGMA_T_VAL = Real(3.44);  // N/mm²  mesoscale tensile st
 static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energy
 
 // Prescribed velocity of the top (driven) plate in mm/s.
-// The CPU reference uses ~1 mm/s quasi-static; here we use a larger value
-// so that visible damage accumulates within the short GPU demo window.
-static constexpr Real V_PLATE = Real(200.0);  // mm/s
+// Matches the CPU reference (dogbone_cpuref.cpp): 1 mm/s loading rate.
+// With specimen length ~150 mm and c_N ≈ 5e6 mm/s, this rate satisfies
+// V/c_N ≈ 2e-7 << 1, confirming the loading is quasi-static relative to
+// the elastic wave speed.
+static constexpr Real V_PLATE = Real(1.0);  // mm/s
 
-// Duration of the linear velocity ramp from 0 → V_PLATE.
-// Matches the ramp in ChFunctionPoly used by dogbone_cpuref.cpp.
-static constexpr Real T_RAMP = Real(1e-4);  // s
+// Duration of the linear velocity ramp from 0 → V_PLATE, then constant.
+// Matches the ChFunctionPoly duration in dogbone_cpuref.cpp (0.001 s).
+static constexpr Real T_RAMP = Real(1e-3);  // s
+
+// Total simulation time and VTK output interval.
+// The step count and output intervals are computed from the CFL time step
+// at runtime so the simulation always covers T_SIM regardless of mesh size.
+static constexpr Real T_SIM  = Real(0.1);    // s — total simulation time
+static constexpr Real T_VTK  = Real(0.005);  // s — VTK + console output interval (~20 frames)
 
 // Fraction of bounding-box extent used as tolerance for boundary detection.
 static constexpr Real BC_TOL_FRAC = Real(1e-3);
@@ -259,12 +267,15 @@ int main() {
     solver.SetParameters(&params);
     solver.Setup();
 
-    const int n_steps = 2000;
-    const int print_interval = 200;
-    const int vtk_interval = 200;
+    // Step count and output intervals derived from CFL dt so the simulation
+    // always runs for T_SIM seconds regardless of mesh refinement.
+    const int n_steps        = static_cast<int>(std::ceil(T_SIM / dt));
+    const int vtk_interval   = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
+    const int print_interval = vtk_interval;
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
-    std::cout << "  Total simulation time: " << n_steps * dt << " s\n";
+    std::cout << "  Total simulation time : " << n_steps * dt << " s\n";
+    std::cout << "  VTK output every      : " << vtk_interval << " steps (" << T_VTK << " s)\n";
     std::cout << std::fixed << std::setprecision(6);
 
     // Helpers: build numbered VTK filenames.
