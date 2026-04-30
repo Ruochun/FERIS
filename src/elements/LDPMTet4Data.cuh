@@ -305,6 +305,10 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // omega_out : size n_edge, omega ∈ [0, 1] (0 = undamaged, 1 = fully failed)
     void RetrieveFacetDamageToCPU(VectorXR& omega_out);
 
+    // Retrieve per-edge max effective strain history (κ) from GPU to host.
+    // kappa_out : size n_edge, κ ≥ 0 (max damage-driving strain ever reached)
+    void RetrieveFacetKappaToCPU(VectorXR& kappa_out);
+
     // Expose edge connectivity for visualization (e.g. VTK line-segment mesh).
     // Returns a reference to the host-side edge node array (size 2 * n_edge):
     //   h_edge_nodes_vec[2*e+0] = node i,  h_edge_nodes_vec[2*e+1] = node j.
@@ -324,6 +328,22 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     //        receive a value of 0.
     // Must be called after SetupFromMesh() and at least one CalcP() step.
     void ProjectEdgeDamageToSubfacets(VectorXR& out);
+
+    // Project per-edge crack opening displacement onto the sub-facet mesh.
+    //
+    // The crack opening for each edge is computed as ω × κ × l₀ [mm], where:
+    //   ω  — damage variable (0 = elastic, 1 = fully fractured)
+    //   κ  — max damage-driving strain history (irreversible, ≥ 0)
+    //   l₀ — reference edge length [mm]
+    //
+    // This gives the inelastic (crack) displacement per facet in physical units.
+    // For a fully cracked edge (ω ≈ 1) in the localization band all the boundary
+    // displacement concentrates here, so values reach ~0.1 mm for the dogbone
+    // test driven at 1 mm/s for 0.1 s.
+    //
+    // out — resized to n_subfacet on return; units match the mesh length unit (mm).
+    // Must be called after SetupFromMesh() and at least one CalcP() step.
+    void ProjectEdgeCrackDistanceToSubfacets(VectorXR& out);
 
     // Advance a set of particles' z-coordinate by a prescribed increment.
     //
