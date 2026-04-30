@@ -23,9 +23,7 @@
  *      advanced by an externally prescribed displacement increment
  *      v_prescribed(t) * dt after every solver step via
  *      GPU_LDPMTet4_Data::AdvanceDrivenNodesZ().
- *   6. Prescribed velocity profile (linear ramp then constant plateau):
- *        v(t) = V_PLATE * (t / T_RAMP)   for t < T_RAMP   (linear ramp)
- *        v(t) = V_PLATE                   for t >= T_RAMP  (constant)
+ *   6. Prescribed velocity: constant V_PLATE from t = 0.
  *   7. Time-march with LeapfrogSolver; at each output interval write VTK.
  *
  * Differences from dogbone_forcebc.cc (force-BC GPU demo)
@@ -93,9 +91,6 @@ static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energ
 // A 1 mm/s loading rate is quasi-static relative to the elastic wave speed:
 // with specimen length ~150 mm and c_N ≈ 5e6 mm/s, V/c_N ≈ 2e-7 << 1.
 static constexpr Real V_PLATE = Real(1.0);  // mm/s
-
-// Duration of the linear velocity ramp from 0 → V_PLATE, then constant plateau.
-static constexpr Real T_RAMP = Real(1e-3);  // s
 
 // Total simulation time and VTK output interval.
 // The step count and output intervals are computed from the CFL time step
@@ -259,7 +254,6 @@ int main() {
 
     std::cout << "  c_N = " << c_N << " mm/s,  dt_crit = " << dt_crit << " s,  dt = " << dt << " s\n";
     std::cout << "  Prescribed plate velocity V_PLATE = " << V_PLATE << " mm/s\n";
-    std::cout << "  Velocity ramp duration  T_RAMP   = " << T_RAMP << " s\n";
 
     // ──────────────────────────────────────────────────────────────────────────
     // 7. Set up and run LeapfrogSolver
@@ -293,19 +287,11 @@ int main() {
         return s.str();
     };
 
-    // Open stress-displacement CSV for writing.
-    // Columns: displacement_mm, stress_MPa
-    // Displacement = mean z-displacement of the driven (top) plate [mm].
-    // Stress = reaction force at fixed (bottom) nodes divided by A_cross [N/mm² = MPa].
+    // Open stress-displacement CSV for writing (no header).
+    // Each row: displacement_mm,stress_MPa
     std::ofstream stress_disp_csv("dogbone_velbc_stress_disp.csv");
     if (!stress_disp_csv.is_open()) {
         std::cerr << "Warning: could not open dogbone_velbc_stress_disp.csv for writing.\n";
-    } else {
-        stress_disp_csv << "# Stress-displacement output for dogbone_velbc\n";
-        stress_disp_csv << "# Unit system: mm-tonne-s  (stress in N/mm² = MPa)\n";
-        stress_disp_csv << "# Displacement: mean z-displacement of driven (top) plate [mm]\n";
-        stress_disp_csv << "# Stress: reaction force at fixed (bottom) nodes / A_cross [N/mm²]\n";
-        stress_disp_csv << "displacement_mm,stress_MPa\n";
     }
 
     // ── Write frame 0: initial (undeformed) state ─────────────────────────────
@@ -340,12 +326,8 @@ int main() {
     Real prescribed_z_total = Real(0);  // cumulative prescribed displacement
 
     for (int step = 0; step < n_steps; ++step) {
-        // Current simulation time at the start of this step.
-        const Real t_now = step * dt;
-
-        // Prescribed velocity at this time step (linear ramp → constant plateau).
-        const Real v_now = (t_now < T_RAMP) ? V_PLATE * (t_now / T_RAMP) : V_PLATE;
-        const Real dz = v_now * dt;
+        // Prescribed velocity: constant V_PLATE from t = 0.
+        const Real dz = V_PLATE * dt;
         prescribed_z_total += dz;
 
         // Leapfrog step: computes tractions, updates velocities (zeroed at

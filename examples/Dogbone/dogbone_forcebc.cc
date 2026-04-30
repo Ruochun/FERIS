@@ -367,19 +367,11 @@ int main() {
         return s.str();
     };
 
-    // Open stress-displacement CSV for writing.
-    // Columns: displacement_mm, stress_MPa
-    // Displacement = mean z-displacement of the loaded (top) nodes [mm].
-    // Stress = reaction force at fixed (bottom) nodes divided by A_cross [N/mm² = MPa].
+    // Open stress-displacement CSV for writing (no header).
+    // Each row: displacement_mm,stress_MPa
     std::ofstream stress_disp_csv("dogbone_forcebc_stress_disp.csv");
     if (!stress_disp_csv.is_open()) {
         std::cerr << "Warning: could not open dogbone_forcebc_stress_disp.csv for writing.\n";
-    } else {
-        stress_disp_csv << "# Stress-displacement output for dogbone_forcebc\n";
-        stress_disp_csv << "# Unit system: mm-tonne-s  (stress in N/mm² = MPa)\n";
-        stress_disp_csv << "# Displacement: mean z-displacement of loaded (top) nodes [mm]\n";
-        stress_disp_csv << "# Stress: reaction force at fixed (bottom) nodes / A_cross [N/mm²]\n";
-        stress_disp_csv << "displacement_mm,stress_MPa\n";
     }
 
     // ── Write frame 0: initial (undeformed) TET4 and sub-facet (all zeros) ───
