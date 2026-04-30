@@ -67,9 +67,7 @@ When adding a new solver, you must:
            MOPHI_ERROR("MySolver: unsupported element type %s. "
                        "Supported: TYPE_T4, TYPE_T10.",
                        ElementTypeToString(data->type));
-           throw std::invalid_argument(
-               std::string("MySolver: unsupported element type ") +
-               ElementTypeToString(data->type));
+           return;  // unreachable; MOPHI_ERROR is fatal
    }
    ```
 3. **Use the provided helpers** `GetElementDispatchInfo()` and
@@ -83,14 +81,14 @@ When adding a new solver, you must:
 
 ## 4. Error Handling
 
-- Solvers must **throw `std::invalid_argument`** (after logging with
-  `MOPHI_ERROR`) when constructed with an element type they do not support.
-  This ensures the program fails fast with a clear message rather than
-  silently misbehaving.
+- Solvers must call **`MOPHI_ERROR`** (after which execution does not continue)
+  when constructed with an element type they do not support.  Do **not** follow
+  `MOPHI_ERROR` with a `throw` — `MOPHI_ERROR` is the project's fatal-error
+  mechanism and is sufficient on its own.
 - Error messages must name **both the solver and the unsupported element
   type**, and must suggest which solver to use instead when applicable.
-- Do not leave the constructor in a half-constructed state (e.g., with a null
-  `d_data_` pointer) after detecting an invalid type.
+- Add a `return;` (or equivalent) after `MOPHI_ERROR` to silence compiler
+  unreachable-code warnings; it will never execute.
 
 ---
 
