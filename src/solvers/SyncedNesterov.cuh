@@ -15,9 +15,6 @@
  *==============================================================
  *==============================================================*/
 
-#include <stdexcept>
-#include <string>
-
 #include "../elements/ANCF3243Data.cuh"
 #include "../elements/ANCF3443Data.cuh"
 #include "../elements/ElementBase.h"
@@ -57,9 +54,7 @@ class SyncedNesterovSolver : public SolverBase {
                     "Supported types: TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4. "
                     "For TYPE_LDPM_TET4 use LeapfrogSolver instead.",
                     ElementTypeToString(data->type));
-                throw std::invalid_argument(
-                    std::string("SyncedNesterovSolver: unsupported element type ") +
-                    ElementTypeToString(data->type));
+                return;  // unreachable; MOPHI_ERROR is fatal
         }
 
         type_ = data->type;

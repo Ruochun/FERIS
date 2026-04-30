@@ -1,22 +1,20 @@
 /*==============================================================
  *==============================================================
- * Project: RoboDyna
+ * Project: TLFEA
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    ElementBase.h
  * Brief:   Declares the ElementBase class and common interfaces shared by
- *          concrete GPU element data types (ANCF3243, ANCF3443, FEAT10).
- *          Provides virtual accessors for coefficients, beams/elements,
- *          mass/force/constraint storage, and type tagging used by the
- *          synchronized solvers and collision modules.
+ *          all concrete GPU element data types (ANCF3243, ANCF3443, FEAT4,
+ *          FEAT10, LDPMTet4). Provides virtual dispatch helpers, size
+ *          accessors, and computation interfaces used by solvers.
  *==============================================================
  *==============================================================*/
 
 #pragma once
 
-#include <stdexcept>
-#include <string>
 #include <vector>
+#include <MoPhiEssentials.h>
 #include "../types.h"
 
 namespace tlfea {
@@ -60,9 +58,9 @@ inline ElementDispatchInfo GetElementDispatchInfo(ElementType type) {
         case TYPE_T4:        return {1,  4};
         case TYPE_LDPM_TET4: return {1,  2};
         default:
-            throw std::invalid_argument(
-                std::string("GetElementDispatchInfo: unknown element type ") +
-                ElementTypeToString(type));
+            MOPHI_ERROR("GetElementDispatchInfo: unknown element type %s",
+                        ElementTypeToString(type));
+            return {0, 0};  // unreachable; MOPHI_ERROR is fatal
     }
 }
 
@@ -73,11 +71,6 @@ class ElementBase {
     ElementType type;
 
     virtual ~ElementBase() {}
-
-    // Pointer to the device-side copy of this struct (allocated by the concrete
-    // class).  The base-class member is kept for legacy compatibility; prefer
-    // calling GetDevicePtr() to obtain the correctly-typed device pointer.
-    ElementBase* d_data = nullptr;
 
     // ── Dispatch helpers ─────────────────────────────────────────────────────
     // These host-only virtual methods let solver constructors avoid per-type

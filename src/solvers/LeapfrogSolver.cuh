@@ -20,9 +20,6 @@
 
 #pragma once
 
-#include <stdexcept>
-#include <string>
-
 #include <MoPhiEssentials.h>
 
 #include "../elements/ANCF3243Data.cuh"
@@ -73,9 +70,7 @@ class LeapfrogSolver : public SolverBase {
                 MOPHI_ERROR(
                     "LeapfrogSolver: unknown element type %s.",
                     ElementTypeToString(data->type));
-                throw std::invalid_argument(
-                    std::string("LeapfrogSolver: unknown element type ") +
-                    ElementTypeToString(data->type));
+                return;  // unreachable; MOPHI_ERROR is fatal
         }
 
         type_ = data->type;

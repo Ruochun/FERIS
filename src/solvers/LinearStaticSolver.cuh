@@ -7,11 +7,13 @@
  *          single-step steady-state (linear) FEA solve for tetrahedral
  *          elements entirely on the GPU.
  *
- *          The TData template parameter can be GPU_FEAT10_Data (TET10) or
- *          GPU_FEAT4_Data (TET4). Both element types must provide:
+ *          The TData template parameter must be GPU_FEAT10_Data (TET10) or
+ *          GPU_FEAT4_Data (TET4). Passing any other element type triggers a
+ *          static_assert with a clear error message. Both element types must
+ *          provide:
  *            - get_n_elem(), get_n_coef(), get_n_constraint()
  *            - static constexpr N_NODES_PER_ELEM, N_QP_PER_ELEM
- *            - d_data  (GPU copy of the struct)
+ *            - GetDevicePtr() (GPU copy of the struct)
  *            - GetX12DevicePtr(), GetY12DevicePtr(), GetZ12DevicePtr()
  *            - GetExternalForceDevicePtr()
  *            - SetNodalFixed()
@@ -26,6 +28,8 @@
  *            4. Updates the nodal positions stored in TData.
  *==============================================================
  *==============================================================*/
+
+#include <type_traits>
 
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
@@ -42,6 +46,12 @@ namespace tlfea {
 
 template <typename TData>
 class LinearStaticSolver : public SolverBase {
+    static_assert(
+        std::is_same<TData, GPU_FEAT10_Data>::value || std::is_same<TData, GPU_FEAT4_Data>::value,
+        "LinearStaticSolver only supports GPU_FEAT10_Data (TYPE_T10) and GPU_FEAT4_Data (TYPE_T4). "
+        "For ANCF elements use SyncedAdamWSolver or SyncedNesterovSolver. "
+        "For LDPM particles use LeapfrogSolver.");
+
   public:
     /**
      * Constructor.

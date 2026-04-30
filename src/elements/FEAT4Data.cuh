@@ -1,3 +1,16 @@
+/*==============================================================
+ *==============================================================
+ * Project: TLFEA
+ * File:    FEAT4Data.cuh
+ * Brief:   Declares the GPU_FEAT4_Data structure and associated host/GPU
+ *          interfaces for 4-node linear tetrahedral (TET4) elements.
+ *          Stores mesh connectivity, quadrature data, CSR mass matrices,
+ *          and element-level force and constraint data used by solvers.
+ *==============================================================
+ *==============================================================*/
+
+#pragma once
+
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <cusparse.h>
@@ -11,9 +24,6 @@
 #include "ElementBase.h"
 #include "../types.h"
 #include <MoPhiEssentials.h>
-
-// GPU data structure for 4-node linear tetrahedral (TET4) elements.
-#pragma once
 
 namespace tlfea {
 
@@ -665,6 +675,9 @@ struct GPU_FEAT4_Data : public ElementBase {
         }
     }
 
+    // ── Legacy accessors (kept for backward compatibility) ───────────────────
+    // Prefer the virtual base-class methods IsConstraintSetup() and
+    // GetConstraintDevicePtr() when working through an ElementBase pointer.
     Real* Get_Constraint_Ptr() {
         return d_constraint;
     }

@@ -17,8 +17,6 @@
 #pragma once
 
 #include <cublas_v2.h>
-#include <stdexcept>
-#include <string>
 
 #include <iostream>
 
@@ -45,9 +43,7 @@ class SyncedAdamWNocoopSolver : public SolverBase {
                     "Supported types: TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4. "
                     "For TYPE_LDPM_TET4 use LeapfrogSolver instead.",
                     ElementTypeToString(data->type));
-                throw std::invalid_argument(
-                    std::string("SyncedAdamWNocoopSolver: unsupported element type ") +
-                    ElementTypeToString(data->type));
+                return;  // unreachable; MOPHI_ERROR is fatal
         }
 
         type_ = data->type;
@@ -342,7 +338,7 @@ class SyncedAdamWNocoopSolver : public SolverBase {
     int n_coef_, n_beam_, n_constraints_;
 
     // Device pointer to the pre-computed constraint Jacobian/data block.
-    // Null if no constraints were set up on the element (Get_Is_Constraint_Setup() == false).
+    // Null if no constraints were set up on the element (IsConstraintSetup() == false).
     Real* d_constraint_ptr_;
 
     // DualArrays for long arrays (manage both pinned host and device memory).

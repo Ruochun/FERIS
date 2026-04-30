@@ -1,12 +1,3 @@
-#include <cuda_runtime.h>
-#include <cusparse.h>
-
-#include <cstring>
-#include <iostream>
-#include <vector>
-#include <MoPhiEssentials.h>
-#include "../types.h"
-
 /*==============================================================
  *==============================================================
  * Project: RoboDyna
@@ -20,14 +11,22 @@
  *==============================================================
  *==============================================================*/
 
+#pragma once
+
+#include <cuda_runtime.h>
+#include <cusparse.h>
+
+#include <cstring>
+#include <iostream>
+#include <vector>
+#include <MoPhiEssentials.h>
+#include "../types.h"
+
 #include "../utils/cpu_utils.h"
 #include "../utils/cuda_utils.h"
 #include "../utils/quadrature_utils.h"
 #include "../materials/MaterialModel.cuh"
 #include "ElementBase.h"
-
-// Definition of GPU_ANCF3443 and data access device functions
-#pragma once
 
 namespace tlfea {
 
@@ -1070,6 +1069,9 @@ struct GPU_ANCF3443_Data : public ElementBase {
 
     void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12);
 
+    // ── Legacy accessors (kept for backward compatibility) ───────────────────
+    // Prefer the virtual base-class methods IsConstraintSetup() and
+    // GetConstraintDevicePtr() when working through an ElementBase pointer.
     Real* Get_Constraint_Ptr() {
         return d_constraint;
     }
