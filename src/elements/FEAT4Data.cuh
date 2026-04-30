@@ -673,6 +673,20 @@ struct GPU_FEAT4_Data : public ElementBase {
         return is_constraints_setup;
     }
 
+    // ── ElementBase dispatch helpers ─────────────────────────────────────────
+
+    ElementBase* GetDevicePtr() override {
+        return d_data;
+    }
+
+    bool IsConstraintSetup() override {
+        return is_constraints_setup;
+    }
+
+    Real* GetConstraintDevicePtr() override {
+        return d_constraint;
+    }
+
     GPU_FEAT4_Data* d_data;  // GPU copy of this struct
 
     int n_elem;

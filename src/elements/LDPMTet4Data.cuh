@@ -258,6 +258,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     void RetrieveDeformationGradientToCPU(std::vector<std::vector<MatrixXR>>&) override {}
     void RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>&) override {}
 
+    // ── ElementBase dispatch helpers ─────────────────────────────────────────
+
+    ElementBase* GetDevicePtr() override {
+        return d_data;
+    }
+
     // ── Constructor ──────────────────────────────────────────────────────────
 
     GPU_LDPMTet4_Data(int num_nodes, int num_elems)

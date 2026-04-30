@@ -730,6 +730,20 @@ struct GPU_FEAT10_Data : public ElementBase {
         return is_constraints_setup;
     }
 
+    // ── ElementBase dispatch helpers ─────────────────────────────────────────
+
+    ElementBase* GetDevicePtr() override {
+        return d_data;
+    }
+
+    bool IsConstraintSetup() override {
+        return is_constraints_setup;
+    }
+
+    Real* GetConstraintDevicePtr() override {
+        return d_constraint;
+    }
+
     GPU_FEAT10_Data* d_data;  // Storing GPU copy of SAPGPUData
 
     int n_elem;

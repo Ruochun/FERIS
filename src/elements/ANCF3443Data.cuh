@@ -1082,6 +1082,24 @@ struct GPU_ANCF3443_Data : public ElementBase {
         return constraint_mode;
     }
 
+    // ── ElementBase dispatch helpers ─────────────────────────────────────────
+
+    ElementBase* GetDevicePtr() override {
+        return d_data;
+    }
+
+    void PrepareSolverData() override {
+        CalcDsDuPre();
+    }
+
+    bool IsConstraintSetup() override {
+        return is_constraints_setup;
+    }
+
+    Real* GetConstraintDevicePtr() override {
+        return d_constraint;
+    }
+
     void RetrieveConstraintJacobianCSRToCPU(std::vector<int>& offsets,
                                             std::vector<int>& columns,
                                             std::vector<Real>& values);
