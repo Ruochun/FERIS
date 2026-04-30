@@ -6,6 +6,14 @@ or an existing pairing is enabled/disabled, this file must be updated to
 reflect the change.**  See `AGENTS.md` for the full rule set that governs
 modifications to this repository.
 
+> **Note on physical formulations**: Not all elements use the same physics.
+> FEAT4 and FEAT10 implement **Total Lagrangian (TL) continuum FEA**.
+> ANCF3243 and ANCF3443 implement **ANCF large-deformation structural mechanics**
+> (a distinct formulation — not classical TL).
+> LDPMTet4 implements **Lattice Discrete Particle Model (LDPM)** — a mesoscale
+> particle method that is **not FEA at all**.  See `docs/ARCHITECTURE.md` for
+> the full physical description of each element type.
+
 ---
 
 ## Element Types

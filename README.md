@@ -1,16 +1,26 @@
 # TLFEA
 
-Total Lagrangian Finite Element Analysis — A GPU-accelerated FEA and discrete-particle framework.
+A GPU-accelerated (CUDA) framework for nonlinear solid mechanics and discrete particle simulations.
 
 ## Overview
 
-TLFEA provides a GPU-accelerated (CUDA) infrastructure for Total Lagrangian finite element analysis and lattice particle mechanics, featuring:
+TLFEA combines two physically distinct simulation paradigms on the GPU:
+
+**Continuum / structural mechanics** (Total Lagrangian or ANCF formulation):
+- FEAT4 (TET4) and FEAT10 (TET10) — nonlinear continuum solid mechanics using Total Lagrangian kinematics (deformation gradient **F**, Green–Lagrange strain, Piola–Kirchhoff stress)
+- ANCF3243 (cable) and ANCF3443 (shell) — large-deformation flexible structures using Absolute Nodal Coordinate Formulation (not classical TL; generalized position + slope coordinates)
+
+**Discrete particle mechanics** (LDPM — *not* FEA):
+- LDPMTet4 — Lattice Discrete Particle Model on a TET4 Delaunay triangulation; 6-DOF particles (translation + rotation) interacting via Voronoi facet tractions; no continuum field, no deformation gradient
+
+---
+
 - **Five element types**: FEAT4 (TET4), FEAT10 (TET10), ANCF3243 (cable), ANCF3443 (shell), LDPMTet4 (discrete particle)
 - **Five solvers**: LinearStaticSolver, SyncedNesterov, SyncedAdamW, SyncedAdamWNocoop, LeapfrogSolver
-- **Multiple material models**: St. Venant–Kirchhoff, Mooney–Rivlin, LDPM damage law
+- **Multiple material models**: St. Venant–Kirchhoff, Mooney–Rivlin, LDPM tensile-shear damage law
 - **CMake build system**: Easy to build and extend
 
-Based on the [Total-Lagrangian-FEA](https://github.com/uwsbel/Total-Lagrangian-FEA) project from SBEL at UW-Madison.
+Based on the [Total-Lagrangian-FEA](https://github.com/uwsbel/Total-Lagrangian-FEA) project from SBEL at UW-Madison (which covered TL continuum FEA only; the ANCF and LDPM components were added later).
 
 ## Solver–Element Compatibility
 

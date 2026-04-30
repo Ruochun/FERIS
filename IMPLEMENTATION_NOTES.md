@@ -2,7 +2,9 @@
 
 ## Project Setup Summary
 
-This document describes the implementation of the minimal TLFEA starting point based on the reference repository at https://github.com/uwsbel/Total-Lagrangian-FEA/.
+This document describes the implementation history of TLFEA, starting from the TL continuum-FEA
+reference repository at https://github.com/uwsbel/Total-Lagrangian-FEA/ and extending it with
+ANCF structural elements and the LDPM discrete particle model.
 
 ## What Was Implemented
 
