@@ -26,7 +26,7 @@
 7. [Force Assembly — Facet Tractions to Nodal Forces](#7-force-assembly--facet-tractions-to-nodal-forces)
 8. [Mass Matrix](#8-mass-matrix)
 9. [Leapfrog Time Integration](#9-leapfrog-time-integration)
-10. [Damage Visualisation — Projecting ω onto Sub-Facets](#10-damage-visualisation--projecting--onto-sub-facets)
+10. [Crack-Distance Visualisation — Projecting onto Sub-Facets](#10-crack-distance-visualisation--projecting-onto-sub-facets)
 11. [Complete Workflow Summary](#11-complete-workflow-summary)
 12. [Theory-Symbol to Code-Variable Reference Table](#12-theory-symbol-to-code-variable-reference-table)
 
@@ -670,52 +670,58 @@ d_data->rx12()(tid) += dt * d_solver->v_rot()(tid * 3 + 0);
 
 ---
 
-## 10. Damage Visualisation — Projecting ω onto Sub-Facets
+## 10. Crack-Distance Visualisation — Projecting onto Sub-Facets
 
 ### Theory
 
-After each time step, the per-edge damage variable ω provides a complete description
-of the fracture state. To visualise where cracks have opened, ω must be mapped back
-onto the Voronoi **sub-facet** triangle mesh because these triangles constitute what
-a human observer associates with physical crack surfaces.
+After each time step the per-edge damage variable ω ∈ [0, 1] and the maximum
+effective-strain history κ together define a physical **crack opening distance**
+for each interaction strut:
 
-A **macroscopic crack plane** in the simulation is a contiguous surface of sub-facets
-whose parent edges all have ω ≈ 1.
+```
+crack_distance = ω · κ · l₀    [mm]
+```
+
+where l₀ is the reference edge length. This quantity has a clear physical meaning:
+it is the width of the opened crack at the strut's Voronoi facet, in millimetres.
+For intact facets (ω = 0) it is zero; for a fully failed facet it equals κ · l₀.
+
+To visualise where cracks have opened, the crack distance must be mapped back onto
+the Voronoi **sub-facet** triangle mesh, because these triangles are what a human
+observer associates with physical crack surfaces.
 
 ### Implementation
 
 The `subfacet→edge` lookup table `d_subfacet_edge_idx[]` is built during
-`SetupFromMesh()`. A GPU kernel projects ω from the coarser edge lattice onto the
-finer sub-facet mesh:
+`SetupFromMesh()`. A GPU kernel projects the crack distance from the coarser edge
+lattice onto the finer sub-facet mesh:
 
 ```cpp
-// LDPMTet4Data.cu — project_edge_damage_to_subfacets_kernel
-__global__ void project_edge_damage_to_subfacets_kernel(
+// LDPMTet4Data.cu — project_edge_crack_distance_to_subfacets_kernel
+__global__ void project_edge_crack_distance_to_subfacets_kernel(
         int n_subfacet,
         const int* __restrict__ subfacet_edge_idx,
         const Real* __restrict__ edge_omega,
-        Real* __restrict__ subfacet_damage) {
+        const Real* __restrict__ edge_kappa,
+        const Real* __restrict__ edge_l0,
+        Real* __restrict__ subfacet_crack_dist) {
     const int sf = blockIdx.x * blockDim.x + threadIdx.x;
     if (sf >= n_subfacet) return;
     const int eidx = subfacet_edge_idx[sf];
-    subfacet_damage[sf] = (eidx >= 0) ? edge_omega[eidx] : Real(0);
+    subfacet_crack_dist[sf] = (eidx >= 0)
+        ? edge_omega[eidx] * edge_kappa[eidx] * edge_l0[eidx]
+        : Real(0);
 }
 ```
 
-The result is a flat array of length `n_subfacet` with values ∈ [0, 1], where 1
-means the sub-facet's parent strut is fully fractured. Unmatched sub-facets (entries
-where `subfacet_edge_idx == -1`) receive a value of 0.
-
-This array can be written to VTK files for ParaView visualisation. Filtering
-sub-facets with `damage > threshold` (e.g. 0.9) isolates the crack surface geometry.
+The result is a flat array of length `n_subfacet` with values ≥ 0 in mm. Unmatched
+sub-facets (entries where `subfacet_edge_idx == -1`) receive a value of 0.
 
 ```cpp
-// Retrieve to host, then write
-data.ProjectEdgeDamageToSubfacets(subfacet_damage);
-WriteLDPMTet4SubfacetMeshToVTK(filename, mesh, subfacet_damage);
-// or, for the edge-lattice coloured by damage:
-WriteLDPMTet4EdgeDamageToVTK(filename, n_particles, n_edges,
-                              edge_nodes, x_cur, y_cur, z_cur, edge_damage);
+// Retrieve to host, then write VTK field "crack_distance" [mm]
+VectorXR sf_crack;
+element_data.ProjectEdgeCrackDistanceToSubfacets(sf_crack);
+WriteLDPMTet4SubfacetMeshToVTK(filename, mesh, "crack_distance", sf_crack);
 ```
 
 ---
@@ -802,14 +808,21 @@ LeapfrogSolver::Setup()
     │    x_{n+1} = xₙ + Δt · v_{n+½}
     └─ leapfrog_update_rotation_kernel:
          θ_{n+1} = θₙ + Δt · ω_{n+½}
+
+    Every T_CSV seconds (default 0.5 ms, ~200 points over 0.1 s):
+    ├─ RetrievePositionToCPU() + RetrieveInternalForceToCPU()
+    └─ Append one row to CSV:
+         displacement_mm,stress_MPa
+         <mean z-disp of loaded nodes>, <reaction force / A_cross>
+
+    Every T_VTK seconds (default 5 ms, ~20 frames over 0.1 s):
+    ├─ WriteLDPMTet4TetMeshToVTK()
+    │    → deformed particle positions on TET4 mesh
+    └─ ProjectEdgeCrackDistanceToSubfacets()
+         crack_distance[sf] = ω[edge] · κ[edge] · l₀[edge]   [mm]
+         WriteLDPMTet4SubfacetMeshToVTK("crack_distance", …)
+         → VTK field for ParaView crack-surface visualisation
 ─────────────────────────────────────────────────
-    ↓
-ProjectEdgeDamageToSubfacets()
-    → GPU scatter:  subfacet_damage[sf] = d_omega[subfacet_edge_idx[sf]]
-    ↓
-WriteLDPMTet4SubfacetMeshToVTK() / WriteLDPMTet4EdgeDamageToVTK()
-    → VTK files for ParaView crack-surface visualisation
-    → Filter on damage > 0.9 to isolate crack surfaces
 ```
 
 ---
@@ -841,3 +854,6 @@ WriteLDPMTet4SubfacetMeshToVTK() / WriteLDPMTet4EdgeDamageToVTK()
 | **M**_int | Rotational internal moment | `d_f_int_r[node*3+k]` → `f_int_r()(node*3+k)` | `LDPMTet4Data.cuh` |
 | mᵢ | Translational lumped mass | `d_csr_values[i]` → `mass_lump()(i)` | `LeapfrogSolver.cuh` |
 | Iᵢ | Rotational inertia | `d_I_lump[i]` → `mass_inertia()(i)` | `LeapfrogSolver.cuh` |
+| crack_distance | Physical crack opening width [mm]: ω·κ·l₀ | computed in `ProjectEdgeCrackDistanceToSubfacets` | `LDPMTet4Data.cu` |
+| T_VTK | VTK output interval | `static constexpr Real T_VTK` (default 0.005 s) | dogbone demos |
+| T_CSV | CSV output interval | `static constexpr Real T_CSV` (default 0.0005 s) | dogbone demos |

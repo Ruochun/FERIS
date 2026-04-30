@@ -92,11 +92,12 @@ static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energ
 // with specimen length ~150 mm and c_N ≈ 5e6 mm/s, V/c_N ≈ 2e-7 << 1.
 static constexpr Real V_PLATE = Real(1.0);  // mm/s
 
-// Total simulation time and VTK output interval.
+// Total simulation time, VTK output interval, and CSV output interval.
 // The step count and output intervals are computed from the CFL time step
 // at runtime so the simulation always covers T_SIM regardless of mesh size.
-static constexpr Real T_SIM = Real(0.1);    // s — total simulation time
-static constexpr Real T_VTK = Real(0.005);  // s — VTK + console output interval (~20 frames)
+static constexpr Real T_SIM = Real(0.1);     // s — total simulation time
+static constexpr Real T_VTK = Real(0.005);   // s — VTK + console output interval (~20 frames)
+static constexpr Real T_CSV = Real(0.0005);  // s — CSV stress-displacement output (~200 points)
 
 // Fraction of bounding-box extent used as tolerance for boundary detection.
 static constexpr Real BC_TOL_FRAC = Real(1e-3);
@@ -268,11 +269,13 @@ int main() {
     // always runs for T_SIM seconds regardless of mesh refinement.
     const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
     const int vtk_interval = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
+    const int csv_interval = std::max(1, static_cast<int>(std::round(T_CSV / dt)));
     const int print_interval = vtk_interval;
 
     std::cout << "\nRunning " << n_steps << " leapfrog steps (dt = " << dt << " s)...\n";
     std::cout << "  Total simulation time : " << n_steps * dt << " s\n";
     std::cout << "  VTK output every      : " << vtk_interval << " steps (" << T_VTK << " s)\n";
+    std::cout << "  CSV output every      : " << csv_interval << " steps (" << T_CSV << " s)\n";
     std::cout << std::fixed << std::setprecision(6);
 
     // Helpers: build numbered VTK filenames.
@@ -287,11 +290,13 @@ int main() {
         return s.str();
     };
 
-    // Open stress-displacement CSV for writing (no header).
+    // Open stress-displacement CSV for writing.
     // Each row: displacement_mm,stress_MPa
     std::ofstream stress_disp_csv("dogbone_velbc_stress_disp.csv");
     if (!stress_disp_csv.is_open()) {
         std::cerr << "Warning: could not open dogbone_velbc_stress_disp.csv for writing.\n";
+    } else {
+        stress_disp_csv << "displacement_mm,stress_MPa\n";
     }
 
     // ── Write frame 0: initial (undeformed) state ─────────────────────────────
@@ -339,7 +344,7 @@ int main() {
         // zeroed by the solver, so this is their only source of z-motion.
         element_data.AdvanceDrivenNodesZ(d_driven_idx, n_driven, dz);
 
-        if ((step + 1) % print_interval == 0 || (step + 1) % vtk_interval == 0) {
+        if ((step + 1) % csv_interval == 0 || (step + 1) % vtk_interval == 0) {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
@@ -347,30 +352,30 @@ int main() {
             VectorXR f_int;
             element_data.RetrieveInternalForceToCPU(f_int);
 
-            // Console progress.
+            // Mean actual z-displacement of driven nodes.
+            Real dz_sum = Real(0);
+            for (int i : driven_idx)
+                dz_sum += z_cur(i) - mesh.particle_z(i);
+            const Real dz_mean_driven = dz_sum / static_cast<Real>(driven_idx.size());
+
+            // Reaction stress: sum z-component of internal forces at fixed
+            // (bottom) nodes, divide by cross-sectional area.  The internal
+            // force at a fixed node points in the direction the material
+            // pulls it; negate to get the compressive reaction (tensile = positive).
+            Real f_reaction_z = Real(0);
+            for (int i : fixed_idx)
+                f_reaction_z += f_int(i * 3 + 2);
+            const Real stress = -f_reaction_z / A_cross_approx;
+
+            // Write to stress-displacement CSV at high frequency.
+            if ((step + 1) % csv_interval == 0 && stress_disp_csv.is_open()) {
+                stress_disp_csv << dz_mean_driven << "," << stress << "\n";
+            }
+
+            // Console progress at VTK (lower) frequency.
             if ((step + 1) % print_interval == 0) {
-                // Mean actual z-displacement of driven nodes (tracks prescribed).
-                Real dz_sum = Real(0);
-                for (int i : driven_idx)
-                    dz_sum += z_cur(i) - mesh.particle_z(i);
-                const Real dz_mean_driven = dz_sum / static_cast<Real>(driven_idx.size());
-
-                // Reaction stress: sum z-component of internal forces at fixed
-                // (bottom) nodes, divide by cross-sectional area.  The internal
-                // force at a fixed node points in the direction the material
-                // pulls it; negate to get the compressive reaction (tensile = positive).
-                Real f_reaction_z = Real(0);
-                for (int i : fixed_idx)
-                    f_reaction_z += f_int(i * 3 + 2);
-                const Real stress = -f_reaction_z / A_cross_approx;
-
                 std::cout << std::setw(8) << (step + 1) << std::setw(20) << prescribed_z_total << std::setw(20)
                           << dz_mean_driven << std::setw(18) << stress << "\n";
-
-                // Write to stress-displacement CSV.
-                if (stress_disp_csv.is_open()) {
-                    stress_disp_csv << dz_mean_driven << "," << stress << "\n";
-                }
             }
 
             // VTK snapshot.
