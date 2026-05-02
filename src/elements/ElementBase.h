@@ -33,12 +33,18 @@ struct ElementDispatchInfo {
 // Returns the human-readable name of an ElementType enum value.
 inline const char* ElementTypeToString(ElementType type) {
     switch (type) {
-        case TYPE_3243:      return "TYPE_3243";
-        case TYPE_3443:      return "TYPE_3443";
-        case TYPE_T10:       return "TYPE_T10";
-        case TYPE_T4:        return "TYPE_T4";
-        case TYPE_LDPM_TET4: return "TYPE_LDPM_TET4";
-        default:             return "UNKNOWN_TYPE";
+        case TYPE_3243:
+            return "TYPE_3243";
+        case TYPE_3443:
+            return "TYPE_3443";
+        case TYPE_T10:
+            return "TYPE_T10";
+        case TYPE_T4:
+            return "TYPE_T4";
+        case TYPE_LDPM_TET4:
+            return "TYPE_LDPM_TET4";
+        default:
+            return "UNKNOWN_TYPE";
     }
 }
 
@@ -52,14 +58,18 @@ inline const char* ElementTypeToString(ElementType type) {
 //   TYPE_LDPM_TET4:  1 facet per edge,        2 endpoint nodes per edge
 inline ElementDispatchInfo GetElementDispatchInfo(ElementType type) {
     switch (type) {
-        case TYPE_3243:      return {12, 8};
-        case TYPE_3443:      return {48, 16};
-        case TYPE_T10:       return {5,  10};
-        case TYPE_T4:        return {1,  4};
-        case TYPE_LDPM_TET4: return {1,  2};
+        case TYPE_3243:
+            return {12, 8};
+        case TYPE_3443:
+            return {48, 16};
+        case TYPE_T10:
+            return {5, 10};
+        case TYPE_T4:
+            return {1, 4};
+        case TYPE_LDPM_TET4:
+            return {1, 2};
         default:
-            MOPHI_ERROR("GetElementDispatchInfo: unknown element type %s",
-                        ElementTypeToString(type));
+            MOPHI_ERROR("GetElementDispatchInfo: unknown element type %s", ElementTypeToString(type));
             return {0, 0};  // unreachable; MOPHI_ERROR is fatal
     }
 }

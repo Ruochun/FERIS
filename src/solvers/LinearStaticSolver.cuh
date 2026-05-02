@@ -46,11 +46,10 @@ namespace feris {
 
 template <typename TData>
 class LinearStaticSolver : public SolverBase {
-    static_assert(
-        std::is_same<TData, GPU_FEAT10_Data>::value || std::is_same<TData, GPU_FEAT4_Data>::value,
-        "LinearStaticSolver only supports GPU_FEAT10_Data (TYPE_T10) and GPU_FEAT4_Data (TYPE_T4). "
-        "For ANCF elements use SyncedAdamWSolver or SyncedNesterovSolver. "
-        "For LDPM particles use LeapfrogSolver.");
+    static_assert(std::is_same<TData, GPU_FEAT10_Data>::value || std::is_same<TData, GPU_FEAT4_Data>::value,
+                  "LinearStaticSolver only supports GPU_FEAT10_Data (TYPE_T10) and GPU_FEAT4_Data (TYPE_T4). "
+                  "For ANCF elements use SyncedAdamWSolver or SyncedNesterovSolver. "
+                  "For LDPM particles use LeapfrogSolver.");
 
   public:
     /**

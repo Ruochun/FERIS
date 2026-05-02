@@ -929,8 +929,8 @@ void GPU_LDPMTet4_Data::ProjectEdgeCrackDistanceToSubfacets(VectorXR& out) {
 
     constexpr int threads = 256;
     const int blocks = (n_subfacet + threads - 1) / threads;
-    project_edge_crack_dist_to_subfacets_kernel<<<blocks, threads>>>(
-        n_subfacet, d_subfacet_edge_idx, d_omega, d_kappa, d_l0, d_sf_crack);
+    project_edge_crack_dist_to_subfacets_kernel<<<blocks, threads>>>(n_subfacet, d_subfacet_edge_idx, d_omega, d_kappa,
+                                                                     d_l0, d_sf_crack);
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
 
     out.resize(n_subfacet);

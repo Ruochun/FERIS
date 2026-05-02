@@ -1,10 +1,10 @@
 # FERIS
 
-A GPU-accelerated (CUDA) framework for nonlinear solid mechanics and discrete particle simulations.
+Finite Element Runtime with Independent Solvers, a GPU-accelerated (CUDA) framework for nonlinear solid mechanics and discrete particle simulations.
 
 ## Overview
 
-FERIS combines two physically distinct simulation paradigms on the GPU:
+FERIS currently provides two physically distinct simulation paradigms on the GPU:
 
 **Continuum / structural mechanics** (Total Lagrangian or ANCF formulation):
 - FEAT4 (TET4) and FEAT10 (TET10) — nonlinear continuum solid mechanics using Total Lagrangian kinematics (deformation gradient **F**, Green–Lagrange strain, Piola–Kirchhoff stress)

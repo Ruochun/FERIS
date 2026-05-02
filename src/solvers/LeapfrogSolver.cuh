@@ -67,9 +67,7 @@ class LeapfrogSolver : public SolverBase {
             case TYPE_LDPM_TET4:
                 break;
             default:
-                MOPHI_ERROR(
-                    "LeapfrogSolver: unknown element type %s.",
-                    ElementTypeToString(data->type));
+                MOPHI_ERROR("LeapfrogSolver: unknown element type %s.", ElementTypeToString(data->type));
                 return;  // unreachable; MOPHI_ERROR is fatal
         }
 
