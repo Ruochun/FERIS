@@ -29,7 +29,7 @@
 #include "../src/types.h"
 #include "../src/utils/quadrature_utils.h"
 
-using namespace tlfea;
+using namespace feris;
 
 // Material and geometry parameters
 const Real E_mod = 7e7;    // Young's modulus (Pa)

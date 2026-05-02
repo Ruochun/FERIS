@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    SyncedAdamWNocoop.cuh
@@ -22,7 +22,7 @@
 
 #include "SyncedAdamW.cuh"
 
-namespace tlfea {
+namespace feris {
 
 using SyncedAdamWNocoopParams = SyncedAdamWParams;
 
@@ -408,4 +408,4 @@ class SyncedAdamWNocoopSolver : public SolverBase {
     Real* d_norm_temp_cublas_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

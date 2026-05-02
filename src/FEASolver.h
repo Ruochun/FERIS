@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    FEASolver.h
  * Brief:   Convenience header that includes all element and solver
  *          implementations in this project.  Including this single

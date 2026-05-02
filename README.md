@@ -1,10 +1,10 @@
-# TLFEA
+# FERIS
 
 A GPU-accelerated (CUDA) framework for nonlinear solid mechanics and discrete particle simulations.
 
 ## Overview
 
-TLFEA combines two physically distinct simulation paradigms on the GPU:
+FERIS combines two physically distinct simulation paradigms on the GPU:
 
 **Continuum / structural mechanics** (Total Lagrangian or ANCF formulation):
 - FEAT4 (TET4) and FEAT10 (TET10) — nonlinear continuum solid mechanics using Total Lagrangian kinematics (deformation gradient **F**, Green–Lagrange strain, Piola–Kirchhoff stress)
@@ -48,8 +48,8 @@ See [`docs/SOLVER_ELEMENT_COMPATIBILITY.md`](docs/SOLVER_ELEMENT_COMPATIBILITY.m
 
 ```bash
 # Clone the repository with submodules
-git clone --recursive https://github.com/Ruochun/TLFEA.git
-cd TLFEA
+git clone --recursive https://github.com/Ruochun/FERIS.git
+cd FERIS
 
 # Or if already cloned, initialize submodules
 git submodule update --init --recursive
@@ -93,7 +93,7 @@ See [examples/README_BEAM.md](examples/README_BEAM.md) for detailed information 
 ## Project Structure
 
 ```
-TLFEA/
+FERIS/
 ├── src/
 │   ├── elements/      # FEA element implementations (FEAT4, FEAT10, ANCF3243, ANCF3443, LDPMTet4)
 │   ├── solvers/       # Solvers (LinearStatic, SyncedNesterov, SyncedAdamW, SyncedAdamWNocoop, Leapfrog)

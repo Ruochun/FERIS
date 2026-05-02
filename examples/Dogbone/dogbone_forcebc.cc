@@ -115,7 +115,7 @@
 #include "../src/types.h"
 #include "../src/utils/ldpm_mesh_utils.h"
 
-using namespace tlfea;
+using namespace feris;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 

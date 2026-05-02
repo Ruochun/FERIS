@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    ElementBase.h
@@ -17,7 +17,7 @@
 #include <MoPhiEssentials.h>
 #include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 enum ElementType { TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4, TYPE_LDPM_TET4 };
 
@@ -113,4 +113,4 @@ class ElementBase {
     virtual void RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>& p_from_F) = 0;
 };
 
-}  // namespace tlfea
+}  // namespace feris

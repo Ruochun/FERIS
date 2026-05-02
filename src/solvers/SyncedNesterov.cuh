@@ -26,7 +26,7 @@
 #include "SolverBase.h"
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 // this is a true first order Nesterov method
 // fully synced, and each inner iteration will compute the full gradient
@@ -309,4 +309,4 @@ class SyncedNesterovSolver : public SolverBase {
     int *d_max_inner_, *d_max_outer_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

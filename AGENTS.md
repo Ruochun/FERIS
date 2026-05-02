@@ -98,7 +98,7 @@ When adding a new solver, you must:
   committing if in doubt).
 - File header comments (`Project`, `File`, `Brief`) must be updated when the
   file's purpose or public interface changes significantly.
-- Keep the `namespace tlfea {` wrapping around all library code.
+- Keep the `namespace feris {` wrapping around all library code.
 - Prefer `__host__ __device__` accessors over raw member access for portability.
 - Add `override` to every virtual method in derived classes.
 

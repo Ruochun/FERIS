@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  * File:    LeapfrogSolver.cuh
@@ -33,7 +33,7 @@
 #include "../utils/quadrature_utils.h"
 #include "SolverBase.h"
 
-namespace tlfea {
+namespace feris {
 
 // Parameters for the leapfrog (central-difference) explicit integrator.
 struct LeapfrogParams {
@@ -198,4 +198,4 @@ class LeapfrogSolver : public SolverBase {
     Real* d_time_step_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

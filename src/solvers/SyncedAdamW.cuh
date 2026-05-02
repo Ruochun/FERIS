@@ -1,7 +1,7 @@
 #pragma once
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    SyncedAdamW.cuh
@@ -27,7 +27,7 @@
 #include "SolverBase.h"
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 // this is a first order AdamW method
 // fully synced, and each inner iteration will compute the full gradient
@@ -374,4 +374,4 @@ class SyncedAdamWSolver : public SolverBase {
     int *d_max_inner_, *d_max_outer_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

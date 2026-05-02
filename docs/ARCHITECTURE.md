@@ -1,8 +1,8 @@
-# TLFEA Architecture
+# FERIS Architecture
 
 ## Overview
 
-TLFEA is a GPU-accelerated (CUDA) framework that combines two physically distinct simulation paradigms:
+FERIS is a GPU-accelerated (CUDA) framework that combines two physically distinct simulation paradigms:
 
 1. **Continuum / structural mechanics** — nonlinear solid elements using Total Lagrangian (TL) kinematics (FEAT4, FEAT10) and large-deformation structural elements using Absolute Nodal Coordinate Formulation (ANCF3243, ANCF3443). Both operate on continuous displacement fields; the constitutive law lives at Gauss integration points.
 
@@ -17,7 +17,7 @@ TLFEA is a GPU-accelerated (CUDA) framework that combines two physically distinc
 ## Directory Structure
 
 ```
-TLFEA/
+FERIS/
 ├── src/
 │   ├── elements/       # Finite element / particle element implementations
 │   │   ├── ElementBase.h              # Abstract base; ElementType enum

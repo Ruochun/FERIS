@@ -23,7 +23,7 @@
 #include "../src/utils/cpu_utils.h"
 #include "../src/utils/quadrature_utils.h"
 
-using namespace tlfea;
+using namespace feris;
 
 const Real E = 7e8;      // Young's modulus
 const Real nu = 0.33;    // Poisson's ratio

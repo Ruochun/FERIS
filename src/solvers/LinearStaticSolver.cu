@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    LinearStaticSolver.cu
  * Brief:   Implements the GPU-side steady-state (linear) FEA solver for
  *          tetrahedral elements (TET10 via GPU_FEAT10_Data, TET4 via
@@ -52,7 +52,7 @@
         }
 #endif
 
-namespace tlfea {
+namespace feris {
 
 // ---------------------------------------------------------------------------
 // Helper: set the last entry of an offset array.
@@ -494,4 +494,4 @@ template __global__ void assemble_stiffness_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Dat
 template __global__ void mark_fixed_dofs_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, int*);
 template __global__ void mark_fixed_dofs_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, int*);
 
-}  // namespace tlfea
+}  // namespace feris

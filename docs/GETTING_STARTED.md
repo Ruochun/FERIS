@@ -1,10 +1,10 @@
-# Getting Started with TLFEA
+# Getting Started with FERIS
 
-This guide will help you get up and running with TLFEA quickly.
+This guide will help you get up and running with FERIS quickly.
 
-## What is TLFEA?
+## What is FERIS?
 
-TLFEA is a GPU-accelerated framework for solid mechanics and particle simulations built on CUDA. It provides:
+FERIS is a GPU-accelerated framework for solid mechanics and particle simulations built on CUDA. It provides:
 
 - **Five element types**: FEAT4 (TET4), FEAT10 (TET10), ANCF3243 (cable), ANCF3443 (shell), LDPMTet4 (6-DOF discrete particle)
 - **Five solvers**: LinearStaticSolver, SyncedNesterov, SyncedAdamW, SyncedAdamWNocoop, LeapfrogSolver
@@ -30,8 +30,8 @@ Download and install from [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cud
 
 ```bash
 # Clone the repository with submodules
-git clone --recursive https://github.com/Ruochun/TLFEA.git
-cd TLFEA
+git clone --recursive https://github.com/Ruochun/FERIS.git
+cd FERIS
 
 # Create build directory
 mkdir build

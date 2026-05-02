@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  * File:    LeapfrogSolver.cu
@@ -30,7 +30,7 @@
 #include "../elements/LDPMTet4DataFunc.cuh"
 #include "LeapfrogSolver.cuh"
 
-namespace tlfea {
+namespace feris {
 
 // ---------------------------------------------------------------------------
 // leapfrog_compute_lumped_mass_kernel
@@ -446,4 +446,4 @@ template __global__ void leapfrog_update_velocity_rot_kernel<GPU_LDPMTet4_Data>(
 template __global__ void leapfrog_apply_bc_ldpm_tet4_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_rotation_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 
-}  // namespace tlfea
+}  // namespace feris

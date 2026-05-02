@@ -1,11 +1,11 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    SyncedAdamW.cu
  * Brief:   Implements the GPU-synchronized AdamW optimizer used to advance
- *          generalized velocities and positions in TLFEA. Defines the
+ *          generalized velocities and positions in FERIS. Defines the
  *          cooperative kernel that evaluates element residuals, constraint
  *          contributions, and performs fully-synchronized AdamW updates for
  *          ANCF3243, ANCF3443, and FEAT10 element data.
@@ -27,7 +27,7 @@
 
 namespace cg = cooperative_groups;
 
-namespace tlfea {
+namespace feris {
 
 // Templated solver_grad_L
 template <typename ElementType>
@@ -424,4 +424,4 @@ void SyncedAdamWSolver::OneStepAdamW() {
     MOPHI_GPU_CALL(cudaEventDestroy(stop));
 }
 
-}  // namespace tlfea
+}  // namespace feris

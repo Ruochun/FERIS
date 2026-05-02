@@ -2,7 +2,7 @@
 
 #include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 /**
  * Gauss-Legendre quadrature points and weights for ANCF calculations
@@ -179,4 +179,4 @@ const VectorXR tet1pt_z = (VectorXR(N_QP_T4_1) << 0.25).finished();
 const VectorXR tet1pt_weights = (VectorXR(N_QP_T4_1) << 1.0 / 6.0).finished();
 }  // namespace Quadrature
 
-}  // namespace tlfea
+}  // namespace feris

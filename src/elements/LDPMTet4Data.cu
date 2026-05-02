@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    LDPMTet4Data.cu
  * Brief:   Implements GPU-side data management for the 6-DOF LDPM
  *          element (TYPE_LDPM_TET4).  Host methods handle:
@@ -31,7 +31,7 @@
 #include "LDPMTet4DataFunc.cuh"
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 // ─── GPU kernel wrappers ─────────────────────────────────────────────────────
 
@@ -993,4 +993,4 @@ void GPU_LDPMTet4_Data::Destroy() {
     MOPHI_GPU_CALL(cudaFree(d_data));
 }
 
-}  // namespace tlfea
+}  // namespace feris

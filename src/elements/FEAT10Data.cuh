@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    FEAT10Data.cuh
  * Brief:   Declares the GPU_FEAT10_Data structure and associated host/GPU
  *          interfaces for 10-node quadratic tetrahedral (TET10) elements.
@@ -25,7 +25,7 @@
 #include "../types.h"
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 //
 // define a SAP data strucutre
@@ -836,4 +836,4 @@ struct GPU_FEAT10_Data : public ElementBase {
     bool is_j_csr_setup = false;
 };
 
-}  // namespace tlfea
+}  // namespace feris

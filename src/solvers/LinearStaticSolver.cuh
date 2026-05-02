@@ -1,7 +1,7 @@
 #pragma once
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    LinearStaticSolver.cuh
  * Brief:   Declares the LinearStaticSolver class template, which performs a
  *          single-step steady-state (linear) FEA solve for tetrahedral
@@ -42,7 +42,7 @@
 #include "../types.h"
 #include "SolverBase.h"
 
-namespace tlfea {
+namespace feris {
 
 template <typename TData>
 class LinearStaticSolver : public SolverBase {
@@ -129,4 +129,4 @@ class LinearStaticSolver : public SolverBase {
 using LinearStaticSolverT10 = LinearStaticSolver<GPU_FEAT10_Data>;
 using LinearStaticSolverT4 = LinearStaticSolver<GPU_FEAT4_Data>;
 
-}  // namespace tlfea
+}  // namespace feris

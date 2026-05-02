@@ -28,7 +28,7 @@
 #include "ElementBase.h"
 #include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 //
 // define a SAP data strucutre
@@ -1113,4 +1113,4 @@ struct GPU_ANCF3243_Data : public ElementBase {
     int constraint_mode = kConstraintNone;
 };
 
-}  // namespace tlfea
+}  // namespace feris

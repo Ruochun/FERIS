@@ -1,7 +1,7 @@
 #pragma once
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    LDPMTet4DataFunc.cuh
  * Brief:   CUDA device functions for the 6-DOF LDPM element
  *          (TYPE_LDPM_TET4) built on a TET4 Delaunay triangulation.
@@ -35,7 +35,7 @@
 #include "../materials/LDPM.cuh"
 #include "LDPMTet4Data.cuh"
 
-namespace tlfea {
+namespace feris {
 
 // ---------------------------------------------------------------------------
 // compute_p for LDPMTet4
@@ -201,4 +201,4 @@ __device__ __forceinline__ void clear_internal_force(GPU_LDPMTet4_Data* d_data) 
     }
 }
 
-}  // namespace tlfea
+}  // namespace feris

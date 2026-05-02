@@ -27,7 +27,7 @@
 
 namespace cg = cooperative_groups;
 
-namespace tlfea {
+namespace feris {
 
 template <typename ElementType>
 __device__ Real solver_grad_L(int tid, ElementType* data, SyncedNesterovSolver* d_solver) {
@@ -413,4 +413,4 @@ void SyncedNesterovSolver::OneStepNesterov() {
     MOPHI_GPU_CALL(cudaEventDestroy(stop));
 }
 
-}  // namespace tlfea
+}  // namespace feris

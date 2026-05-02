@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    types.h
  * Brief:   Defines the Real type as an alias for double and provides
  *          type aliases for Eigen matrix and vector types using Real.
@@ -13,7 +13,7 @@
 
 #include <Eigen/Dense>
 
-namespace tlfea {
+namespace feris {
 
 // Define Real as the primary floating-point type for the project
 typedef double Real;
@@ -23,12 +23,12 @@ static constexpr int DynamicMatrix = Eigen::Dynamic;
 static constexpr int RowMajorMatrix = Eigen::RowMajor;
 static constexpr int ColMajorMatrix = Eigen::ColMajor;
 
-// Wrap Eigen::Matrix under tlfea namespace
+// Wrap Eigen::Matrix under feris namespace
 // This allows future flexibility to change the underlying implementation
 template <typename Scalar, int Rows, int Cols, int Options = 0>
 using Matrix = Eigen::Matrix<Scalar, Rows, Cols, Options>;
 
-// Wrap Eigen::Map under tlfea namespace
+// Wrap Eigen::Map under feris namespace
 // This allows future flexibility to change the underlying implementation
 template <typename PlainObjectType, int MapOptions = Eigen::Unaligned, typename StrideType = Eigen::Stride<0, 0>>
 using Map = Eigen::Map<PlainObjectType, MapOptions, StrideType>;
@@ -41,4 +41,4 @@ typedef Matrix<Real, 3, 1> Vector3R;
 typedef Matrix<int, DynamicMatrix, DynamicMatrix> MatrixXi;
 typedef Matrix<int, DynamicMatrix, 1> VectorXi;
 
-}  // namespace tlfea
+}  // namespace feris

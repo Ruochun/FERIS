@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    FEAT4Data.cuh
  * Brief:   Declares the GPU_FEAT4_Data structure and associated host/GPU
  *          interfaces for 4-node linear tetrahedral (TET4) elements.
@@ -25,7 +25,7 @@
 #include "../types.h"
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 struct GPU_FEAT4_Data : public ElementBase {
     // Static compile-time constants for template dispatch
@@ -763,4 +763,4 @@ struct GPU_FEAT4_Data : public ElementBase {
     bool is_j_csr_setup = false;
 };
 
-}  // namespace tlfea
+}  // namespace feris

@@ -1,4 +1,4 @@
-# Building TLFEA
+# Building FERIS
 
 ## Prerequisites
 
@@ -37,8 +37,8 @@ sudo dnf install eigen3-devel
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/Ruochun/TLFEA.git
-cd TLFEA
+git clone https://github.com/Ruochun/FERIS.git
+cd FERIS
 ```
 
 2. Create a build directory:

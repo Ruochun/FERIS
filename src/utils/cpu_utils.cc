@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 namespace ANCFCPUUtils {
 
@@ -736,4 +736,4 @@ int FEAT10_read_elements(const std::string& filename, MatrixXi& elements) {
 
 }  // namespace ANCFCPUUtils
 
-}  // namespace tlfea
+}  // namespace feris

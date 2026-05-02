@@ -2,7 +2,7 @@
 
 ## Overview
 
-`LDPMTet4` (`TYPE_LDPM_TET4`) is the recommended LDPM element in TLFEA.  It
+`LDPMTet4` (`TYPE_LDPM_TET4`) is the recommended LDPM element in FERIS.  It
 extends the original 3-DOF (`TYPE_LDPM4_DEPRECATED`) formulation by adding
 three linearised rotational degrees of freedom per particle (θ_x, θ_y, θ_z),
 enabling a richer representation of bending and twisting interactions between

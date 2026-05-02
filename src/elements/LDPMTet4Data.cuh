@@ -44,7 +44,7 @@
 //  • Rotational inertia: I_lump = ALPHA_ROT * m_lump * l_min_node^2
 //    with ALPHA_ROT = 0.25.
 
-namespace tlfea {
+namespace feris {
 
 // Rotational inertia scaling factor  (I = alpha * m * l_min^2).
 static constexpr Real LDPM_TET4_ALPHA_ROT = Real(0.25);
@@ -522,4 +522,4 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     bool is_constraints_setup = false;
 };
 
-}  // namespace tlfea
+}  // namespace feris

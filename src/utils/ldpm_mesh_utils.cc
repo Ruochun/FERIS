@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    ldpm_mesh_utils.cc
  * Brief:   Implements the six LDPM mesh-file readers declared in
  *          ldpm_mesh_utils.h.
@@ -22,7 +22,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace tlfea {
+namespace feris {
 
 // ============================================================
 // Internal helpers
@@ -909,4 +909,4 @@ bool WriteLDPMTet4EdgeDamageToVTK(const std::string& filename,
     return true;
 }
 
-}  // namespace tlfea
+}  // namespace feris

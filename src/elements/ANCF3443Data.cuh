@@ -28,7 +28,7 @@
 #include "../materials/MaterialModel.cuh"
 #include "ElementBase.h"
 
-namespace tlfea {
+namespace feris {
 
 //
 // define a SAP data strucutre
@@ -1188,4 +1188,4 @@ struct GPU_ANCF3443_Data : public ElementBase {
     int constraint_mode = kConstraintNone;
 };
 
-}  // namespace tlfea
+}  // namespace feris

@@ -13,7 +13,7 @@
 
 #pragma once
 
-namespace tlfea {
+namespace feris {
 
 class SolverBase {
   public:
@@ -24,4 +24,4 @@ class SolverBase {
     virtual void SetParameters(void* params) = 0;
 };
 
-}  // namespace tlfea
+}  // namespace feris

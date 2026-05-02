@@ -25,7 +25,7 @@
 #include "ANCF3443DataFunc.cuh"
 namespace cg = cooperative_groups;
 
-namespace tlfea {
+namespace feris {
 
 __device__ __forceinline__ int binary_search_column_csr_mass_3443(const int* cols, int n_cols, int target) {
     int left = 0;
@@ -748,4 +748,4 @@ void GPU_ANCF3443_Data::CalcConstraintData() {
     cudaDeviceSynchronize();
 }
 
-}  // namespace tlfea
+}  // namespace feris

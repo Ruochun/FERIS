@@ -1,13 +1,13 @@
 # Beam Simulation Example
 
-This example demonstrates loading a mesh from a VTU file and performing a realistic engineering analysis using the TLFEA framework.
+This example demonstrates loading a mesh from a VTU file and performing a realistic engineering analysis using the FERIS framework.
 
 ## Overview
 
 The simulation performs the following steps:
 
 1. **Load Mesh**: Reads a tetrahedral mesh (TET10 10-node elements) from `data/meshes/T10/beam.vtu` using MoPhiEssentials' VTU loader
-2. **Extract Data**: Converts the mophi::Mesh data structure to TLFEA's format (Eigen matrices)
+2. **Extract Data**: Converts the mophi::Mesh data structure to FERIS's format (Eigen matrices)
 3. **Apply Boundary Conditions**: Fixes all nodes at x≈0 (one end of the beam)
 4. **Apply Loading**: Applies a concentrated downward force at x≈10 (the free end)
 5. **Run Simulation**: Executes 10000 timesteps using the SyncedNesterov solver
@@ -104,7 +104,7 @@ This example uses MoPhiEssentials' `mophi::Mesh` class and `mophi::LoadVtu()` fu
 - Node coordinates with halo support for multi-GPU simulations
 - Element region tags and boundary condition tags
 
-This demo specifically uses TET10 elements, which are compatible with TLFEA's FEAT10 element type.
+This demo specifically uses TET10 elements, which are compatible with FERIS's FEAT10 element type.
 
 ### Mesh Requirements
 

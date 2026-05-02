@@ -14,7 +14,7 @@ set(DOGBONE_INCLUDE_DIRS
 # simulation with a constant applied nodal force (force-BC / load-controlled).
 # Step count and output intervals are computed from the CFL time step.
 add_executable(dogbone_forcebc dogbone_forcebc.cc)
-target_link_libraries(dogbone_forcebc tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(dogbone_forcebc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(dogbone_forcebc PRIVATE ${DOGBONE_INCLUDE_DIRS})
 set_target_properties(dogbone_forcebc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -24,6 +24,6 @@ set_target_properties(dogbone_forcebc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAK
 # the ChLinkMotorLinearPosition kinematic-BC approach.  Runs for 0.1 s with
 # step count and output intervals computed from the CFL time step.
 add_executable(dogbone_velbc dogbone_velbc.cc)
-target_link_libraries(dogbone_velbc tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(dogbone_velbc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(dogbone_velbc PRIVATE ${DOGBONE_INCLUDE_DIRS})
 set_target_properties(dogbone_velbc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
