@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(TLFEA VERSION 0.1.0 LANGUAGES CXX CUDA)
+project(FERIS VERSION 0.1.0 LANGUAGES CXX CUDA)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -34,13 +34,13 @@ file(GLOB SOLVER_SOURCES CONFIGURE_DEPENDS src/solvers/*.cu)
 file(GLOB UTILS_SOURCES CONFIGURE_DEPENDS src/utils/*.cc)
 
 # Create a library with all FEA components
-add_library(tlfea_lib STATIC
+add_library(feris_lib STATIC
     ${ELEMENT_SOURCES}
     ${SOLVER_SOURCES}
     ${UTILS_SOURCES}
 )
 
-target_link_libraries(tlfea_lib
+target_link_libraries(feris_lib
     PUBLIC
         Eigen3::Eigen
         CUDA::cudart
@@ -50,10 +50,10 @@ target_link_libraries(tlfea_lib
         mophi_essentials
 )
 
-target_include_directories(tlfea_lib PUBLIC
+target_include_directories(feris_lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/MoPhiEssentials/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/tlfea>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/feris>
 )
 
 # Add examples subdirectory
@@ -71,10 +71,10 @@ include(CMakePackageConfigHelpers)
 # Install the compiled library and export its targets.
 # mophi_essentials is also listed here so that CMake's install-export
 # dependency checker (which flags even PRIVATE deps on older CMake) can
-# resolve the target; the generated TLFEATargets.cmake will carry it as
-# TLFEA::mophi_essentials.
-install(TARGETS tlfea_lib mophi_essentials
-    EXPORT TLFEATargets
+# resolve the target; the generated FERISTargets.cmake will carry it as
+# FERIS::mophi_essentials.
+install(TARGETS feris_lib mophi_essentials
+    EXPORT FERISTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -82,17 +82,17 @@ install(TARGETS tlfea_lib mophi_essentials
 
 # Install all public headers, preserving the src/ subdirectory structure
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tlfea
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/feris
     FILES_MATCHING
         PATTERN "*.h"
         PATTERN "*.hpp"
         PATTERN "*.cuh"
 )
 
-# Install bundled MoPhiEssentials headers alongside TLFEA headers so
+# Install bundled MoPhiEssentials headers alongside FERIS headers so
 # downstream consumers that use the installed package still have them.
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/external/MoPhiEssentials/src/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tlfea
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/feris
     FILES_MATCHING
         PATTERN "*.h"
         PATTERN "*.hpp"
@@ -100,29 +100,29 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/external/MoPhiEssentials/src/
 )
 
 # Export targets file (for use from an install tree)
-install(EXPORT TLFEATargets
-    FILE TLFEATargets.cmake
-    NAMESPACE TLFEA::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TLFEA
+install(EXPORT FERISTargets
+    FILE FERISTargets.cmake
+    NAMESPACE FERIS::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/FERIS
 )
 
 # Generate a version file
 write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/TLFEAConfigVersion.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/FERISConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY AnyNewerVersion
 )
 
 # Generate the package config file from the template
 configure_package_config_file(
-    "${CMAKE_SOURCE_DIR}/cmake/TLFEAConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/TLFEAConfig.cmake"
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TLFEA
+    "${CMAKE_SOURCE_DIR}/cmake/FERISConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/FERISConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/FERIS
 )
 
 # Install the config and version files
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/TLFEAConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/TLFEAConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TLFEA
+    "${CMAKE_CURRENT_BINARY_DIR}/FERISConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/FERISConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/FERIS
 )

@@ -8,7 +8,7 @@
 
 #include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 namespace ANCFCPUUtils {
 
@@ -265,4 +265,4 @@ bool WriteFEAT4ToVTK(const std::string& filename,
 
 }  // namespace ANCFCPUUtils
 
-}  // namespace tlfea
+}  // namespace feris

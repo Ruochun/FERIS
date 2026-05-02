@@ -1,12 +1,12 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    SyncedAdamWNocoop.cu
  * Brief:   Implements the GPU-synchronized AdamW optimizer (non-cooperative
  *          variant) used to advance generalized velocities and positions in
- *          TLFEA. Defines kernels that evaluate element residuals,
+ *          FERIS. Defines kernels that evaluate element residuals,
  *          constraint contributions, and apply AdamW updates for ANCF3243,
  *          ANCF3443, and FEAT10 element data without cooperative groups.
  *==============================================================
@@ -28,7 +28,7 @@
 #include "SyncedAdamWNocoop.cuh"
 #include <MoPhiEssentials.h>
 
-namespace tlfea {
+namespace feris {
 
 Real SyncedAdamWNocoopSolver::compute_l2_norm_cublas(Real* d_vec, int n_dofs) {
     cublasDnrm2(cublas_handle_, n_dofs, d_vec, 1, d_norm_temp_cublas_);
@@ -505,4 +505,4 @@ template __global__ void adamw_dual_update_kernel<GPU_ANCF3443_Data>(GPU_ANCF344
 template __global__ void adamw_dual_update_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, SyncedAdamWNocoopSolver*);
 template __global__ void adamw_dual_update_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, SyncedAdamWNocoopSolver*);
 
-}  // namespace tlfea
+}  // namespace feris

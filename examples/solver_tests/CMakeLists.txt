@@ -17,12 +17,12 @@ set(SOLVER_TEST_INCLUDE_DIRS
 
 # ── Nesterov accelerated gradient descent ────────────────────────────────────
 add_executable(test_feat10_nesterov test_feat10_nesterov.cc)
-target_link_libraries(test_feat10_nesterov tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(test_feat10_nesterov feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(test_feat10_nesterov PRIVATE ${SOLVER_TEST_INCLUDE_DIRS})
 set_target_properties(test_feat10_nesterov PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── AdamW optimizer-based solver ─────────────────────────────────────────────
 add_executable(test_feat10_adamw test_feat10_adamw.cc)
-target_link_libraries(test_feat10_adamw tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(test_feat10_adamw feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(test_feat10_adamw PRIVATE ${SOLVER_TEST_INCLUDE_DIRS})
 set_target_properties(test_feat10_adamw PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

@@ -1,8 +1,12 @@
-# TLFEA Architecture
+# FERIS Architecture
 
 ## Overview
 
-TLFEA (Total Lagrangian Finite Element Analysis) is a GPU-accelerated FEA / particle-mechanics framework for solid mechanics and discrete particle simulations.
+FERIS is a GPU-accelerated (CUDA) framework that combines two physically distinct simulation paradigms:
+
+1. **Continuum / structural mechanics** — nonlinear solid elements using Total Lagrangian (TL) kinematics (FEAT4, FEAT10) and large-deformation structural elements using Absolute Nodal Coordinate Formulation (ANCF3243, ANCF3443). Both operate on continuous displacement fields; the constitutive law lives at Gauss integration points.
+
+2. **Discrete particle mechanics** (LDPM) — the `LDPMTet4` element is **not** FEA of any kind. It is a mesoscale lattice model where physics are described by discrete particle interactions across Voronoi facets, without a continuum displacement field or deformation gradient. The only geometric connection to the FEA elements is that the same TET4 Delaunay triangulation format is reused to define the particle neighbourhood.
 
 ## Design Philosophy
 
@@ -13,7 +17,7 @@ TLFEA (Total Lagrangian Finite Element Analysis) is a GPU-accelerated FEA / part
 ## Directory Structure
 
 ```
-TLFEA/
+FERIS/
 ├── src/
 │   ├── elements/       # Finite element / particle element implementations
 │   │   ├── ElementBase.h              # Abstract base; ElementType enum
@@ -73,17 +77,29 @@ TLFEA/
 
 ## Element Types
 
-### `FEAT4` / `FEAT10` — Continuum FEA
+### `FEAT4` / `FEAT10` — Total Lagrangian Continuum FEA
 
-TET4 (4-node) and TET10 (10-node) tetrahedral elements using a St. Venant-Kirchhoff
-(SVK) hyperelastic material law.  Each node carries 3 translational DOFs.
-Best suited for problems where continuum stress and deformation fields are of interest.
+TET4 (4-node) and TET10 (10-node) tetrahedral elements implementing a **Total Lagrangian** formulation:
+all quantities (strain, stress, integration) are referenced to the undeformed configuration throughout
+the simulation.  Kinematics: deformation gradient **F = ∂x/∂X**; strain: Green–Lagrange tensor
+**E = (F^T F − I)/2**; stress: 1st Piola–Kirchhoff **P**.  Supports St. Venant–Kirchhoff (SVK)
+and Mooney–Rivlin material laws.  Each node carries 3 translational DOFs.
 
-### `LDPMTet4` (TYPE_LDPM_TET4) — 6-DOF Lattice Discrete Particle Model *(recommended)*
+### `ANCF3243` / `ANCF3443` — Large-Deformation Structural Elements (ANCF)
 
-Implements the Lattice Discrete Particle Model on a TET4 Delaunay triangulation.
-Every unique edge (i, j) of the mesh is one discrete "strut" with an associated
-Voronoi facet area.
+Cable and shell elements using the **Absolute Nodal Coordinate Formulation (ANCF)**.  ANCF is a
+large-deformation, large-rotation structural mechanics method that uses absolute positions and
+slope vectors as generalized coordinates instead of the classical TL deformation gradient.  Each node
+carries 8 (cable) or 16 (shell) generalized coordinates.  *These elements are not Total Lagrangian
+continuum FEA; they are a distinct structural mechanics formulation.*
+
+### `LDPMTet4` (TYPE_LDPM_TET4) — 6-DOF Lattice Discrete Particle Model *(not FEA)*
+
+**This element does not implement FEA of any kind.**  It is a **Lattice Discrete Particle Model
+(LDPM)** — a mesoscale particle method where physics are defined by discrete interactions between
+neighbouring particles across Voronoi facets, without a continuum displacement field, deformation
+gradient, or integration over a volume.  The TET4 Delaunay triangulation is used solely to define
+the particle neighbourhood topology.
 
 **DOF layout** — 6 DOFs per particle:
 - Translational: `x, y, z`
@@ -122,8 +138,8 @@ backward-compatibility only; may be removed in a future release.
 
 ### `LeapfrogSolver` — Explicit Central-Difference Integrator
 
-The preferred solver for dynamic LDPM simulations.  Advances the state by one
-time step using the velocity-Verlet (leapfrog) scheme:
+The preferred solver for dynamic LDPM simulations, and also usable for explicit dynamic continuum FEA.
+Advances the state by one time step using the velocity-Verlet (leapfrog) scheme:
 
 ```
 v_{n+½} = v_{n−½} + dt · M_lump⁻¹ · (f_ext − f_int)
@@ -142,13 +158,27 @@ Recommended safety factor: 0.5.
 ### `SyncedNesterov` / `SyncedAdamW` — Quasi-static/Dynamic Optimizers
 
 First-order momentum-based iterative solvers.  Suitable for continuum FEA
-elements (FEAT4, FEAT10) where energy minimisation converges to equilibrium.
-Not designed for LDPM lattice models.
+elements (FEAT4, FEAT10) and ANCF structural elements, where the simulation
+goal is energy minimisation toward equilibrium.  **Not designed for LDPM lattice
+models** — LDPM has no global energy landscape in the FEA sense; use
+`LeapfrogSolver` instead.
 
 ### Linear Static Solver (cuSPARSE)
 
 Solves `K · u = f` directly using the sparse linear solver from cuSPARSE.
 Gives the exact static equilibrium solution in a single solve.
+
+## Physical Formulations: What Each Element Actually Implements
+
+| Element | Formulation | Is it FEA? | Reference config? | Stress/traction |
+|---------|------------|-----------|-------------------|-----------------|
+| FEAT4, FEAT10 | **Total Lagrangian** continuum FEA | ✅ Yes | Undeformed body (TL) | Piola–Kirchhoff **P** at Gauss points |
+| ANCF3243, ANCF3443 | **ANCF** large-deformation structural | ✅ FEA-like (structural) | Undeformed element | Generalised internal forces |
+| LDPMTet4 | **LDPM** discrete particle lattice | ❌ Not FEA | Particle reference positions | Facet tractions **t** and moments **m** |
+
+LDPM (LDPMTet4) is physically a different class of model from FEA.  Results from LDPM and
+continuum FEA are **not directly comparable** even on the same geometry, because they represent
+different physics (mesoscale particle interactions vs. continuum stress fields).
 
 ## Why LDPM Results Differ from Linear/AdamW Solvers
 

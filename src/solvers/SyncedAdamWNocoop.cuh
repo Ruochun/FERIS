@@ -1,12 +1,16 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    SyncedAdamWNocoop.cuh
  * Brief:   Declares the non-cooperative GPU-synchronized AdamW solver.
  *          Provides host/device storage and kernels to evaluate residuals and
- *          apply AdamW updates for ANCF3243, ANCF3443, and FEAT10 element data.
+ *          apply AdamW updates for ANCF3243, ANCF3443, FEAT10, and FEAT4
+ *          element data.
+ *
+ *          Supported element types: TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4.
+ *          See docs/SOLVER_ELEMENT_COMPATIBILITY.md for the full matrix.
  *==============================================================
  *==============================================================*/
 
@@ -18,7 +22,7 @@
 
 #include "SyncedAdamW.cuh"
 
-namespace tlfea {
+namespace feris {
 
 using SyncedAdamWNocoopParams = SyncedAdamWParams;
 
@@ -26,41 +30,29 @@ class SyncedAdamWNocoopSolver : public SolverBase {
   public:
     SyncedAdamWNocoopSolver(ElementBase* data, int n_constraints)
         : n_coef_(data->get_n_coef()), n_beam_(data->get_n_beam()), n_constraints_(n_constraints) {
-        if (data->type == TYPE_3243) {
-            type_ = TYPE_3243;
-            auto* typed_data = static_cast<GPU_ANCF3243_Data*>(data);
-            d_data_ = typed_data->d_data;
-            d_constraint_ptr_ = typed_data->Get_Is_Constraint_Setup() ? typed_data->Get_Constraint_Ptr() : nullptr;
-            n_total_qp_ = Quadrature::N_TOTAL_QP_3_2_2;
-            n_shape_ = Quadrature::N_SHAPE_3243;
-            typed_data->CalcDsDuPre();
-        } else if (data->type == TYPE_3443) {
-            type_ = TYPE_3443;
-            auto* typed_data = static_cast<GPU_ANCF3443_Data*>(data);
-            d_data_ = typed_data->d_data;
-            d_constraint_ptr_ = typed_data->Get_Is_Constraint_Setup() ? typed_data->Get_Constraint_Ptr() : nullptr;
-            n_total_qp_ = Quadrature::N_TOTAL_QP_4_4_3;
-            n_shape_ = Quadrature::N_SHAPE_3443;
-            typed_data->CalcDsDuPre();
-        } else if (data->type == TYPE_T10) {
-            type_ = TYPE_T10;
-            auto* typed_data = static_cast<GPU_FEAT10_Data*>(data);
-            d_data_ = typed_data->d_data;
-            d_constraint_ptr_ = typed_data->Get_Is_Constraint_Setup() ? typed_data->Get_Constraint_Ptr() : nullptr;
-            n_total_qp_ = Quadrature::N_QP_T10_5;
-            n_shape_ = Quadrature::N_NODE_T10_10;
-        } else if (data->type == TYPE_T4) {
-            type_ = TYPE_T4;
-            auto* typed_data = static_cast<GPU_FEAT4_Data*>(data);
-            d_data_ = typed_data->d_data;
-            d_constraint_ptr_ = typed_data->Get_Is_Constraint_Setup() ? typed_data->Get_Constraint_Ptr() : nullptr;
-            n_total_qp_ = Quadrature::N_QP_T4_1;
-            n_shape_ = Quadrature::N_NODE_T4_4;
-        } else {
-            d_data_ = nullptr;
-            d_constraint_ptr_ = nullptr;
-            MOPHI_ERROR("Unknown element type!");
+        // Validate: this solver only supports continuum and ANCF element types.
+        switch (data->type) {
+            case TYPE_3243:
+            case TYPE_3443:
+            case TYPE_T10:
+            case TYPE_T4:
+                break;
+            default:
+                MOPHI_ERROR(
+                    "SyncedAdamWNocoopSolver does not support element type %s. "
+                    "Supported types: TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4. "
+                    "For TYPE_LDPM_TET4 use LeapfrogSolver instead.",
+                    ElementTypeToString(data->type));
+                return;  // unreachable; MOPHI_ERROR is fatal
         }
+
+        type_ = data->type;
+        data->PrepareSolverData();       // no-op for FEAT; calls CalcDsDuPre for ANCF
+        d_data_ = data->GetDevicePtr();  // device-side copy pointer
+        d_constraint_ptr_ = data->IsConstraintSetup() ? data->GetConstraintDevicePtr() : nullptr;
+        auto info = GetElementDispatchInfo(type_);
+        n_total_qp_ = info.n_total_qp;
+        n_shape_ = info.n_shape;
 
         cudaMalloc(&d_norm_g_, sizeof(Real));
         cudaMalloc(&d_norm_v_, sizeof(Real));
@@ -346,7 +338,7 @@ class SyncedAdamWNocoopSolver : public SolverBase {
     int n_coef_, n_beam_, n_constraints_;
 
     // Device pointer to the pre-computed constraint Jacobian/data block.
-    // Null if no constraints were set up on the element (Get_Is_Constraint_Setup() == false).
+    // Null if no constraints were set up on the element (IsConstraintSetup() == false).
     Real* d_constraint_ptr_;
 
     // DualArrays for long arrays (manage both pinned host and device memory).
@@ -416,4 +408,4 @@ class SyncedAdamWNocoopSolver : public SolverBase {
     Real* d_norm_temp_cublas_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

@@ -1,7 +1,7 @@
 #pragma once
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author:  Json Zhou
  * Email:   zzhou292@wisc.edu
  * File:    SyncedAdamW.cuh
@@ -10,21 +10,24 @@
  *          buffers for velocities, dual variables, convergence flags, and
  *          time-stepping parameters, and provides device accessors used by the
  *          AdamW kernel implementations.
+ *
+ *          Supported element types: TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4.
+ *          See docs/SOLVER_ELEMENT_COMPATIBILITY.md for the full matrix.
  *==============================================================
  *==============================================================*/
 
-#include "../utils/cuda_utils.h"
-#include "../utils/quadrature_utils.h"
 #include "../elements/ANCF3243Data.cuh"
 #include "../elements/ANCF3443Data.cuh"
 #include "../elements/ElementBase.h"
 #include "../elements/FEAT10Data.cuh"
 #include "../elements/FEAT4Data.cuh"
+#include "../types.h"
+#include "../utils/cuda_utils.h"
+#include "../utils/quadrature_utils.h"
 #include "SolverBase.h"
 #include <MoPhiEssentials.h>
-#include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 // this is a first order AdamW method
 // fully synced, and each inner iteration will compute the full gradient
@@ -42,41 +45,28 @@ class SyncedAdamWSolver : public SolverBase {
   public:
     SyncedAdamWSolver(ElementBase* data, int n_constraints)
         : n_coef_(data->get_n_coef()), n_beam_(data->get_n_beam()), n_constraints_(n_constraints) {
-        // Type-based casting to get the correct d_data from derived class
-        if (data->type == TYPE_3243) {
-            type_ = TYPE_3243;
-            auto* typed_data = static_cast<GPU_ANCF3243_Data*>(data);
-            d_data_ = typed_data->d_data;  // This accesses the derived class's d_data
-            n_total_qp_ = Quadrature::N_TOTAL_QP_3_2_2;
-            n_shape_ = Quadrature::N_SHAPE_3243;
-            typed_data->CalcDsDuPre();
-        } else if (data->type == TYPE_3443) {
-            type_ = TYPE_3443;
-            auto* typed_data = static_cast<GPU_ANCF3443_Data*>(data);
-            d_data_ = typed_data->d_data;  // This accesses the derived class's d_data
-            n_total_qp_ = Quadrature::N_TOTAL_QP_4_4_3;
-            n_shape_ = Quadrature::N_SHAPE_3443;
-            typed_data->CalcDsDuPre();
-        } else if (data->type == TYPE_T10) {
-            type_ = TYPE_T10;
-            auto* typed_data = static_cast<GPU_FEAT10_Data*>(data);
-            d_data_ = typed_data->d_data;  // This accesses the derived class's d_data
-            n_total_qp_ = Quadrature::N_QP_T10_5;
-            n_shape_ = Quadrature::N_NODE_T10_10;
-        } else if (data->type == TYPE_T4) {
-            type_ = TYPE_T4;
-            auto* typed_data = static_cast<GPU_FEAT4_Data*>(data);
-            d_data_ = typed_data->d_data;
-            n_total_qp_ = Quadrature::N_QP_T4_1;
-            n_shape_ = Quadrature::N_NODE_T4_4;
-        } else {
-            d_data_ = nullptr;
-            MOPHI_ERROR("Unknown element type!");
+        // Validate: this solver only supports continuum and ANCF element types.
+        switch (data->type) {
+            case TYPE_3243:
+            case TYPE_3443:
+            case TYPE_T10:
+            case TYPE_T4:
+                break;
+            default:
+                MOPHI_ERROR(
+                    "SyncedAdamWSolver does not support element type %s. "
+                    "Supported types: TYPE_3243, TYPE_3443, TYPE_T10, TYPE_T4. "
+                    "For TYPE_LDPM_TET4 use LeapfrogSolver instead.",
+                    ElementTypeToString(data->type));
+                return;  // unreachable; MOPHI_ERROR is fatal
         }
 
-        if (d_data_ == nullptr) {
-            MOPHI_ERROR("d_data_ is null in SyncedAdamWSolver constructor");
-        }
+        type_ = data->type;
+        data->PrepareSolverData();       // no-op for FEAT; calls CalcDsDuPre for ANCF
+        d_data_ = data->GetDevicePtr();  // device-side copy pointer
+        auto info = GetElementDispatchInfo(type_);
+        n_total_qp_ = info.n_total_qp;
+        n_shape_ = info.n_shape;
 
         cudaMalloc(&d_norm_g_, sizeof(Real));
         cudaMalloc(&d_inner_flag_, sizeof(int));
@@ -384,4 +374,4 @@ class SyncedAdamWSolver : public SolverBase {
     int *d_max_inner_, *d_max_outer_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

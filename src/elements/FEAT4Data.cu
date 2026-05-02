@@ -13,7 +13,7 @@
 
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    FEAT4Data.cu
  * Brief:   Implements GPU-side data management and element kernels for
  *          4-node linear tetrahedral (TET4/FEAT4) elements. Handles
@@ -27,7 +27,7 @@
 
 namespace cg = cooperative_groups;
 
-namespace tlfea {
+namespace feris {
 
 // ---------------------------------------------------------------------------
 // Keys kernel for mass CSR pattern building
@@ -649,4 +649,4 @@ void GPU_FEAT4_Data::RetrieveMassCSRToCPU(std::vector<int>& offsets,
     MOPHI_GPU_CALL(cudaMemcpy(values.data(), d_csr_values, h_nnz * sizeof(Real), cudaMemcpyDeviceToHost));
 }
 
-}  // namespace tlfea
+}  // namespace feris

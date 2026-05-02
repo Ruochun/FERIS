@@ -19,7 +19,7 @@
 #include "../materials/SVK.cuh"
 #include "ANCF3443Data.cuh"
 
-namespace tlfea {
+namespace feris {
 
 // forward-declare solver type (pointer-only used here)
 struct SyncedNewtonSolver;
@@ -968,4 +968,4 @@ __device__ __forceinline__ void compute_hessian_assemble_csr<GPU_ANCF3443_Data>(
     }
 }
 
-}  // namespace tlfea
+}  // namespace feris

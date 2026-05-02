@@ -1,15 +1,17 @@
-# Getting Started with TLFEA
+# Getting Started with FERIS
 
-This guide will help you get up and running with TLFEA quickly.
+This guide will help you get up and running with FERIS quickly.
 
-## What is TLFEA?
+## What is FERIS?
 
-TLFEA (Total Lagrangian Finite Element Analysis) is a GPU-accelerated FEA framework designed for simulating flexible multibody dynamics. This minimal implementation features:
+FERIS is a GPU-accelerated framework for solid mechanics and particle simulations built on CUDA. It provides:
 
-- **FEAT10 Element**: 10-node tetrahedral element for 3D solid mechanics
-- **SyncedNesterov Solver**: Fast iterative solver with Nesterov acceleration
-- **SVK Material**: St. Venant-Kirchhoff hyperelastic material model
-- **CUDA Acceleration**: Leverages GPU for fast computation
+- **Five element types**: FEAT4 (TET4), FEAT10 (TET10), ANCF3243 (cable), ANCF3443 (shell), LDPMTet4 (6-DOF discrete particle)
+- **Five solvers**: LinearStaticSolver, SyncedNesterov, SyncedAdamW, SyncedAdamWNocoop, LeapfrogSolver
+- **Multiple material models**: St. Venant–Kirchhoff, Mooney–Rivlin, LDPM facet damage law
+- **CUDA acceleration** for all element and solver kernels
+
+See [`docs/SOLVER_ELEMENT_COMPATIBILITY.md`](SOLVER_ELEMENT_COMPATIBILITY.md) for which element types work with which solvers.
 
 ## Installation
 
@@ -27,9 +29,9 @@ Download and install from [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cud
 ### Step 2: Clone and Build
 
 ```bash
-# Clone the repository
-git clone https://github.com/Ruochun/TLFEA.git
-cd TLFEA
+# Clone the repository with submodules
+git clone --recursive https://github.com/Ruochun/FERIS.git
+cd FERIS
 
 # Create build directory
 mkdir build
@@ -42,101 +44,65 @@ make -j$(nproc)
 
 ## Running Your First Simulation
 
-The included example (`test_feat10_nesterov`) demonstrates the FEA framework:
+### Continuum FEA (TET10, Nesterov solver)
 
 ```bash
 cd build
 ./bin/test_feat10_nesterov
 ```
 
-### What the Example Does
+This example tests the FEAT10 element infrastructure with the SyncedNesterov solver on a small cube mesh.
 
-1. Loads a cubic tetrahedral mesh from `data/meshes/T10/cube.1.node`
-2. Fixes all nodes on the z=0 plane
-3. Applies a horizontal point load
-4. Solves for equilibrium using the Nesterov solver
-5. Prints the deformed positions
+### Cantilever Beam (TET10, SyncedNesterov)
 
-### Expected Output
-
-You should see output like:
-```
-mesh read nodes: 27
-mesh read elements: 48
-gpu_t10_data created
-gpu_t10_data initialized
-Fixed nodes (z == 0):
-0 1 2 3 4 5 6 7 8
-...
-x12:
-0.00000000000000000 1.00000000000000000 ...
+```bash
+cd build
+./bin/beam_simulation
 ```
 
-The solver iterates to find the equilibrium configuration under the applied load.
+Loads a beam mesh from `data/meshes/T10/beam.vtu`, applies a tip load, and runs quasi-static equilibrium.
+
+### Cantilever Beam — Linear Static
+
+```bash
+./bin/beam_linear_static     # TET10
+./bin/beam_linear_static_t4  # TET4
+```
+
+Single-step linear static solve using cuSPARSE conjugate-gradient.
+
+### Cantilever Beam — Explicit Dynamic (Leapfrog)
+
+```bash
+./bin/test_leapfrog_t4    # TET4 continuum
+./bin/test_ldpm_tet4      # LDPMTet4 6-DOF particle (recommended LDPM example)
+```
+
+See [`examples/README.md`](../examples/README.md) for the full list and a description of why results differ across examples.
 
 ## Understanding the Code
 
 ### Main Components
 
 ```cpp
-// 1. Load mesh
-int n_nodes = ANCFCPUUtils::FEAT10_read_nodes("data/meshes/T10/cube.1.node", nodes);
-int n_elems = ANCFCPUUtils::FEAT10_read_elements("data/meshes/T10/cube.1.ele", elements);
-
-// 2. Create GPU data structure
+// 1. Create GPU element data structure
 GPU_FEAT10_Data gpu_t10_data(n_elems, n_nodes);
+gpu_t10_data.Setup(x, y, z, connectivity);
 
-// 3. Set up material properties
-gpu_t10_data.SetSVK(E, nu);  // Young's modulus, Poisson's ratio
+// 2. Set material and density
+gpu_t10_data.SetSVK(E, nu);       // St. Venant-Kirchhoff material
 gpu_t10_data.SetDensity(rho0);
 
-// 4. Create solver
+// 3. Apply boundary conditions and loads
+gpu_t10_data.SetNodalFixed(fixed_nodes);
+gpu_t10_data.SetExternalForce(f_ext);
+
+// 4. Create solver and solve
 SyncedNesterovSolver solver(&gpu_t10_data, n_constraints);
-
-// 5. Solve
-solver.Solve();
+SyncedNesterovParams params = {...};
+solver.SetParameters(&params);
+for (int i = 0; i < N_STEPS; ++i) solver.Solve();
 ```
-
-### Key Parameters
-
-- `E = 7e8` Pa: Young's modulus (aluminum-like stiffness)
-- `nu = 0.33`: Poisson's ratio
-- `rho0 = 2700` kg/m³: Density (aluminum)
-- `time_step = 1e-3` s: Time step for integration
-
-## Next Steps
-
-### Modify the Example
-
-1. **Change material properties**: Edit `E`, `nu`, `rho0` in the example
-2. **Apply different loads**: Modify the external force vector
-3. **Use different meshes**: Create your own `.node` and `.ele` files
-4. **Adjust solver parameters**: Tune convergence tolerances and iteration counts
-
-### Create Your Own Mesh
-
-Meshes are in Tetgen format:
-- `.node` file: Node coordinates
-- `.ele` file: Element connectivity
-
-You can use [Tetgen](http://wias-berlin.de/software/tetgen/) to generate meshes:
-```bash
-tetgen -pq1.414a0.001 your_geometry.poly
-```
-
-### Add New Materials
-
-To implement a new material model:
-1. Create a new header in `src/materials/`
-2. Implement the stress computation from deformation gradient
-3. Include in `FEAT10DataFunc.cuh`
-
-### Extend with More Elements
-
-Future extensions could add:
-- ANCF beam elements (for cables, ropes)
-- ANCF shell elements (for thin structures)
-- Other solid elements (hex, prism)
 
 ## Troubleshooting
 
@@ -157,27 +123,8 @@ Future extensions could add:
 
 ## Further Reading
 
-- [ARCHITECTURE.md](ARCHITECTURE.md): Understand the system design
-- [BUILDING.md](BUILDING.md): Detailed build instructions
-- [README.md](../README.md): Project overview
-
-## Getting Help
-
-If you encounter issues:
-1. Check the troubleshooting section above
-2. Review the example code for correct usage patterns
-3. Open an issue on GitHub with:
-   - Your system configuration
-   - Build/runtime error messages
-   - Steps to reproduce the problem
-
-## Contributing
-
-Contributions are welcome! Consider:
-- Adding new example programs
-- Implementing additional material models
-- Improving documentation
-- Optimizing performance
-- Adding unit tests
-
-See the main README for the project structure and extension points.
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md): System design and component overview
+- [`docs/SOLVER_ELEMENT_COMPATIBILITY.md`](SOLVER_ELEMENT_COMPATIBILITY.md): Which solver works with which element
+- [`docs/BUILDING.md`](BUILDING.md): Detailed build instructions
+- [`AGENTS.md`](../AGENTS.md): Rules for coding agents modifying this repo
+- [`README.md`](../README.md): Project overview

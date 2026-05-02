@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  * File:    LeapfrogSolver.cuh
@@ -11,6 +11,10 @@
  *          ANCF3243, ANCF3443, FEAT10, FEAT4, and LDPM_TET4 element
  *          types, with primary focus on LDPM_TET4 for
  *          particle-scale simulations with 6 DOFs per particle.
+ *
+ *          Supported element types: TYPE_3243, TYPE_3443, TYPE_T10,
+ *          TYPE_T4, TYPE_LDPM_TET4.
+ *          See docs/SOLVER_ELEMENT_COMPATIBILITY.md for the full matrix.
  *==============================================================
  *==============================================================*/
 
@@ -29,7 +33,7 @@
 #include "../utils/quadrature_utils.h"
 #include "SolverBase.h"
 
-namespace tlfea {
+namespace feris {
 
 // Parameters for the leapfrog (central-difference) explicit integrator.
 struct LeapfrogParams {
@@ -54,43 +58,25 @@ struct LeapfrogParams {
 class LeapfrogSolver : public SolverBase {
   public:
     LeapfrogSolver(ElementBase* data) : n_coef_(data->get_n_coef()), n_beam_(data->get_n_beam()) {
-        if (data->type == TYPE_3243) {
-            type_ = TYPE_3243;
-            auto* typed_data = static_cast<GPU_ANCF3243_Data*>(data);
-            d_data_ = typed_data->d_data;
-            n_total_qp_ = Quadrature::N_TOTAL_QP_3_2_2;
-            n_shape_ = Quadrature::N_SHAPE_3243;
-            typed_data->CalcDsDuPre();
-        } else if (data->type == TYPE_3443) {
-            type_ = TYPE_3443;
-            auto* typed_data = static_cast<GPU_ANCF3443_Data*>(data);
-            d_data_ = typed_data->d_data;
-            n_total_qp_ = Quadrature::N_TOTAL_QP_4_4_3;
-            n_shape_ = Quadrature::N_SHAPE_3443;
-            typed_data->CalcDsDuPre();
-        } else if (data->type == TYPE_T10) {
-            type_ = TYPE_T10;
-            auto* typed_data = static_cast<GPU_FEAT10_Data*>(data);
-            d_data_ = typed_data->d_data;
-            n_total_qp_ = Quadrature::N_QP_T10_5;
-            n_shape_ = Quadrature::N_NODE_T10_10;
-        } else if (data->type == TYPE_T4) {
-            type_ = TYPE_T4;
-            auto* typed_data = static_cast<GPU_FEAT4_Data*>(data);
-            d_data_ = typed_data->d_data;
-            n_total_qp_ = Quadrature::N_QP_T4_1;
-            n_shape_ = Quadrature::N_NODE_T4_4;
-        } else if (data->type == TYPE_LDPM_TET4) {
-            type_ = TYPE_LDPM_TET4;
-            auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(data);
-            d_data_ = typed_data->d_data;
-            // One facet per edge (one "QP"), two endpoint nodes per edge.
-            n_total_qp_ = 1;
-            n_shape_ = 2;
-        } else {
-            d_data_ = nullptr;
-            MOPHI_ERROR("Unknown element type in LeapfrogSolver!");
+        // Validate: all element types are supported; guard against unknown future types.
+        switch (data->type) {
+            case TYPE_3243:
+            case TYPE_3443:
+            case TYPE_T10:
+            case TYPE_T4:
+            case TYPE_LDPM_TET4:
+                break;
+            default:
+                MOPHI_ERROR("LeapfrogSolver: unknown element type %s.", ElementTypeToString(data->type));
+                return;  // unreachable; MOPHI_ERROR is fatal
         }
+
+        type_ = data->type;
+        data->PrepareSolverData();       // no-op for FEAT/LDPM; calls CalcDsDuPre for ANCF
+        d_data_ = data->GetDevicePtr();  // device-side copy pointer
+        auto info = GetElementDispatchInfo(type_);
+        n_total_qp_ = info.n_total_qp;
+        n_shape_ = info.n_shape;
 
         cudaMalloc(&d_time_step_, sizeof(Real));
         cudaMalloc(&d_leapfrog_solver_, sizeof(LeapfrogSolver));
@@ -210,4 +196,4 @@ class LeapfrogSolver : public SolverBase {
     Real* d_time_step_;
 };
 
-}  // namespace tlfea
+}  // namespace feris

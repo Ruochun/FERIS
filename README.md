@@ -1,15 +1,38 @@
-# TLFEA
+# FERIS
 
-Total Lagrangian Finite Element Analysis - A minimal FEA framework for flexible multibody dynamics.
+Finite Element Runtime with Independent Solvers, a GPU-accelerated (CUDA) framework for nonlinear solid mechanics and discrete particle simulations.
 
 ## Overview
 
-This project provides a starting point for Total Lagrangian finite element analysis, featuring:
-- **One element type**: FEAT10 (10-node tetrahedral element)
-- **One solver**: SyncedNesterov (iterative gradient-based solver)
+FERIS currently provides two physically distinct simulation paradigms on the GPU:
+
+**Continuum / structural mechanics** (Total Lagrangian or ANCF formulation):
+- FEAT4 (TET4) and FEAT10 (TET10) — nonlinear continuum solid mechanics using Total Lagrangian kinematics (deformation gradient **F**, Green–Lagrange strain, Piola–Kirchhoff stress)
+- ANCF3243 (cable) and ANCF3443 (shell) — large-deformation flexible structures using Absolute Nodal Coordinate Formulation (not classical TL; generalized position + slope coordinates)
+
+**Discrete particle mechanics** (LDPM — *not* FEA):
+- LDPMTet4 — Lattice Discrete Particle Model on a TET4 Delaunay triangulation; 6-DOF particles (translation + rotation) interacting via Voronoi facet tractions; no continuum field, no deformation gradient
+
+---
+
+- **Five element types**: FEAT4 (TET4), FEAT10 (TET10), ANCF3243 (cable), ANCF3443 (shell), LDPMTet4 (discrete particle)
+- **Five solvers**: LinearStaticSolver, SyncedNesterov, SyncedAdamW, SyncedAdamWNocoop, LeapfrogSolver
+- **Multiple material models**: St. Venant–Kirchhoff, Mooney–Rivlin, LDPM tensile-shear damage law
 - **CMake build system**: Easy to build and extend
 
-Based on the [Total-Lagrangian-FEA](https://github.com/uwsbel/Total-Lagrangian-FEA) project from SBEL at UW-Madison.
+Based on the [Total-Lagrangian-FEA](https://github.com/uwsbel/Total-Lagrangian-FEA) project from SBEL at UW-Madison (which covered TL continuum FEA only; the ANCF and LDPM components were added later).
+
+## Solver–Element Compatibility
+
+See [`docs/SOLVER_ELEMENT_COMPATIBILITY.md`](docs/SOLVER_ELEMENT_COMPATIBILITY.md) for the full matrix.
+
+|  | LinearStatic | SyncedNesterov | SyncedAdamW | SyncedAdamWNocoop | Leapfrog |
+|---|---|---|---|---|---|
+| FEAT4 (TET4) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| FEAT10 (TET10) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ANCF3243 (cable) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| ANCF3443 (shell) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| LDPMTet4 (particle) | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ## Quick Start
 
@@ -25,8 +48,8 @@ Based on the [Total-Lagrangian-FEA](https://github.com/uwsbel/Total-Lagrangian-F
 
 ```bash
 # Clone the repository with submodules
-git clone --recursive https://github.com/Ruochun/TLFEA.git
-cd TLFEA
+git clone --recursive https://github.com/Ruochun/FERIS.git
+cd FERIS
 
 # Or if already cloned, initialize submodules
 git submodule update --init --recursive
@@ -70,17 +93,20 @@ See [examples/README_BEAM.md](examples/README_BEAM.md) for detailed information 
 ## Project Structure
 
 ```
-TLFEA/
+FERIS/
 ├── src/
-│   ├── elements/      # FEA element implementations (FEAT10)
-│   ├── solvers/       # Iterative solvers (SyncedNesterov)
-│   ├── materials/     # Material models (St. Venant-Kirchhoff)
+│   ├── elements/      # FEA element implementations (FEAT4, FEAT10, ANCF3243, ANCF3443, LDPMTet4)
+│   ├── solvers/       # Solvers (LinearStatic, SyncedNesterov, SyncedAdamW, SyncedAdamWNocoop, Leapfrog)
+│   ├── materials/     # Material models (SVK, Mooney-Rivlin, LDPM damage)
 │   └── utils/         # Utility functions
 ├── external/
 │   └── MoPhiEssentials/  # Low-level GPU infrastructure (submodule)
 ├── examples/          # Example programs
 ├── data/              # Test data and meshes
 ├── docs/              # Documentation
+│   ├── SOLVER_ELEMENT_COMPATIBILITY.md  # Element/solver compatibility matrix
+│   └── ...
+├── AGENTS.md          # Rules for coding agents modifying this repo
 └── CMakeLists.txt     # Build configuration
 ```
 
@@ -103,23 +129,25 @@ The integration provides consistent error handling and logging across the codeba
 ## Features
 
 ### Implemented
+- ✅ FEAT4 (4-node tetrahedral) element
 - ✅ FEAT10 (10-node tetrahedral) element
+- ✅ ANCF3243 (flexible cable) element
+- ✅ ANCF3443 (flexible shell) element
+- ✅ LDPMTet4 (6-DOF lattice discrete particle) element
+- ✅ LinearStaticSolver (cuSPARSE conjugate-gradient)
 - ✅ SyncedNesterov iterative solver
+- ✅ SyncedAdamW iterative solver
+- ✅ SyncedAdamWNocoop iterative solver
+- ✅ LeapfrogSolver explicit dynamic integrator
 - ✅ St. Venant-Kirchhoff hyperelastic material
+- ✅ Mooney-Rivlin hyperelastic material
+- ✅ LDPM tensile-shear damage material
 - ✅ GPU acceleration via CUDA
 - ✅ CMake build system
-- ✅ Basic infrastructure test example
 - ✅ VTU mesh loading capability via MoPhiEssentials
-- ✅ Beam simulation demo using mophi::Mesh with VTU loading
 - ✅ MoPhiEssentials integration for error handling and logging
-- ✅ Custom Real type for flexible floating-point precision
-
-### Future Extensions
-- Additional element types (ANCF beam/shell elements)
-- More material models (Neo-Hookean, Mooney-Rivlin)
-- Additional solvers (Newton-Raphson, VBD)
-- Collision detection and contact handling
-- Advanced examples and benchmarks
+- ✅ Solver–element compatibility matrix (`docs/SOLVER_ELEMENT_COMPATIBILITY.md`)
+- ✅ Coding agent rules (`AGENTS.md`)
 
 ## License
 

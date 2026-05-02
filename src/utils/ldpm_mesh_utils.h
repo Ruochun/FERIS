@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    ldpm_mesh_utils.h
  * Brief:   Declares data structures and reader functions for the
  *          six Chrono Workbench / LDPM mesh data files produced
@@ -38,7 +38,7 @@
 
 #include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 // ============================================================
 // LDPMTet4Mesh — aggregates the data from all six LDPM files
@@ -286,4 +286,4 @@ bool WriteLDPMTet4EdgeDamageToVTK(const std::string& filename,
                                   const VectorXR& z_cur,
                                   const VectorXR& edge_damage);
 
-}  // namespace tlfea
+}  // namespace feris

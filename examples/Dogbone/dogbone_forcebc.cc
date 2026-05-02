@@ -115,7 +115,7 @@
 #include "../src/types.h"
 #include "../src/utils/ldpm_mesh_utils.h"
 
-using namespace tlfea;
+using namespace feris;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
@@ -166,10 +166,10 @@ static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energ
 //   computed at runtime, so the simulation always covers exactly T_SIM
 //   regardless of mesh refinement.
 
-static constexpr Real LOAD_FAC = Real(0.3);   // fraction of static failure load (0.3 = 30% of σ_t × A_cross)
-static constexpr Real T_SIM = Real(0.1);      // s — total simulation time
-static constexpr Real T_VTK = Real(0.005);    // s — VTK + console output interval (~20 frames)
-static constexpr Real T_CSV = Real(0.0005);   // s — CSV stress-displacement output (~200 points)
+static constexpr Real LOAD_FAC = Real(0.3);  // fraction of static failure load (0.3 = 30% of σ_t × A_cross)
+static constexpr Real T_SIM = Real(0.1);     // s — total simulation time
+static constexpr Real T_VTK = Real(0.005);   // s — VTK + console output interval (~20 frames)
+static constexpr Real T_CSV = Real(0.0005);  // s — CSV stress-displacement output (~200 points)
 
 // Fraction of bounding-box extent used as tolerance when identifying boundary
 // particles (nodes on the min/max face of the specimen).
@@ -407,8 +407,7 @@ int main() {
     // Print column header.
     const int n_edge = element_data.n_edge;
     std::cout << "\n"
-              << std::setw(8) << "Step" << std::setw(22) << "mean dz (loaded) [mm]" << std::setw(18)
-              << "stress [MPa]"
+              << std::setw(8) << "Step" << std::setw(22) << "mean dz (loaded) [mm]" << std::setw(18) << "stress [MPa]"
               << "\n";
     std::cout << std::string(50, '-') << "\n";
 
@@ -442,8 +441,7 @@ int main() {
 
             // Console progress at VTK (lower) frequency.
             if ((step + 1) % print_interval == 0) {
-                std::cout << std::setw(8) << (step + 1) << std::setw(22) << dz_mean << std::setw(18) << stress
-                          << "\n";
+                std::cout << std::setw(8) << (step + 1) << std::setw(22) << dz_mean << std::setw(18) << stress << "\n";
             }
 
             // VTK snapshot: TET4 displacement + sub-facet crack distance.

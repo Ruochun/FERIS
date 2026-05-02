@@ -12,7 +12,7 @@
 #pragma once
 #if defined(__CUDACC__)
 
-namespace tlfea {
+namespace feris {
 
 __device__ __forceinline__ void svk_compute_P_from_trFtF_and_FFtF(const Real F[3][3],
                                                                   Real trFtF,
@@ -116,6 +116,6 @@ __device__ __forceinline__ void svk_compute_P(const Real F[3][3], Real lambda, R
     svk_compute_P_from_trFtF_and_FFtF(F, trFtF, FFtF, lambda, mu, P_out);
 }
 
-}  // namespace tlfea
+}  // namespace feris
 
 #endif

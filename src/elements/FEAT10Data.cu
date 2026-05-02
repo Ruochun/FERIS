@@ -29,7 +29,7 @@
 
 namespace cg = cooperative_groups;
 
-namespace tlfea {
+namespace feris {
 
 __global__ void build_mass_keys_feat10_kernel(GPU_FEAT10_Data* d_data, unsigned long long* d_keys) {
     const int total = d_data->gpu_n_elem() * Quadrature::N_NODE_T10_10 * Quadrature::N_NODE_T10_10;
@@ -793,4 +793,4 @@ void GPU_FEAT10_Data::WriteOutputVTK(const std::string& filename) {
     out.close();
 }
 
-}  // namespace tlfea
+}  // namespace feris

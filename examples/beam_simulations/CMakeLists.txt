@@ -20,27 +20,27 @@ set(BEAM_INCLUDE_DIRS
 
 # ── Dynamic TET10 beam (Nesterov) ─────────────────────────────────────────────
 add_executable(beam_simulation beam_simulation.cc)
-target_link_libraries(beam_simulation tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(beam_simulation feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(beam_simulation PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(beam_simulation PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── Static TET10 beam (linear) ────────────────────────────────────────────────
 add_executable(beam_linear_static beam_linear_static.cc)
-target_link_libraries(beam_linear_static tlfea_lib Eigen3::Eigen CUDA::cudart
+target_link_libraries(beam_linear_static feris_lib Eigen3::Eigen CUDA::cudart
     CUDA::cusparse CUDA::cublas mophi_essentials)
 target_include_directories(beam_linear_static PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(beam_linear_static PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── Static TET4 beam (linear) ─────────────────────────────────────────────────
 add_executable(beam_linear_static_t4 beam_linear_static_t4.cc)
-target_link_libraries(beam_linear_static_t4 tlfea_lib Eigen3::Eigen CUDA::cudart
+target_link_libraries(beam_linear_static_t4 feris_lib Eigen3::Eigen CUDA::cudart
     CUDA::cusparse CUDA::cublas mophi_essentials)
 target_include_directories(beam_linear_static_t4 PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(beam_linear_static_t4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── Dynamic TET4 beam (FEAT4, Leapfrog) ──────────────────────────────────────
 add_executable(test_leapfrog_t4 test_leapfrog_t4.cc)
-target_link_libraries(test_leapfrog_t4 tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(test_leapfrog_t4 feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(test_leapfrog_t4 PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(test_leapfrog_t4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -48,6 +48,6 @@ set_target_properties(test_leapfrog_t4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMA
 # Uses TYPE_LDPM_TET4 (translational + linearised-rotational DOFs).
 # This is the recommended LDPM element for new simulations.
 add_executable(test_ldpm_tet4 test_ldpm_tet4.cc)
-target_link_libraries(test_ldpm_tet4 tlfea_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_link_libraries(test_ldpm_tet4 feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(test_ldpm_tet4 PRIVATE ${BEAM_INCLUDE_DIRS})
 set_target_properties(test_ldpm_tet4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

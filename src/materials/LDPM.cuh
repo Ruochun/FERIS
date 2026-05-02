@@ -1,6 +1,6 @@
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    LDPM.cuh
  * Brief:   Cusatis LDPM tensile-shear damage constitutive law
  *          for the 6-DOF LDPMTet4 element.
@@ -77,7 +77,7 @@
 
 #include "../types.h"
 
-namespace tlfea {
+namespace feris {
 
 // ---------------------------------------------------------------------------
 // ldpm_tet4_cusatis_traction
@@ -162,4 +162,4 @@ __device__ __forceinline__ void ldpm_tet4_cusatis_traction(Real e_N,
     m_L = E_kL * kappa_L;
 }
 
-}  // namespace tlfea
+}  // namespace feris

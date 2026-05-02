@@ -1,7 +1,7 @@
 #pragma once
 /*==============================================================
  *==============================================================
- * Project: TLFEA
+ * Project: FERIS
  * File:    FEAT4DataFunc.cuh
  * Brief:   Defines CUDA device utilities and kernels for FEAT4 (TET4)
  *          elements, including shape function evaluation, quadrature
@@ -21,7 +21,7 @@
 #include "../materials/SVK.cuh"
 #include "FEAT4Data.cuh"
 
-namespace tlfea {
+namespace feris {
 
 // Forward declaration for device helper templates.
 struct SyncedNewtonSolver;
@@ -582,4 +582,4 @@ __device__ __forceinline__ void compute_hessian_assemble_csr<GPU_FEAT4_Data>(GPU
     }
 }
 
-}  // namespace tlfea
+}  // namespace feris

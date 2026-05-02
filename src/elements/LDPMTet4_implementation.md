@@ -1,6 +1,6 @@
 # LDPM-TET4 GPU Implementation — Theory-to-Code Analysis
 
-> **Repository:** Ruochun/TLFEA  
+> **Repository:** Ruochun/FERIS  
 > **Reference:** Cusatis, Pelessone & Mencarelli (2011), *"Lattice Discrete Particle
 > Model (LDPM) for failure behavior of concrete I: Theory"*,
 > Cement & Concrete Composites 33(9): 881–890.

@@ -7,7 +7,7 @@
  * a realistic engineering analysis:
  * 1. Load a tetrahedral mesh (TET10 elements) from beam.vtu using MoPhiEssentials
  * 2. Apply boundary conditions (fix one end at x≈0, apply load at x≈10)
- * 3. Run a dynamic simulation using TLFEA's solvers
+ * 3. Run a dynamic simulation using FERIS's solvers
  * 4. Export the results to VTK files for visualization
  *
  * This simulates a cantilever beam with one end fixed and a concentrated load
@@ -29,7 +29,7 @@
 #include "../src/utils/mesh_utils.h"
 #include "../src/utils/quadrature_utils.h"
 
-using namespace tlfea;
+using namespace feris;
 
 // Material properties for aluminum
 const Real E = 7e10;     // Young's modulus: 7e10 Pa (70 GPa)
@@ -71,7 +71,7 @@ int main() {
     std::cout << "  HEX8 elements: " << mesh.NumOwnedHexes() << std::endl;
 
     // ==========================================================================
-    // Extract mesh data for TLFEA
+    // Extract mesh data for FERIS
     // ==========================================================================
 
     // Check that we have tet10 elements (required for FEAT10)
@@ -105,7 +105,7 @@ int main() {
         }
     }
 
-    std::cout << "Converted mesh data to TLFEA format" << std::endl;
+    std::cout << "Converted mesh data to FERIS format" << std::endl;
 
     // ==========================================================================
     // Initialize GPU data structure

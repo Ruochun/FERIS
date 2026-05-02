@@ -10,7 +10,7 @@
 
 **Solution**: Delete the build directory and reconfigure:
 ```bash
-cd /path/to/TLFEA
+cd /path/to/FERIS
 rm -rf build
 mkdir build
 cd build

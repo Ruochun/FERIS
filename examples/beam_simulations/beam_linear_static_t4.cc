@@ -38,7 +38,7 @@
 #include "../src/utils/mesh_utils.h"
 #include "../src/utils/quadrature_utils.h"
 
-using namespace tlfea;
+using namespace feris;
 
 // ---------------------------------------------------------------------------
 // Material properties (Aluminium)
