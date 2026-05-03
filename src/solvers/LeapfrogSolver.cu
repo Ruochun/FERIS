@@ -247,6 +247,62 @@ __global__ void leapfrog_apply_bc_ldpm_tet4_kernel(ElemType* d_data, LeapfrogSol
 }
 
 // ---------------------------------------------------------------------------
+// leapfrog_half_kick_kernel
+//
+// Half-step translational velocity update:
+//   v += sign * (dt/2) * M_lump^{-1} * (f_ext - f_int)
+//
+// sign = -1: backward half-kick — InitialHalfKick, converts v_0 → v_{-1/2}
+// sign = +1: forward  half-kick — FinalHalfKick,   converts v_{N-1/2} → v_N
+//
+// One thread per global DOF (node * 3 + direction).
+// ---------------------------------------------------------------------------
+template <typename ElemType>
+__global__ void leapfrog_half_kick_kernel(ElemType* d_data, LeapfrogSolver* d_solver, Real sign) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= d_solver->get_n_coef() * 3)
+        return;
+
+    int node_i = tid / 3;
+    Real half_dt = Real(0.5) * d_solver->solver_time_step();
+    Real mass_val = d_solver->mass_lump()(node_i);
+    if (mass_val <= Real(0))
+        return;
+    Real inv_mass = Real(1) / mass_val;
+    Real net_force = d_data->f_ext()(tid) - d_data->f_int()(tid);
+
+    d_solver->v()(tid) += sign * half_dt * inv_mass * net_force;
+}
+
+// ---------------------------------------------------------------------------
+// leapfrog_half_kick_rot_kernel
+//
+// Half-step rotational velocity update for TYPE_LDPM_TET4:
+//   omega += sign * (dt/2) * I_lump^{-1} * (m_ext - m_int)
+//
+// sign = -1: backward half-kick (InitialHalfKick)
+// sign = +1: forward  half-kick (FinalHalfKick)
+//
+// One thread per rotational DOF (node * 3 + direction).
+// ---------------------------------------------------------------------------
+template <typename ElemType>
+__global__ void leapfrog_half_kick_rot_kernel(ElemType* d_data, LeapfrogSolver* d_solver, Real sign) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= d_solver->get_n_coef() * 3)
+        return;
+
+    int node_i = tid / 3;
+    Real half_dt = Real(0.5) * d_solver->solver_time_step();
+    Real inertia_val = d_solver->mass_inertia()(node_i);
+    if (inertia_val <= Real(0))
+        return;
+    Real inv_inertia = Real(1) / inertia_val;
+    Real net_moment = d_data->f_ext_r()(tid) - d_data->f_int_r()(tid);
+
+    d_solver->v_rot()(tid) += sign * half_dt * inv_inertia * net_moment;
+}
+
+// ---------------------------------------------------------------------------
 // leapfrog_update_rotation_kernel
 //
 // Full-step rotation update for TYPE_LDPM_TET4:
@@ -398,6 +454,109 @@ void LeapfrogSolver::OneStepLeapfrog() {
 }
 
 // ---------------------------------------------------------------------------
+// LeapfrogSolver::HalfKickImpl
+//
+// Shared implementation for InitialHalfKick() and FinalHalfKick().
+//
+// Computes forces at the current configuration, then nudges every
+// nodal velocity by  sign * (dt/2) * M_lump^{-1} * (f_ext - f_int).
+//
+//   sign = -1  →  backward half-kick  (InitialHalfKick)
+//   sign = +1  →  forward  half-kick  (FinalHalfKick)
+//
+// Boundary conditions are enforced after the kick so that fixed/driven nodes
+// remain at the velocity prescribed by the caller (typically zero for a
+// fixed node).  No position update is performed.
+// ---------------------------------------------------------------------------
+void LeapfrogSolver::HalfKickImpl(Real sign) {
+    constexpr int threadsPerBlock = 256;
+
+    const int blocks_coef = (n_coef_ + threadsPerBlock - 1) / threadsPerBlock;
+    const int blocks_dof = (n_coef_ * 3 + threadsPerBlock - 1) / threadsPerBlock;
+
+    cudaDeviceProp props;
+    MOPHI_GPU_CALL(cudaGetDeviceProperties(&props, 0));
+    const int max_grid_stride_blocks = 32 * props.multiProcessorCount;
+
+    int blocks_p =
+        std::max(1, std::min((n_beam_ * n_total_qp_ + threadsPerBlock - 1) / threadsPerBlock, max_grid_stride_blocks));
+    int blocks_if =
+        std::max(1, std::min((n_beam_ * n_shape_ + threadsPerBlock - 1) / threadsPerBlock, max_grid_stride_blocks));
+
+    auto half_kick_typed = [&](auto* typed_data) {
+        // Recompute forces at the current configuration.
+        leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+        leapfrog_clear_f_int_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data);
+        leapfrog_compute_f_int_kernel<<<blocks_if, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+
+        // Apply the signed half-step velocity nudge.
+        leapfrog_half_kick_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_, sign);
+
+        // Enforce BCs so fixed/driven nodes stay at their prescribed velocity.
+        leapfrog_apply_bc_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+    };
+
+    if (type_ == TYPE_T4) {
+        half_kick_typed(static_cast<GPU_FEAT4_Data*>(d_data_));
+    } else if (type_ == TYPE_T10) {
+        half_kick_typed(static_cast<GPU_FEAT10_Data*>(d_data_));
+    } else if (type_ == TYPE_3243) {
+        half_kick_typed(static_cast<GPU_ANCF3243_Data*>(d_data_));
+    } else if (type_ == TYPE_3443) {
+        half_kick_typed(static_cast<GPU_ANCF3443_Data*>(d_data_));
+    } else if (type_ == TYPE_LDPM_TET4) {
+        auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);
+
+        // Recompute forces and moments at the current configuration.
+        leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+        leapfrog_clear_f_int_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data);
+        leapfrog_compute_f_int_kernel<<<blocks_if, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+
+        // Apply the signed half-step translational and rotational velocity nudges.
+        leapfrog_half_kick_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_, sign);
+        leapfrog_half_kick_rot_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_, sign);
+
+        // Enforce BCs (6 DOFs per fixed node).
+        leapfrog_apply_bc_ldpm_tet4_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+    }
+
+    MOPHI_GPU_CALL(cudaDeviceSynchronize());
+}
+
+// ---------------------------------------------------------------------------
+// LeapfrogSolver::InitialHalfKick
+//
+// Converts full-step initial velocities v_0 stored in da_v_ to half-step
+// velocities v_{-1/2} needed by the staggered leapfrog:
+//
+//   v_{-1/2} = v_0 - (dt/2) * M_lump^{-1} * (f_ext - f_int(x_0))
+//
+// Call this after Setup() when da_v_ has been seeded with non-zero physical
+// initial velocities v_0.  For rest-start simulations (v_0 = 0, f_0 = 0)
+// this is a no-op and need not be called.
+// ---------------------------------------------------------------------------
+void LeapfrogSolver::InitialHalfKick() {
+    HalfKickImpl(Real(-1));
+}
+
+// ---------------------------------------------------------------------------
+// LeapfrogSolver::FinalHalfKick
+//
+// Converts the half-step velocity v_{N-1/2} stored in da_v_ after the last
+// Solve() call to the synchronized full-step velocity at the end of the
+// simulation:
+//
+//   v_N = v_{N-1/2} + (dt/2) * M_lump^{-1} * (f_ext - f_int(x_N))
+//
+// Call this after the last Solve() when a velocity output synchronized with
+// the final position x_N is required (e.g. kinetic-energy reporting).
+// It is never needed for the regular time-stepping loop.
+// ---------------------------------------------------------------------------
+void LeapfrogSolver::FinalHalfKick() {
+    HalfKickImpl(Real(+1));
+}
+
+// ---------------------------------------------------------------------------
 // Explicit template instantiations for all supported element types
 // ---------------------------------------------------------------------------
 
@@ -445,5 +604,15 @@ template __global__ void leapfrog_update_position_kernel<GPU_LDPMTet4_Data>(GPU_
 template __global__ void leapfrog_update_velocity_rot_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_apply_bc_ldpm_tet4_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
 template __global__ void leapfrog_update_rotation_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*);
+
+// Half-kick kernels (all element types)
+template __global__ void leapfrog_half_kick_kernel<GPU_ANCF3243_Data>(GPU_ANCF3243_Data*, LeapfrogSolver*, Real);
+template __global__ void leapfrog_half_kick_kernel<GPU_ANCF3443_Data>(GPU_ANCF3443_Data*, LeapfrogSolver*, Real);
+template __global__ void leapfrog_half_kick_kernel<GPU_FEAT10_Data>(GPU_FEAT10_Data*, LeapfrogSolver*, Real);
+template __global__ void leapfrog_half_kick_kernel<GPU_FEAT4_Data>(GPU_FEAT4_Data*, LeapfrogSolver*, Real);
+template __global__ void leapfrog_half_kick_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*, Real);
+
+// Rotational half-kick kernel (TYPE_LDPM_TET4 only)
+template __global__ void leapfrog_half_kick_rot_kernel<GPU_LDPMTet4_Data>(GPU_LDPMTet4_Data*, LeapfrogSolver*, Real);
 
 }  // namespace feris
