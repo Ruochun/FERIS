@@ -104,8 +104,13 @@ quantities are:
 | A | Projected Voronoi facet area |
 
 All reference geometry is computed once at setup time and stored as read-only
-per-edge GPU arrays. It is **never updated** during the simulation; this is the
-Total-Lagrangian character of the formulation.
+per-edge GPU arrays. It is **never updated** during the simulation, consistent
+with LDPM's **linearised (small-displacement) kinematics**: strains are
+engineering measures (Δu / l₀), so the reference frame is by definition
+the correct frame to project onto throughout.  This is *not* a
+Total-Lagrangian continuum formulation — LDPM is a discrete lattice model,
+not FEA, and its strain measures are first-order (engineering) quantities,
+not Green–Lagrange strains.
 
 ### 3.1 Path A: TET4-derived geometry (Setup)
 
@@ -257,8 +262,10 @@ three facet frame directions (n, m, l):
 | κ_M | (Δθ · **m**) / l₀ | Bending about m |
 | κ_L | (Δθ · **l**) / l₀ | Bending about l |
 
-where Δ**u** = (**x**ⱼ − **x**ᵢ) − l₀ **n** is the displacement relative to the
-undeformed reference configuration (Total-Lagrangian).
+where Δ**u** = (**x**ⱼ − **x**ᵢ) − l₀ **n** is the displacement of the current
+edge vector relative to the reference (undeformed) configuration, and l₀ and **n**
+are fixed reference-configuration quantities consistent with LDPM's linearised
+kinematics.
 
 ### Implementation
 
@@ -271,7 +278,7 @@ r[0] = d_data->x12()(nj) - d_data->x12()(ni);   // current edge vector
 r[1] = d_data->y12()(nj) - d_data->y12()(ni);
 r[2] = d_data->z12()(nj) - d_data->z12()(ni);
 
-// Total-Lagrangian relative displacement: Δu = r − l₀·n_ref
+// Relative displacement from reference: Δu = r − l₀·n_ref
 const Real du0 = r[0] - l0 * n0;
 const Real du1 = r[1] - l0 * n1;
 const Real du2 = r[2] - l0 * n2;
@@ -290,9 +297,13 @@ const Real kappa_M = (dt0*m0 + dt1*m1 + dt2*m2) * inv_l0;
 const Real kappa_L = (dt0*l_0 + dt1*l_1 + dt2*l_2) * inv_l0;
 ```
 
-> **Total-Lagrangian note:** All reference geometry (`l0`, `n`, `m`, `l`) is
+> **Linearised-kinematics note:** All reference geometry (`l0`, `n`, `m`, `l`) is
 > precomputed once and stored in read-only per-edge arrays. The subtraction
-> `r − l₀·n` always measures strain relative to the undeformed configuration.
+> `r − l₀·n` always measures strain relative to the undeformed configuration, which
+> is correct for LDPM's engineering (first-order) strain measures.  This is *not*
+> the same as a Total-Lagrangian continuum FEA formulation (which would use the
+> deformation gradient **F** and Green–Lagrange strains); LDPM is a discrete lattice
+> model whose linearised kinematics assume small displacements and small rotations.
 
 ---
 
