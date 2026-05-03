@@ -137,33 +137,33 @@ class SyncedNesterovSolver : public SolverBase {
         cudaMemcpy(d_solver_rho_, &p->rho, sizeof(Real), cudaMemcpyHostToDevice);
 
         da_v_guess_.SetVal(Real(0));
-        da_v_guess_.MakeReadyDevice();
+        da_v_guess_.ToDevice();
         da_v_prev_.SetVal(Real(0));
-        da_v_prev_.MakeReadyDevice();
+        da_v_prev_.ToDevice();
         da_lambda_guess_.SetVal(Real(0));
-        da_lambda_guess_.MakeReadyDevice();
+        da_lambda_guess_.ToDevice();
     }
 
     void Setup() {
         da_x12_prev_.SetVal(Real(0));
-        da_x12_prev_.MakeReadyDevice();
+        da_x12_prev_.ToDevice();
         da_y12_prev_.SetVal(Real(0));
-        da_y12_prev_.MakeReadyDevice();
+        da_y12_prev_.ToDevice();
         da_z12_prev_.SetVal(Real(0));
-        da_z12_prev_.MakeReadyDevice();
+        da_z12_prev_.ToDevice();
 
         da_v_guess_.SetVal(Real(0));
-        da_v_guess_.MakeReadyDevice();
+        da_v_guess_.ToDevice();
         da_v_prev_.SetVal(Real(0));
-        da_v_prev_.MakeReadyDevice();
+        da_v_prev_.ToDevice();
         da_v_k_.SetVal(Real(0));
-        da_v_k_.MakeReadyDevice();
+        da_v_k_.ToDevice();
         da_v_next_.SetVal(Real(0));
-        da_v_next_.MakeReadyDevice();
+        da_v_next_.ToDevice();
         da_lambda_guess_.SetVal(Real(0));
-        da_lambda_guess_.MakeReadyDevice();
+        da_lambda_guess_.ToDevice();
         da_g_.SetVal(Real(0));
-        da_g_.MakeReadyDevice();
+        da_g_.ToDevice();
 
         MOPHI_GPU_CALL(cudaMemcpy(d_nesterov_solver_, this, sizeof(SyncedNesterovSolver), cudaMemcpyHostToDevice));
     }

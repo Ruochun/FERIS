@@ -613,16 +613,16 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_element_connectivity.ToDevice();
 
         da_f_int.SetVal(Real(0));
-        da_f_int.MakeReadyDevice();
+        da_f_int.ToDevice();
 
         da_F.SetVal(Real(0));
-        da_F.MakeReadyDevice();
+        da_F.ToDevice();
         da_P.SetVal(Real(0));
-        da_P.MakeReadyDevice();
+        da_P.ToDevice();
         da_Fdot.SetVal(Real(0));
-        da_Fdot.MakeReadyDevice();
+        da_Fdot.ToDevice();
         da_P_vis.SetVal(Real(0));
-        da_P_vis.MakeReadyDevice();
+        da_P_vis.ToDevice();
 
         std::copy(height.data(), height.data() + n_beam, da_H.host());
         da_H.ToDevice();
@@ -792,7 +792,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_fixed_nodes.BindDevicePointer(&d_fixed_nodes);
 
         da_constraint.SetVal(Real(0));
-        da_constraint.MakeReadyDevice();
+        da_constraint.ToDevice();
         std::copy(fixed_nodes.data(), fixed_nodes.data() + fixed_nodes.size(), da_fixed_nodes.host());
         da_fixed_nodes.ToDevice();
 
@@ -851,7 +851,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_constraint.resize(n_constraint);
         da_constraint.BindDevicePointer(&d_constraint);
         da_constraint.SetVal(Real(0));
-        da_constraint.MakeReadyDevice();
+        da_constraint.ToDevice();
 
         MOPHI_GPU_CALL(cudaMalloc(&d_constraint_rhs, n_constraint * sizeof(Real)));
         MOPHI_GPU_CALL(cudaMemcpy(d_constraint_rhs, rhs.data(), n_constraint * sizeof(Real), cudaMemcpyHostToDevice));

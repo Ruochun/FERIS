@@ -168,38 +168,38 @@ class SyncedAdamWNocoopSolver : public SolverBase {
         cudaMemcpy(d_convergence_check_interval_, &p->convergence_check_interval, sizeof(int), cudaMemcpyHostToDevice);
 
         da_v_guess_.SetVal(Real(0));
-        da_v_guess_.MakeReadyDevice();
+        da_v_guess_.ToDevice();
         da_v_prev_.SetVal(Real(0));
-        da_v_prev_.MakeReadyDevice();
+        da_v_prev_.ToDevice();
         da_lambda_guess_.SetVal(Real(0));
-        da_lambda_guess_.MakeReadyDevice();
+        da_lambda_guess_.ToDevice();
     }
 
     void Setup() {
         da_x12_prev_.SetVal(Real(0));
-        da_x12_prev_.MakeReadyDevice();
+        da_x12_prev_.ToDevice();
         da_y12_prev_.SetVal(Real(0));
-        da_y12_prev_.MakeReadyDevice();
+        da_y12_prev_.ToDevice();
         da_z12_prev_.SetVal(Real(0));
-        da_z12_prev_.MakeReadyDevice();
+        da_z12_prev_.ToDevice();
 
         da_v_guess_.SetVal(Real(0));
-        da_v_guess_.MakeReadyDevice();
+        da_v_guess_.ToDevice();
         da_v_prev_.SetVal(Real(0));
-        da_v_prev_.MakeReadyDevice();
+        da_v_prev_.ToDevice();
         da_v_k_.SetVal(Real(0));
-        da_v_k_.MakeReadyDevice();
+        da_v_k_.ToDevice();
         da_v_next_.SetVal(Real(0));
-        da_v_next_.MakeReadyDevice();
+        da_v_next_.ToDevice();
         da_lambda_guess_.SetVal(Real(0));
-        da_lambda_guess_.MakeReadyDevice();
+        da_lambda_guess_.ToDevice();
         da_g_.SetVal(Real(0));
-        da_g_.MakeReadyDevice();
+        da_g_.ToDevice();
 
         da_m_.SetVal(Real(0));
-        da_m_.MakeReadyDevice();
+        da_m_.ToDevice();
         da_v_adam_.SetVal(Real(0));
-        da_v_adam_.MakeReadyDevice();
+        da_v_adam_.ToDevice();
 
         MOPHI_GPU_CALL(cudaMemcpy(d_adamw_solver_, this, sizeof(SyncedAdamWNocoopSolver), cudaMemcpyHostToDevice));
     }

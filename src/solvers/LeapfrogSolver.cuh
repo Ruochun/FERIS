@@ -113,7 +113,7 @@ class LeapfrogSolver : public SolverBase {
         cudaMemcpy(d_time_step_, &p->time_step, sizeof(Real), cudaMemcpyHostToDevice);
 
         da_v_.SetVal(Real(0));
-        da_v_.MakeReadyDevice();
+        da_v_.ToDevice();
     }
 
     // Copy struct mirror to device and compute the lumped mass from the

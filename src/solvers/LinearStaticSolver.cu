@@ -299,7 +299,7 @@ void LinearStaticSolver<TData>::BuildStiffnessCSRPattern() {
 template <typename TData>
 void LinearStaticSolver<TData>::AssembleLinearStiffness() {
     da_K_values_.SetVal(Real(0));
-    da_K_values_.MakeReadyDevice();
+    da_K_values_.ToDevice();
 
     const int total_qp = data_->get_n_elem() * TData::N_QP_PER_ELEM;
     constexpr int threads = 128;
@@ -349,7 +349,7 @@ void LinearStaticSolver<TData>::SolveLinearSystemCG() {
     const int n = n_dof_;
 
     da_u_.SetVal(Real(0));
-    da_u_.MakeReadyDevice();
+    da_u_.ToDevice();
     MOPHI_GPU_CALL(cudaMemcpy(d_r_, d_f_, static_cast<size_t>(n) * sizeof(Real), cudaMemcpyDeviceToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_p_, d_f_, static_cast<size_t>(n) * sizeof(Real), cudaMemcpyDeviceToDevice));
 

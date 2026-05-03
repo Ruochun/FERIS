@@ -275,7 +275,7 @@ __global__ void leapfrog_update_rotation_kernel(ElemType* d_data, LeapfrogSolver
 // ---------------------------------------------------------------------------
 void LeapfrogSolver::Setup() {
     da_mass_lump_.SetVal(Real(0));
-    da_mass_lump_.MakeReadyDevice();
+    da_mass_lump_.ToDevice();
 
     MOPHI_GPU_CALL(cudaMemcpy(d_leapfrog_solver_, this, sizeof(LeapfrogSolver), cudaMemcpyHostToDevice));
 

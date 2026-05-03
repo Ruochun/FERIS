@@ -153,39 +153,39 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_rx12.resize(n_coef);
     da_rx12.BindDevicePointer(&d_rx12);
     da_rx12.SetVal(Real(0));
-    da_rx12.MakeReadyDevice();
+    da_rx12.ToDevice();
 
     da_ry12.resize(n_coef);
     da_ry12.BindDevicePointer(&d_ry12);
     da_ry12.SetVal(Real(0));
-    da_ry12.MakeReadyDevice();
+    da_ry12.ToDevice();
 
     da_rz12.resize(n_coef);
     da_rz12.BindDevicePointer(&d_rz12);
     da_rz12.SetVal(Real(0));
-    da_rz12.MakeReadyDevice();
+    da_rz12.ToDevice();
 
     // ── 3. Allocate force / moment arrays ────────────────────────────────────
 
     da_f_int_t.resize(n_coef * 3);
     da_f_int_t.BindDevicePointer(&d_f_int_t);
     da_f_int_t.SetVal(Real(0));
-    da_f_int_t.MakeReadyDevice();
+    da_f_int_t.ToDevice();
 
     da_f_ext_t.resize(n_coef * 3);
     da_f_ext_t.BindDevicePointer(&d_f_ext_t);
     da_f_ext_t.SetVal(Real(0));
-    da_f_ext_t.MakeReadyDevice();
+    da_f_ext_t.ToDevice();
 
     da_f_int_r.resize(n_coef * 3);
     da_f_int_r.BindDevicePointer(&d_f_int_r);
     da_f_int_r.SetVal(Real(0));
-    da_f_int_r.MakeReadyDevice();
+    da_f_int_r.ToDevice();
 
     da_f_ext_r.resize(n_coef * 3);
     da_f_ext_r.BindDevicePointer(&d_f_ext_r);
     da_f_ext_r.SetVal(Real(0));
-    da_f_ext_r.MakeReadyDevice();
+    da_f_ext_r.ToDevice();
 
     // ── 4. Store TET connectivity on host for CalcMassMatrix ─────────────────
 
@@ -352,19 +352,19 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_facet_t.resize(static_cast<size_t>(n_edge) * 6);
     da_facet_t.BindDevicePointer(&d_facet_t);
     da_facet_t.SetVal(Real(0));
-    da_facet_t.MakeReadyDevice();
+    da_facet_t.ToDevice();
 
     // ── Per-edge damage state (initialised to zero / undamaged) ──────────────
 
     da_kappa.resize(n_edge);
     da_kappa.BindDevicePointer(&d_kappa);
     da_kappa.SetVal(Real(0));
-    da_kappa.MakeReadyDevice();
+    da_kappa.ToDevice();
 
     da_omega.resize(n_edge);
     da_omega.BindDevicePointer(&d_omega);
     da_omega.SetVal(Real(0));
-    da_omega.MakeReadyDevice();
+    da_omega.ToDevice();
 
     // ── 9. Allocate device material scalars with safe defaults ────────────────
 
@@ -392,7 +392,7 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_I_lump.resize(n_coef);
     da_I_lump.BindDevicePointer(&d_I_lump);
     da_I_lump.SetVal(Real(0));
-    da_I_lump.MakeReadyDevice();
+    da_I_lump.ToDevice();
 
     // ── 11. Allocate device-side struct mirror ────────────────────────────────
 
