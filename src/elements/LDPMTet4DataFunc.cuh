@@ -46,7 +46,7 @@ namespace feris {
 //   v_guess   = half-step translational nodal velocity (unused here)
 //   dt        = time step  (unused for quasi-static constitutive law)
 //
-// Translational strains (same as LDPM4):
+// Translational strains:
 //   delta_u = (x_j - x_i) - l0 * n_ref
 //   e_N = (delta_u · n) / l0
 //   e_M = (delta_u · m) / l0
@@ -190,12 +190,12 @@ __device__ __forceinline__ void compute_internal_force(int edge_idx, int node_lo
 // clear_internal_force for LDPMTet4
 //
 // Zeroes both translational (f_int) and rotational (f_int_r) force
-// vectors.  Each thread (one per translational DOF, n_coef * 3 total)
+// vectors.  Each thread (one per translational DOF, n_nodes * 3 total)
 // clears the corresponding entry in both arrays.
 // ---------------------------------------------------------------------------
 __device__ __forceinline__ void clear_internal_force(GPU_LDPMTet4_Data* d_data) {
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < d_data->n_coef * 3) {
+    if (tid < d_data->n_nodes * 3) {
         d_data->f_int()[tid] = Real(0);
         d_data->f_int_r()[tid] = Real(0);
     }

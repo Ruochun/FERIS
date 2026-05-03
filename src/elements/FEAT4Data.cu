@@ -533,7 +533,7 @@ void GPU_FEAT4_Data::SetNodalFixed(const VectorXi& fixed_nodes_in) {
     da_constraint.resize(static_cast<size_t>(n_constraint));
     da_constraint.BindDevicePointer(&d_constraint);
     da_constraint.SetVal(Real(0));
-    da_constraint.MakeReadyDevice();
+    da_constraint.ToDevice();
 
     da_fixed_nodes.resize(static_cast<size_t>(fixed_nodes_in.size()));
     da_fixed_nodes.BindDevicePointer(&d_fixed_nodes);
@@ -561,7 +561,7 @@ void GPU_FEAT4_Data::UpdateNodalFixed(const VectorXi& fixed_nodes_in) {
     }
 
     da_constraint.SetVal(Real(0));
-    da_constraint.MakeReadyDevice();
+    da_constraint.ToDevice();
     std::copy(fixed_nodes_in.data(), fixed_nodes_in.data() + fixed_nodes_in.size(), da_fixed_nodes.host());
     da_fixed_nodes.ToDevice();
 

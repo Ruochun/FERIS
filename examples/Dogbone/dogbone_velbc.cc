@@ -224,7 +224,7 @@ int main() {
     // ──────────────────────────────────────────────────────────────────────────
     // 4. Create and configure GPU_LDPMTet4_Data
     // ──────────────────────────────────────────────────────────────────────────
-    GPU_LDPMTet4_Data element_data(mesh.n_particles, mesh.n_tets);
+    GPU_LDPMTet4_Data element_data;
     element_data.SetupFromMesh(mesh);
 
     std::cout << "  Unique edges: " << element_data.n_edge << "\n";

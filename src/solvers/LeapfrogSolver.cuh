@@ -113,7 +113,7 @@ class LeapfrogSolver : public SolverBase {
         cudaMemcpy(d_time_step_, &p->time_step, sizeof(Real), cudaMemcpyHostToDevice);
 
         da_v_.SetVal(Real(0));
-        da_v_.MakeReadyDevice();
+        da_v_.ToDevice();
     }
 
     // Copy struct mirror to device and compute the lumped mass from the
@@ -170,6 +170,24 @@ class LeapfrogSolver : public SolverBase {
         OneStepLeapfrog();
     }
 
+    // Backward half-kick to initialize the staggered leapfrog from a
+    // full-step initial velocity v_0 stored in da_v_:
+    //
+    //   v_{-1/2} = v_0 - (dt/2) * M_lump^{-1} * (f_ext - f_int(x_0))
+    //
+    // Call after Setup() when da_v_ has been seeded with non-zero physical
+    // initial velocities.  For rest-start simulations this is a no-op.
+    void InitialHalfKick();
+
+    // Forward half-kick to recover a synchronized full-step velocity
+    // after the last Solve():
+    //
+    //   v_N = v_{N-1/2} + (dt/2) * M_lump^{-1} * (f_ext - f_int(x_N))
+    //
+    // Call after the final Solve() when a velocity output synchronized
+    // with the current position is required (e.g. kinetic-energy reporting).
+    void FinalHalfKick();
+
   private:
     ElementType type_;
     // Device pointer to the element data struct (GPU_FEAT4_Data, etc.).
@@ -194,6 +212,10 @@ class LeapfrogSolver : public SolverBase {
 
     // Physical simulation time step stored on device for kernel access.
     Real* d_time_step_;
+
+    // Shared implementation for InitialHalfKick() and FinalHalfKick().
+    // sign = -1: backward half-kick; sign = +1: forward half-kick.
+    void HalfKickImpl(Real sign);
 };
 
 }  // namespace feris

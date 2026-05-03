@@ -302,7 +302,7 @@ int main() {
     //    This uses the file-based sub-facet info for facet areas and tangent
     //    frame vectors (m, l) instead of the tet4-derived approximation.
     // ──────────────────────────────────────────────────────────────────────────
-    GPU_LDPMTet4_Data element_data(mesh.n_particles, mesh.n_tets);
+    GPU_LDPMTet4_Data element_data;
 
     element_data.SetupFromMesh(mesh);
 

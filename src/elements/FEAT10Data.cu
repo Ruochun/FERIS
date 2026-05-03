@@ -661,7 +661,7 @@ void GPU_FEAT10_Data::SetNodalFixed(const VectorXi& fixed_nodes) {
     da_fixed_nodes.BindDevicePointer(&d_fixed_nodes);
 
     da_constraint.SetVal(Real(0));
-    da_constraint.MakeReadyDevice();
+    da_constraint.ToDevice();
     std::copy(fixed_nodes.data(), fixed_nodes.data() + fixed_nodes.size(), da_fixed_nodes.host());
     da_fixed_nodes.ToDevice();
 
@@ -717,7 +717,7 @@ void GPU_FEAT10_Data::UpdateNodalFixed(const VectorXi& fixed_nodes) {
 
     // Clear constraint data and upload new fixed nodes
     da_constraint.SetVal(Real(0));
-    da_constraint.MakeReadyDevice();
+    da_constraint.ToDevice();
     std::copy(fixed_nodes.data(), fixed_nodes.data() + fixed_nodes.size(), da_fixed_nodes.host());
     da_fixed_nodes.ToDevice();
 

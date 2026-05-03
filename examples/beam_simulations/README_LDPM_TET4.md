@@ -3,10 +3,9 @@
 ## Overview
 
 `LDPMTet4` (`TYPE_LDPM_TET4`) is the recommended LDPM element in FERIS.  It
-extends the original 3-DOF (`TYPE_LDPM4_DEPRECATED`) formulation by adding
-three linearised rotational degrees of freedom per particle (θ_x, θ_y, θ_z),
-enabling a richer representation of bending and twisting interactions between
-neighbouring particles.
+adds three linearised rotational degrees of freedom per particle (θ_x, θ_y, θ_z)
+in addition to the three translational ones, enabling a richer representation of
+bending and twisting interactions between neighbouring particles.
 
 ## Demo
 
@@ -41,7 +40,7 @@ ReadLDPMTet4MeshFromFiles("data/meshes/LDPMTet4/Dogbone/LDPMgeo000", mesh, &err)
 
 // 2. Initialise the element from the mesh (SetupFromMesh overrides the
 //    tet4-derived facet areas and tangent frame with the richer file values)
-GPU_LDPMTet4_Data element(mesh.n_particles, mesh.n_tets);
+GPU_LDPMTet4_Data element;
 element.SetupFromMesh(mesh);
 ```
 
@@ -64,7 +63,7 @@ element.SetDensity(rho);
 
 // Boundary conditions
 element.SetNodalFixed(fixed_nodes);     // clamp nodes
-element.SetExternalForce(h_f_ext);      // translational force [n_coef * 3]
+element.SetExternalForce(h_f_ext);      // translational force [n_nodes * 3]
 
 // Build lumped mass + rotational inertia
 element.CalcMassMatrix();
@@ -83,17 +82,17 @@ Each particle has 6 DOFs:
 
 | Array | Size | Meaning |
 |-------|------|---------|
-| `d_x12, d_y12, d_z12` | `n_coef` each | Translational positions |
-| `d_rx12, d_ry12, d_rz12` | `n_coef` each | Rotational angles (θ_x, θ_y, θ_z) |
-| `d_f_int_t, d_f_ext_t` | `n_coef * 3` each | Translational force vectors |
-| `d_f_int_r, d_f_ext_r` | `n_coef * 3` each | Rotational moment vectors |
+| `d_x12, d_y12, d_z12` | `n_nodes` each | Translational positions |
+| `d_rx12, d_ry12, d_rz12` | `n_nodes` each | Rotational angles (θ_x, θ_y, θ_z) |
+| `d_f_int_t, d_f_ext_t` | `n_nodes * 3` each | Translational force vectors |
+| `d_f_int_r, d_f_ext_r` | `n_nodes * 3` each | Rotational moment vectors |
 
 Inside `LeapfrogSolver` the extended arrays are:
 
 | Array | Size | Layout |
 |-------|------|--------|
-| velocity `d_v_` | `6 * n_coef` | `[v_x, v_y, v_z, … | ω_x, ω_y, ω_z, …]` |
-| mass `d_mass_lump_` | `2 * n_coef` | `[m_0, …, m_{N-1} | I_0, …, I_{N-1}]` |
+| velocity `d_v_` | `6 * n_nodes` | `[v_x, v_y, v_z, … | ω_x, ω_y, ω_z, …]` |
+| mass `d_mass_lump_` | `2 * n_nodes` | `[m_0, …, m_{N-1} | I_0, …, I_{N-1}]` |
 
 ## Constitutive Law (`src/materials/LDPMTet4.cuh`)
 
@@ -171,7 +170,6 @@ LDPM-TET4 with the Leapfrog solver will produce different results than:
 
 - **Linear static solver** — gives the static equilibrium; Leapfrog shows transient dynamics
 - **Nesterov / AdamW with FEAT10** — different physical model (continuum FEA vs. discrete particles)
-- **TYPE_LDPM4_DEPRECATED** — same mesh, but 3-DOF only; no rotational stiffness
 
 These differences are expected and correct.
 

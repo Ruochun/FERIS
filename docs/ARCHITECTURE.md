@@ -27,8 +27,6 @@ FERIS/
 │   │   ├── FEAT10DataFunc.cuh         # Device functions for FEAT10
 │   │   ├── ANCF3243Data.cu/cuh        # ANCF cable element (3-node)
 │   │   ├── ANCF3443Data.cu/cuh        # ANCF beam element (4-node)
-│   │   ├── LDPM4Data.cu/cuh           # [DEPRECATED] 3-DOF LDPM on TET4
-│   │   ├── LDPM4DataFunc.cuh          # [DEPRECATED] Device functions
 │   │   ├── LDPMTet4Data.cu/cuh        # 6-DOF LDPM on TET4 (recommended)
 │   │   └── LDPMTet4DataFunc.cuh       # Device functions for LDPMTet4
 │   │
@@ -40,8 +38,7 @@ FERIS/
 │   │
 │   ├── materials/      # Constitutive models
 │   │   ├── SVK.cuh                    # St. Venant-Kirchhoff hyperelastic
-│   │   ├── LDPM.cuh                   # LDPM 3-DOF facet law (deprecated)
-│   │   └── LDPMTet4.cuh               # LDPM 6-DOF facet + moment law
+│   │   └── LDPM.cuh                   # LDPM facet constitutive law (LDPMTet4)
 │   │
 │   └── utils/          # Utilities
 │       ├── types.h                     # Real, MatrixXR, VectorXR
@@ -56,7 +53,6 @@ FERIS/
 │   │   ├── beam_linear_static.cc       # TET10, linear static
 │   │   ├── beam_linear_static_t4.cc    # TET4,  linear static
 │   │   ├── test_leapfrog_t4.cc         # TET4,  Leapfrog (dynamic)
-│   │   ├── test_ldpm_t4.cc             # LDPM4, Leapfrog [DEPRECATED element]
 │   │   ├── test_ldpm_tet4.cc           # LDPMTet4, Leapfrog (recommended)
 │   │   └── README_BEAM.md
 │   └── solver_tests/                   # Focused solver tests
@@ -105,7 +101,7 @@ the particle neighbourhood topology.
 - Translational: `x, y, z`
 - Rotational (linearised): `rx (θ_x), ry (θ_y), rz (θ_z)`
 
-**Constitutive law** (`src/materials/LDPMTet4.cuh`) — 5 moduli:
+**Constitutive law** (`src/materials/LDPM.cuh`) — 5 moduli:
 
 | Strain | Formula | Traction / moment | Modulus |
 |--------|---------|-------------------|---------|
@@ -128,11 +124,6 @@ reference facet frame `(n, m, l)`.
 - Mass array layout: `[m_trans (n) | I_rot (n)]` (2·n total)
 - New kernels: `leapfrog_update_velocity_rot`, `leapfrog_apply_bc_ldpm_tet4`,
   `leapfrog_update_rotation`, `leapfrog_compute_lumped_mass_ldpm_tet4`
-
-### `LDPM4` (TYPE_LDPM4_DEPRECATED) — 3-DOF LDPM *(deprecated)*
-
-Original 3-translational-DOF LDPM.  Superseded by `LDPMTet4`.  Retained for
-backward-compatibility only; may be removed in a future release.
 
 ## Solvers
 

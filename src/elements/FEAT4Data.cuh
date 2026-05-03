@@ -442,21 +442,21 @@ struct GPU_FEAT4_Data : public ElementBase {
                   da_tet1pt_weights.host());
         da_tet1pt_weights.ToDevice();
         da_grad_N_ref.SetVal(Real(0));
-        da_grad_N_ref.MakeReadyDevice();
+        da_grad_N_ref.ToDevice();
         da_detJ_ref.SetVal(Real(0));
-        da_detJ_ref.MakeReadyDevice();
+        da_detJ_ref.ToDevice();
 
         da_f_int.SetVal(Real(0));
-        da_f_int.MakeReadyDevice();
+        da_f_int.ToDevice();
 
         da_F.SetVal(Real(0));
-        da_F.MakeReadyDevice();
+        da_F.ToDevice();
         da_P.SetVal(Real(0));
-        da_P.MakeReadyDevice();
+        da_P.ToDevice();
         da_Fdot.SetVal(Real(0));
-        da_Fdot.MakeReadyDevice();
+        da_Fdot.ToDevice();
         da_P_vis.SetVal(Real(0));
-        da_P_vis.MakeReadyDevice();
+        da_P_vis.ToDevice();
 
         Real rho0 = 0.0;
         Real nu = 0.0;

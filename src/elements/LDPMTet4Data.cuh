@@ -29,17 +29,17 @@
 //
 // DOF layout
 // ──────────
-//  • Translational positions: d_x12, d_y12, d_z12  [n_coef each]
-//  • Rotational positions:    d_rx12, d_ry12, d_rz12 [n_coef each]
-//  • Translational forces:    d_f_int_t, d_f_ext_t  [n_coef*3 each]
-//  • Rotational moments:      d_f_int_r, d_f_ext_r  [n_coef*3 each]
+//  • Translational positions: d_x12, d_y12, d_z12  [n_nodes each]
+//  • Rotational positions:    d_rx12, d_ry12, d_rz12 [n_nodes each]
+//  • Translational forces:    d_f_int_t, d_f_ext_t  [n_nodes*3 each]
+//  • Rotational moments:      d_f_int_r, d_f_ext_r  [n_nodes*3 each]
 //
 // Compatibility with LeapfrogSolver
 // ──────────────────────────────────
-//  • TYPE_LDPM_TET4 uses a 6*n_coef velocity array in the solver split as:
-//      [v_trans (3*n_coef) | v_rot (3*n_coef)]
-//  • Lumped mass array is 2*n_coef:
-//      [m_trans (n_coef)   | I_rot  (n_coef)]
+//  • TYPE_LDPM_TET4 uses a 6*n_nodes velocity array in the solver split as:
+//      [v_trans (3*n_nodes) | v_rot (3*n_nodes)]
+//  • Lumped mass array is 2*n_nodes:
+//      [m_trans (n_nodes)   | I_rot  (n_nodes)]
 //  • n_total_qp_ = 1 and n_shape_ = 2 (one facet per edge, two endpoint nodes).
 //  • Rotational inertia: I_lump = ALPHA_ROT * m_lump * l_min_node^2
 //    with ALPHA_ROT = 0.25.
@@ -55,85 +55,85 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // ── Translational nodal positions ────────────────────────────────────────
 
     __device__ Map<VectorXR> x12() {
-        return Map<VectorXR>(d_x12, n_coef);
+        return Map<VectorXR>(d_x12, n_nodes);
     }
     __device__ const Map<VectorXR> x12() const {
-        return Map<VectorXR>(d_x12, n_coef);
+        return Map<VectorXR>(d_x12, n_nodes);
     }
     __device__ Map<VectorXR> y12() {
-        return Map<VectorXR>(d_y12, n_coef);
+        return Map<VectorXR>(d_y12, n_nodes);
     }
     __device__ const Map<VectorXR> y12() const {
-        return Map<VectorXR>(d_y12, n_coef);
+        return Map<VectorXR>(d_y12, n_nodes);
     }
     __device__ Map<VectorXR> z12() {
-        return Map<VectorXR>(d_z12, n_coef);
+        return Map<VectorXR>(d_z12, n_nodes);
     }
     __device__ const Map<VectorXR> z12() const {
-        return Map<VectorXR>(d_z12, n_coef);
+        return Map<VectorXR>(d_z12, n_nodes);
     }
 
     // ── Rotational nodal positions (θ_x, θ_y, θ_z per node) ─────────────────
 
     __device__ Map<VectorXR> rx12() {
-        return Map<VectorXR>(d_rx12, n_coef);
+        return Map<VectorXR>(d_rx12, n_nodes);
     }
     __device__ const Map<VectorXR> rx12() const {
-        return Map<VectorXR>(d_rx12, n_coef);
+        return Map<VectorXR>(d_rx12, n_nodes);
     }
     __device__ Map<VectorXR> ry12() {
-        return Map<VectorXR>(d_ry12, n_coef);
+        return Map<VectorXR>(d_ry12, n_nodes);
     }
     __device__ const Map<VectorXR> ry12() const {
-        return Map<VectorXR>(d_ry12, n_coef);
+        return Map<VectorXR>(d_ry12, n_nodes);
     }
     __device__ Map<VectorXR> rz12() {
-        return Map<VectorXR>(d_rz12, n_coef);
+        return Map<VectorXR>(d_rz12, n_nodes);
     }
     __device__ const Map<VectorXR> rz12() const {
-        return Map<VectorXR>(d_rz12, n_coef);
+        return Map<VectorXR>(d_rz12, n_nodes);
     }
 
     // ── Translational nodal forces ───────────────────────────────────────────
 
     __device__ Map<VectorXR> f_int() {
-        return Map<VectorXR>(d_f_int_t, n_coef * 3);
+        return Map<VectorXR>(d_f_int_t, n_nodes * 3);
     }
     __device__ const Map<VectorXR> f_int() const {
-        return Map<VectorXR>(d_f_int_t, n_coef * 3);
+        return Map<VectorXR>(d_f_int_t, n_nodes * 3);
     }
     __device__ Map<VectorXR> f_ext() {
-        return Map<VectorXR>(d_f_ext_t, n_coef * 3);
+        return Map<VectorXR>(d_f_ext_t, n_nodes * 3);
     }
     __device__ const Map<VectorXR> f_ext() const {
-        return Map<VectorXR>(d_f_ext_t, n_coef * 3);
+        return Map<VectorXR>(d_f_ext_t, n_nodes * 3);
     }
 
     // ── Rotational nodal moments ─────────────────────────────────────────────
 
     __device__ Map<VectorXR> f_int_r() {
-        return Map<VectorXR>(d_f_int_r, n_coef * 3);
+        return Map<VectorXR>(d_f_int_r, n_nodes * 3);
     }
     __device__ const Map<VectorXR> f_int_r() const {
-        return Map<VectorXR>(d_f_int_r, n_coef * 3);
+        return Map<VectorXR>(d_f_int_r, n_nodes * 3);
     }
     __device__ Map<VectorXR> f_ext_r() {
-        return Map<VectorXR>(d_f_ext_r, n_coef * 3);
+        return Map<VectorXR>(d_f_ext_r, n_nodes * 3);
     }
     __device__ const Map<VectorXR> f_ext_r() const {
-        return Map<VectorXR>(d_f_ext_r, n_coef * 3);
+        return Map<VectorXR>(d_f_ext_r, n_nodes * 3);
     }
 
     // ── Boundary conditions ──────────────────────────────────────────────────
 
     __device__ Map<VectorXi> fixed_nodes() {
-        return Map<VectorXi>(d_fixed_nodes, n_constraint / 3);
+        return Map<VectorXi>(d_fixed_nodes, n_constraint / 6);
     }
     __device__ int gpu_n_constraint() const {
         return n_constraint;
     }
     __device__ int gpu_n_coef() const {
-        return n_coef;
+        return n_nodes;
     }
     __device__ int gpu_n_edge() const {
         return n_edge;
@@ -237,7 +237,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // ── Host/device scalar accessors ─────────────────────────────────────────
 
     __host__ __device__ int get_n_coef() const override {
-        return n_coef;
+        return n_nodes;
     }
     __host__ __device__ int get_n_beam() const override {
         return n_edge;
@@ -266,8 +266,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
+    // Default constructor: mesh counts are set later by SetupFromMesh() or Setup().
+    GPU_LDPMTet4_Data() : n_nodes(0), n_elem(0), n_edge(0), n_constraint(0), h_rho(0) {
+        type = TYPE_LDPM_TET4;
+    }
+
+    // Parameterized constructor: use when calling Setup() directly.
     GPU_LDPMTet4_Data(int num_nodes, int num_elems)
-        : n_coef(num_nodes), n_elem(num_elems), n_edge(0), n_constraint(0), h_rho(0) {
+        : n_nodes(num_nodes), n_elem(num_elems), n_edge(0), n_constraint(0), h_rho(0) {
         type = TYPE_LDPM_TET4;
     }
 
@@ -401,10 +407,10 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     GPU_LDPMTet4_Data* d_data;
 
-    int n_coef;        // Number of particles
+    int n_nodes;       // Number of nodes (particles)
     int n_elem;        // Number of TET4 elements
     int n_edge;        // Number of unique edges (set by Setup)
-    int n_constraint;  // 3 * number of fixed nodes
+    int n_constraint;  // 6 * number of fixed nodes (LDPMTet4 has 6 DOFs per node)
 
     // ── File-loaded mesh data (host-side; filled by SetupFromMesh) ────────────
     // These fields mirror the six LDPM Chrono Workbench output files.
@@ -412,7 +418,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // the current linear-elastic simulation kernel.
 
     // From particles.dat — aggregate diameter per particle (0 = boundary node).
-    // Size: n_coef.
+    // Size: n_nodes.
     VectorXR h_particle_d;
 
     // From facets.dat — precomputed Voronoi sub-facet geometry.
