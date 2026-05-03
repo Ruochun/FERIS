@@ -104,7 +104,7 @@ integration for nonlinear solid mechanics and LDPM particle dynamics.
 Advances the simulation by one time step per `Solve()` call.
 
 For `TYPE_LDPM_TET4` both translational and rotational DOFs are integrated;
-the velocity buffer is `6·n_coef` and the mass buffer is `2·n_coef`.
+the velocity buffer is `6·n_nodes` and the mass buffer is `2·n_nodes`.
 
 | Element type | Supported? | Notes |
 |---|---|---|

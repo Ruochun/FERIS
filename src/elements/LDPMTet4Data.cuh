@@ -407,7 +407,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     GPU_LDPMTet4_Data* d_data;
 
-    int n_nodes;       // Number of particles
+    int n_nodes;       // Number of nodes (particles)
     int n_elem;        // Number of TET4 elements
     int n_edge;        // Number of unique edges (set by Setup)
     int n_constraint;  // 6 * number of fixed nodes (LDPMTet4 has 6 DOFs per node)
