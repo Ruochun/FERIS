@@ -13,7 +13,6 @@ Useful for cross-comparing physical models and solver strategies.
 | `beam_linear_static` | FEAT10 (TET10) | Linear (cuSPARSE) | Static equilibrium |
 | `beam_linear_static_t4` | FEAT4 (TET4) | Linear (cuSPARSE) | Static equilibrium |
 | `test_leapfrog_t4` | FEAT4 (TET4) | Leapfrog | Explicit dynamic |
-| `test_ldpm_t4` | LDPM4 (3-DOF) | Leapfrog | **Deprecated element** — for reference only |
 | `test_ldpm_tet4` | LDPMTet4 (6-DOF) | Leapfrog | **Recommended LDPM example** |
 
 See [`README_BEAM.md`](beam_simulations/README_BEAM.md) for mesh details and

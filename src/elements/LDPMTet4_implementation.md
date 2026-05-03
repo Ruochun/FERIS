@@ -213,29 +213,29 @@ are translational forces (f_x, f_y, f_z) and rotational moments (m_x, m_y, m_z).
 
 ### Implementation
 
-Six separate GPU device arrays hold the per-particle state, each of length `n_coef`:
+Six separate GPU device arrays hold the per-particle state, each of length `n_nodes`:
 
 ```cpp
 // LDPMTet4Data.cuh — device accessors
-__device__ Map<VectorXR> x12()     { return Map<VectorXR>(d_x12,  n_coef); }
-__device__ Map<VectorXR> rx12()    { return Map<VectorXR>(d_rx12, n_coef); }  // θ_x
+__device__ Map<VectorXR> x12()     { return Map<VectorXR>(d_x12,  n_nodes); }
+__device__ Map<VectorXR> rx12()    { return Map<VectorXR>(d_rx12, n_nodes); }  // θ_x
 
-__device__ Map<VectorXR> f_int()   { return Map<VectorXR>(d_f_int_t, n_coef*3); }
-__device__ Map<VectorXR> f_int_r() { return Map<VectorXR>(d_f_int_r, n_coef*3); }
+__device__ Map<VectorXR> f_int()   { return Map<VectorXR>(d_f_int_t, n_nodes*3); }
+__device__ Map<VectorXR> f_int_r() { return Map<VectorXR>(d_f_int_r, n_nodes*3); }
 ```
 
 In `LeapfrogSolver` the velocity array layout for `TYPE_LDPM_TET4` is:
 
 ```
-da_v_[0 … 3*n_coef−1]          ← translational half-step velocities
-da_v_[3*n_coef … 6*n_coef−1]   ← rotational half-step velocities  (v_rot)
+da_v_[0 … 3*n_nodes−1]          ← translational half-step velocities
+da_v_[3*n_nodes … 6*n_nodes−1]   ← rotational half-step velocities  (v_rot)
 ```
 
 and the mass/inertia array as:
 
 ```
-da_mass_lump_[0 … n_coef−1]         ← translational lumped mass  mᵢ
-da_mass_lump_[n_coef … 2*n_coef−1]  ← rotational inertia Iᵢ
+da_mass_lump_[0 … n_nodes−1]         ← translational lumped mass  mᵢ
+da_mass_lump_[n_nodes … 2*n_nodes−1]  ← rotational inertia Iᵢ
 ```
 
 ---
@@ -583,7 +583,7 @@ node_volumes[n3] += vol / Real(4);
 h_I_lump[i] = LDPM_TET4_ALPHA_ROT * m_i * node_l_min[i] * node_l_min[i];
 ```
 
-The translational mass is stored in a diagonal CSR matrix (nnz = n_coef). The
+The translational mass is stored in a diagonal CSR matrix (nnz = n_nodes). The
 specialised `leapfrog_compute_lumped_mass_ldpm_tet4_kernel` copies the rotational
 inertia into the second half of the solver's mass array:
 

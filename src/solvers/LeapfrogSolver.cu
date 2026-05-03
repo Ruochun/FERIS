@@ -231,7 +231,7 @@ __global__ void leapfrog_update_velocity_rot_kernel(ElemType* d_data, LeapfrogSo
 template <typename ElemType>
 __global__ void leapfrog_apply_bc_ldpm_tet4_kernel(ElemType* d_data, LeapfrogSolver* d_solver) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int n_fixed = d_data->gpu_n_constraint() / 3;
+    int n_fixed = d_data->gpu_n_constraint() / 6;
     if (tid >= n_fixed)
         return;
 

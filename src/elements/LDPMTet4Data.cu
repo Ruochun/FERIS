@@ -123,7 +123,7 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
         MOPHI_ERROR("GPU_LDPMTet4_Data is already set up.");
         return;
     }
-    if (h_x.size() != n_coef || h_y.size() != n_coef || h_z.size() != n_coef) {
+    if (h_x.size() != n_nodes || h_y.size() != n_nodes || h_z.size() != n_nodes) {
         MOPHI_ERROR("Position vector size mismatch in GPU_LDPMTet4_Data::Setup.");
         return;
     }
@@ -134,55 +134,55 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 
     // ── 1. Allocate and fill translational position arrays ───────────────────
 
-    da_x12.resize(n_coef);
+    da_x12.resize(n_nodes);
     da_x12.BindDevicePointer(&d_x12);
-    da_y12.resize(n_coef);
+    da_y12.resize(n_nodes);
     da_y12.BindDevicePointer(&d_y12);
-    da_z12.resize(n_coef);
+    da_z12.resize(n_nodes);
     da_z12.BindDevicePointer(&d_z12);
 
-    std::copy(h_x.data(), h_x.data() + n_coef, da_x12.host());
+    std::copy(h_x.data(), h_x.data() + n_nodes, da_x12.host());
     da_x12.ToDevice();
-    std::copy(h_y.data(), h_y.data() + n_coef, da_y12.host());
+    std::copy(h_y.data(), h_y.data() + n_nodes, da_y12.host());
     da_y12.ToDevice();
-    std::copy(h_z.data(), h_z.data() + n_coef, da_z12.host());
+    std::copy(h_z.data(), h_z.data() + n_nodes, da_z12.host());
     da_z12.ToDevice();
 
     // ── 2. Allocate rotation arrays (initialised to zero) ────────────────────
 
-    da_rx12.resize(n_coef);
+    da_rx12.resize(n_nodes);
     da_rx12.BindDevicePointer(&d_rx12);
     da_rx12.SetVal(Real(0));
     da_rx12.ToDevice();
 
-    da_ry12.resize(n_coef);
+    da_ry12.resize(n_nodes);
     da_ry12.BindDevicePointer(&d_ry12);
     da_ry12.SetVal(Real(0));
     da_ry12.ToDevice();
 
-    da_rz12.resize(n_coef);
+    da_rz12.resize(n_nodes);
     da_rz12.BindDevicePointer(&d_rz12);
     da_rz12.SetVal(Real(0));
     da_rz12.ToDevice();
 
     // ── 3. Allocate force / moment arrays ────────────────────────────────────
 
-    da_f_int_t.resize(n_coef * 3);
+    da_f_int_t.resize(n_nodes * 3);
     da_f_int_t.BindDevicePointer(&d_f_int_t);
     da_f_int_t.SetVal(Real(0));
     da_f_int_t.ToDevice();
 
-    da_f_ext_t.resize(n_coef * 3);
+    da_f_ext_t.resize(n_nodes * 3);
     da_f_ext_t.BindDevicePointer(&d_f_ext_t);
     da_f_ext_t.SetVal(Real(0));
     da_f_ext_t.ToDevice();
 
-    da_f_int_r.resize(n_coef * 3);
+    da_f_int_r.resize(n_nodes * 3);
     da_f_int_r.BindDevicePointer(&d_f_int_r);
     da_f_int_r.SetVal(Real(0));
     da_f_int_r.ToDevice();
 
-    da_f_ext_r.resize(n_coef * 3);
+    da_f_ext_r.resize(n_nodes * 3);
     da_f_ext_r.BindDevicePointer(&d_f_ext_r);
     da_f_ext_r.SetVal(Real(0));
     da_f_ext_r.ToDevice();
@@ -389,7 +389,7 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 
     // ── 10. Allocate per-node rotational inertia (filled in CalcMassMatrix) ───
 
-    da_I_lump.resize(n_coef);
+    da_I_lump.resize(n_nodes);
     da_I_lump.BindDevicePointer(&d_I_lump);
     da_I_lump.SetVal(Real(0));
     da_I_lump.ToDevice();
@@ -401,7 +401,7 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 
     is_setup = true;
 
-    MOPHI_INFO("GPU_LDPMTet4_Data: %d nodes, %d TET4 elements, %d unique edges", n_coef, n_elem, n_edge);
+    MOPHI_INFO("GPU_LDPMTet4_Data: %d nodes, %d TET4 elements, %d unique edges", n_nodes, n_elem, n_edge);
 }
 
 // ─── SetupFromMesh ────────────────────────────────────────────────────────────
@@ -439,7 +439,7 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     }
 
     // Update element counts to match what the mesh actually provides.
-    n_coef = mesh.n_particles;
+    n_nodes = mesh.n_particles;
     n_elem = mesh.n_tets;
 
     Setup(mesh.particle_x, mesh.particle_y, mesh.particle_z, mesh.tet_connectivity);
@@ -679,12 +679,12 @@ void GPU_LDPMTet4_Data::SetExternalForce(const VectorXR& h_f_ext) {
         MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting external force.");
         return;
     }
-    if (h_f_ext.size() != n_coef * 3) {
-        MOPHI_ERROR("External force vector size mismatch (expected %d, got %d).", n_coef * 3,
+    if (h_f_ext.size() != n_nodes * 3) {
+        MOPHI_ERROR("External force vector size mismatch (expected %d, got %d).", n_nodes * 3,
                     static_cast<int>(h_f_ext.size()));
         return;
     }
-    std::copy(h_f_ext.data(), h_f_ext.data() + n_coef * 3, da_f_ext_t.host());
+    std::copy(h_f_ext.data(), h_f_ext.data() + n_nodes * 3, da_f_ext_t.host());
     da_f_ext_t.ToDevice();
 }
 
@@ -693,7 +693,7 @@ void GPU_LDPMTet4_Data::SetNodalFixed(const VectorXi& fixed_nodes_in) {
         MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting fixed nodes.");
         return;
     }
-    n_constraint = fixed_nodes_in.size() * 3;
+    n_constraint = static_cast<int>(fixed_nodes_in.size()) * 6;
 
     da_fixed_nodes.resize(static_cast<size_t>(fixed_nodes_in.size()));
     da_fixed_nodes.BindDevicePointer(&d_fixed_nodes);
@@ -717,7 +717,7 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
     const Real* hz = da_z12.host();
 
     // ── Voronoi volumes → translational lumped mass ───────────────────────────
-    std::vector<Real> node_volumes(n_coef, Real(0));
+    std::vector<Real> node_volumes(n_nodes, Real(0));
 
     for (int e = 0; e < n_elem; e++) {
         const int n0 = h_tet_conn_vec[e * 4 + 0];
@@ -739,7 +739,7 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
     }
 
     // ── Per-node minimum edge length → rotational inertia ────────────────────
-    std::vector<Real> node_l_min(n_coef, std::numeric_limits<Real>::max());
+    std::vector<Real> node_l_min(n_nodes, std::numeric_limits<Real>::max());
 
     for (int e = 0; e < n_edge; e++) {
         const int ni = h_edge_nodes_vec[e * 2 + 0];
@@ -752,14 +752,14 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
     }
 
     // Guard against isolated nodes (no edges connected)
-    for (int i = 0; i < n_coef; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         if (node_l_min[i] == std::numeric_limits<Real>::max())
             node_l_min[i] = Real(0);
     }
 
     // I_lump[i] = alpha * m_lump[i] * l_min[i]^2
-    std::vector<Real> h_I_lump(n_coef);
-    for (int i = 0; i < n_coef; i++) {
+    std::vector<Real> h_I_lump(n_nodes);
+    for (int i = 0; i < n_nodes; i++) {
         const Real m_i = h_rho * node_volumes[i];
         h_I_lump[i] = LDPM_TET4_ALPHA_ROT * m_i * node_l_min[i] * node_l_min[i];
     }
@@ -768,33 +768,33 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
     da_I_lump.ToDevice();
 
     // ── Build diagonal CSR for translational mass ─────────────────────────────
-    std::vector<int> h_offsets(n_coef + 1);
-    std::vector<int> h_columns(n_coef);
-    std::vector<Real> h_values(n_coef);
+    std::vector<int> h_offsets(n_nodes + 1);
+    std::vector<int> h_columns(n_nodes);
+    std::vector<Real> h_values(n_nodes);
 
-    for (int i = 0; i < n_coef; i++) {
+    for (int i = 0; i < n_nodes; i++) {
         h_offsets[i] = i;
         h_columns[i] = i;
         h_values[i] = h_rho * node_volumes[i];
     }
-    h_offsets[n_coef] = n_coef;
+    h_offsets[n_nodes] = n_nodes;
 
     if (!is_csr_setup) {
-        MOPHI_GPU_CALL(cudaMalloc((void**)&d_csr_offsets, static_cast<size_t>(n_coef + 1) * sizeof(int)));
-        MOPHI_GPU_CALL(cudaMalloc((void**)&d_csr_columns, static_cast<size_t>(n_coef) * sizeof(int)));
-        MOPHI_GPU_CALL(cudaMalloc((void**)&d_csr_values, static_cast<size_t>(n_coef) * sizeof(Real)));
+        MOPHI_GPU_CALL(cudaMalloc((void**)&d_csr_offsets, static_cast<size_t>(n_nodes + 1) * sizeof(int)));
+        MOPHI_GPU_CALL(cudaMalloc((void**)&d_csr_columns, static_cast<size_t>(n_nodes) * sizeof(int)));
+        MOPHI_GPU_CALL(cudaMalloc((void**)&d_csr_values, static_cast<size_t>(n_nodes) * sizeof(Real)));
         MOPHI_GPU_CALL(cudaMalloc((void**)&d_nnz, sizeof(int)));
         is_csr_setup = true;
     }
 
-    MOPHI_GPU_CALL(cudaMemcpy(d_csr_offsets, h_offsets.data(), static_cast<size_t>(n_coef + 1) * sizeof(int),
+    MOPHI_GPU_CALL(cudaMemcpy(d_csr_offsets, h_offsets.data(), static_cast<size_t>(n_nodes + 1) * sizeof(int),
                               cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(
-        cudaMemcpy(d_csr_columns, h_columns.data(), static_cast<size_t>(n_coef) * sizeof(int), cudaMemcpyHostToDevice));
+        cudaMemcpy(d_csr_columns, h_columns.data(), static_cast<size_t>(n_nodes) * sizeof(int), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(
-        cudaMemcpy(d_csr_values, h_values.data(), static_cast<size_t>(n_coef) * sizeof(Real), cudaMemcpyHostToDevice));
+        cudaMemcpy(d_csr_values, h_values.data(), static_cast<size_t>(n_nodes) * sizeof(Real), cudaMemcpyHostToDevice));
 
-    const int nnz_val = n_coef;
+    const int nnz_val = n_nodes;
     MOPHI_GPU_CALL(cudaMemcpy(d_nnz, &nnz_val, sizeof(int), cudaMemcpyHostToDevice));
 
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
@@ -822,8 +822,8 @@ void GPU_LDPMTet4_Data::CalcInternalForce() {
         return;
     constexpr int threads = 256;
 
-    // Clear both translational and rotational f_int (n_coef * 3 threads)
-    const int blocks_clear = (n_coef * 3 + threads - 1) / threads;
+    // Clear both translational and rotational f_int (n_nodes * 3 threads)
+    const int blocks_clear = (n_nodes * 3 + threads - 1) / threads;
     clear_f_int_ldpm_tet4_kernel<<<blocks_clear, threads>>>(d_data);
 
     // Assemble from edges (n_edge * 2 threads)
@@ -836,39 +836,39 @@ void GPU_LDPMTet4_Data::CalcInternalForce() {
 // ─── Retrieve helpers ─────────────────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::RetrievePositionToCPU(VectorXR& x_out, VectorXR& y_out, VectorXR& z_out) {
-    x_out.resize(n_coef);
-    y_out.resize(n_coef);
-    z_out.resize(n_coef);
+    x_out.resize(n_nodes);
+    y_out.resize(n_nodes);
+    z_out.resize(n_nodes);
     da_x12.ToHost();
     da_y12.ToHost();
     da_z12.ToHost();
-    std::copy(da_x12.host(), da_x12.host() + n_coef, x_out.data());
-    std::copy(da_y12.host(), da_y12.host() + n_coef, y_out.data());
-    std::copy(da_z12.host(), da_z12.host() + n_coef, z_out.data());
+    std::copy(da_x12.host(), da_x12.host() + n_nodes, x_out.data());
+    std::copy(da_y12.host(), da_y12.host() + n_nodes, y_out.data());
+    std::copy(da_z12.host(), da_z12.host() + n_nodes, z_out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveRotationToCPU(VectorXR& rx_out, VectorXR& ry_out, VectorXR& rz_out) {
-    rx_out.resize(n_coef);
-    ry_out.resize(n_coef);
-    rz_out.resize(n_coef);
+    rx_out.resize(n_nodes);
+    ry_out.resize(n_nodes);
+    rz_out.resize(n_nodes);
     da_rx12.ToHost();
     da_ry12.ToHost();
     da_rz12.ToHost();
-    std::copy(da_rx12.host(), da_rx12.host() + n_coef, rx_out.data());
-    std::copy(da_ry12.host(), da_ry12.host() + n_coef, ry_out.data());
-    std::copy(da_rz12.host(), da_rz12.host() + n_coef, rz_out.data());
+    std::copy(da_rx12.host(), da_rx12.host() + n_nodes, rx_out.data());
+    std::copy(da_ry12.host(), da_ry12.host() + n_nodes, ry_out.data());
+    std::copy(da_rz12.host(), da_rz12.host() + n_nodes, rz_out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveInternalForceToCPU(VectorXR& f_out) {
-    f_out.resize(n_coef * 3);
+    f_out.resize(n_nodes * 3);
     da_f_int_t.ToHost();
-    std::copy(da_f_int_t.host(), da_f_int_t.host() + n_coef * 3, f_out.data());
+    std::copy(da_f_int_t.host(), da_f_int_t.host() + n_nodes * 3, f_out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveExternalForceToCPU(VectorXR& f_out) {
-    f_out.resize(n_coef * 3);
+    f_out.resize(n_nodes * 3);
     da_f_ext_t.ToHost();
-    std::copy(da_f_ext_t.host(), da_f_ext_t.host() + n_coef * 3, f_out.data());
+    std::copy(da_f_ext_t.host(), da_f_ext_t.host() + n_nodes * 3, f_out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
