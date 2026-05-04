@@ -179,9 +179,21 @@ class LeapfrogSolver : public SolverBase {
     // Note: this writes only the translational part (first 3*n_coef_ entries of
     // da_v_).  Rotational velocities (TYPE_LDPM_TET4 only) are unchanged.
     void SetNodalVelocity(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        const int n = static_cast<int>(node_indices.size());
+        if (vel_values_3n.size() != n * 3) {
+            MOPHI_ERROR("LeapfrogSolver::SetNodalVelocity: vel_values_3n.size() (%d) must equal "
+                        "3 * node_indices.size() (%d).",
+                        static_cast<int>(vel_values_3n.size()), n * 3);
+            return;
+        }
         Real* h_v = da_v_.host();
-        for (int i = 0; i < static_cast<int>(node_indices.size()); ++i) {
+        for (int i = 0; i < n; ++i) {
             const int node = node_indices(i);
+            if (node < 0 || node >= n_coef_) {
+                MOPHI_ERROR("LeapfrogSolver::SetNodalVelocity: node index %d out of range [0, %d).",
+                            node, n_coef_);
+                return;
+            }
             h_v[node * 3 + 0] = vel_values_3n(i * 3 + 0);
             h_v[node * 3 + 1] = vel_values_3n(i * 3 + 1);
             h_v[node * 3 + 2] = vel_values_3n(i * 3 + 2);
@@ -209,7 +221,22 @@ class LeapfrogSolver : public SolverBase {
     // Must be called after Setup() and before the first Solve().
     // Replaces the old AdvanceDrivenNodesZ() position-update pattern.
     void SetPrescribedVelocityBC(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
-        n_prescribed_vel_ = static_cast<int>(node_indices.size());
+        const int n = static_cast<int>(node_indices.size());
+        if (vel_values_3n.size() != n * 3) {
+            MOPHI_ERROR("LeapfrogSolver::SetPrescribedVelocityBC: vel_values_3n.size() (%d) must equal "
+                        "3 * node_indices.size() (%d).",
+                        static_cast<int>(vel_values_3n.size()), n * 3);
+            return;
+        }
+        for (int i = 0; i < n; ++i) {
+            const int node = node_indices(i);
+            if (node < 0 || node >= n_coef_) {
+                MOPHI_ERROR("LeapfrogSolver::SetPrescribedVelocityBC: node index %d out of range [0, %d).",
+                            node, n_coef_);
+                return;
+            }
+        }
+        n_prescribed_vel_ = n;
         da_pvel_nodes_.resize(n_prescribed_vel_);
         da_pvel_nodes_.BindDevicePointer(&d_pvel_nodes_);
         da_pvel_values_.resize(n_prescribed_vel_ * 3);

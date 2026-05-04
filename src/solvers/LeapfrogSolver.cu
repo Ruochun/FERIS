@@ -261,6 +261,7 @@ __global__ void leapfrog_apply_bc_ldpm_tet4_kernel(ElemType* d_data, LeapfrogSol
 //
 // Not templated: operates only on the solver velocity array.
 // One thread per prescribed node.
+// Node indices are validated host-side by SetPrescribedVelocityBC.
 // ---------------------------------------------------------------------------
 __global__ void leapfrog_apply_prescribed_vel_kernel(Real* d_v, const int* d_nodes, const Real* d_vel, int n) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
