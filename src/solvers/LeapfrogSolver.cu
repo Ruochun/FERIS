@@ -247,9 +247,35 @@ __global__ void leapfrog_apply_bc_ldpm_tet4_kernel(ElemType* d_data, LeapfrogSol
 }
 
 // ---------------------------------------------------------------------------
-// leapfrog_half_kick_kernel
+// leapfrog_apply_prescribed_vel_kernel
 //
-// Half-step translational velocity update:
+// Overwrites the translational velocity of a specified set of nodes with
+// prescribed (constant) values.  Called after the fixed-node BC zeroing
+// in both OneStepLeapfrog and HalfKickImpl so that driven nodes always
+// carry exactly their target velocity into the position update.
+//
+// d_v     – the solver's flat translational velocity array (length 3*n_coef).
+// d_nodes – device array of node indices to update (length n).
+// d_vel   – device array of [vx, vy, vz] values per node (length 3*n).
+// n       – number of prescribed-velocity nodes.
+//
+// Not templated: operates only on the solver velocity array.
+// One thread per prescribed node.
+// ---------------------------------------------------------------------------
+__global__ void leapfrog_apply_prescribed_vel_kernel(Real* d_v, const int* d_nodes, const Real* d_vel, int n) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= n)
+        return;
+
+    const int node_idx = d_nodes[tid];
+    d_v[node_idx * 3 + 0] = d_vel[tid * 3 + 0];
+    d_v[node_idx * 3 + 1] = d_vel[tid * 3 + 1];
+    d_v[node_idx * 3 + 2] = d_vel[tid * 3 + 2];
+}
+
+
+// ---------------------------------------------------------------------------
+// leapfrog_half_kick_kernel
 //   v += sign * (dt/2) * M_lump^{-1} * (f_ext - f_int)
 //
 // sign = -1: backward half-kick — InitialHalfKick, converts v_0 → v_{-1/2}
@@ -398,9 +424,16 @@ void LeapfrogSolver::OneStepLeapfrog() {
         // Step 3: Update half-step velocities: v += dt * M_lump^{-1} * (f_ext - f_int).
         leapfrog_update_velocity_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
 
-        // Step 4: Enforce fixed-node BCs (zero velocity). The kernel is safe
+        // Step 4a: Enforce fixed-node BCs (zero velocity). The kernel is safe
         // to launch even when no nodes are fixed (gpu_n_constraint() == 0).
         leapfrog_apply_bc_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+
+        // Step 4b: Re-impose prescribed (non-zero) velocities on driven nodes.
+        if (n_prescribed_vel_ > 0) {
+            const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
+                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+        }
 
         // Step 5: Advance positions: x += dt * v.
         leapfrog_update_position_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
@@ -432,8 +465,15 @@ void LeapfrogSolver::OneStepLeapfrog() {
         // Step 3b: Update half-step rotational velocities.
         leapfrog_update_velocity_rot_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
 
-        // Step 4: Enforce fixed-node BCs (zero all 6 velocity DOFs).
+        // Step 4a: Enforce fixed-node BCs (zero all 6 velocity DOFs).
         leapfrog_apply_bc_ldpm_tet4_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+
+        // Step 4b: Re-impose prescribed (non-zero) translational velocities.
+        if (n_prescribed_vel_ > 0) {
+            const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
+                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+        }
 
         // Step 5a: Advance translational positions.
         leapfrog_update_position_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
@@ -464,9 +504,8 @@ void LeapfrogSolver::OneStepLeapfrog() {
 //   sign = -1  →  backward half-kick  (InitialHalfKick)
 //   sign = +1  →  forward  half-kick  (FinalHalfKick)
 //
-// Boundary conditions are enforced after the kick so that fixed/driven nodes
-// remain at the velocity prescribed by the caller (typically zero for a
-// fixed node).  No position update is performed.
+// Fixed-node BCs are enforced (velocity zeroed) and prescribed-velocity BCs
+// are re-imposed after the kick.  No position update is performed.
 // ---------------------------------------------------------------------------
 void LeapfrogSolver::HalfKickImpl(Real sign) {
     constexpr int threadsPerBlock = 256;
@@ -492,8 +531,16 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
         // Apply the signed half-step velocity nudge.
         leapfrog_half_kick_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_, sign);
 
-        // Enforce BCs so fixed/driven nodes stay at their prescribed velocity.
+        // Enforce fixed-node BCs (zero velocity).
         leapfrog_apply_bc_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+
+        // Re-impose prescribed (non-zero) velocities so driven nodes keep
+        // their target velocity after the half-kick.
+        if (n_prescribed_vel_ > 0) {
+            const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
+                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+        }
     };
 
     if (type_ == TYPE_T4) {
@@ -516,8 +563,15 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
         leapfrog_half_kick_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_, sign);
         leapfrog_half_kick_rot_kernel<<<blocks_dof, threadsPerBlock>>>(typed_data, d_leapfrog_solver_, sign);
 
-        // Enforce BCs (6 DOFs per fixed node).
+        // Enforce fixed-node BCs (zero all 6 DOFs per fixed node).
         leapfrog_apply_bc_ldpm_tet4_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
+
+        // Re-impose prescribed translational velocities on driven nodes.
+        if (n_prescribed_vel_ > 0) {
+            const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
+                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+        }
     }
 
     MOPHI_GPU_CALL(cudaDeviceSynchronize());

@@ -49,7 +49,8 @@ struct LeapfrogParams {
 //     2. Assemble f_int(x_n) from P
 //     3. a_n = M_lump^{-1} * (f_ext - f_int)
 //     4. v_{n+1/2} = v_{n-1/2} + dt * a_n
-//     5. Enforce BCs: zero velocity at fixed nodes
+//     5. Enforce BCs: zero velocity at fixed nodes;
+//                    set prescribed velocity at driven nodes (SetPrescribedVelocityBC)
 //     6. x_{n+1} = x_n + dt * v_{n+1/2}
 //
 // The lumped (row-sum) mass matrix is computed once in Setup() from the
@@ -102,6 +103,10 @@ class LeapfrogSolver : public SolverBase {
     ~LeapfrogSolver() {
         da_v_.free();
         da_mass_lump_.free();
+        if (n_prescribed_vel_ > 0) {
+            da_pvel_nodes_.free();
+            da_pvel_values_.free();
+        }
 
         cudaFree(d_time_step_);
         cudaFree(d_leapfrog_solver_);
@@ -163,6 +168,58 @@ class LeapfrogSolver : public SolverBase {
         return n_shape_;
     }
 
+    // Seed specific nodal translational velocities into the leapfrog velocity
+    // array (da_v_).  Call after SetParameters() (which zeroes all velocities)
+    // and before InitialHalfKick() or Solve() to set non-zero initial
+    // conditions.
+    //
+    // node_indices  – global node indices, length n.
+    // vel_values_3n – flat array of 3n values, layout [vx0, vy0, vz0, ...].
+    //
+    // Note: this writes only the translational part (first 3*n_coef_ entries of
+    // da_v_).  Rotational velocities (TYPE_LDPM_TET4 only) are unchanged.
+    void SetNodalVelocity(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        Real* h_v = da_v_.host();
+        for (int i = 0; i < static_cast<int>(node_indices.size()); ++i) {
+            const int node = node_indices(i);
+            h_v[node * 3 + 0] = vel_values_3n(i * 3 + 0);
+            h_v[node * 3 + 1] = vel_values_3n(i * 3 + 1);
+            h_v[node * 3 + 2] = vel_values_3n(i * 3 + 2);
+        }
+        da_v_.ToDevice();
+    }
+
+    // Register a set of nodes whose translational velocity is re-imposed to a
+    // constant prescribed value after every velocity update (step 5 of each
+    // leapfrog step and in InitialHalfKick / FinalHalfKick).  The prescribed
+    // values are also applied in InitialHalfKick so that driven nodes keep
+    // their prescribed velocity after the half-kick.
+    //
+    // node_indices  – global node indices, length n.
+    // vel_values_3n – flat array of 3n values, layout [vx0, vy0, vz0, ...].
+    //
+    // Typical use (velocity-driven tensile test):
+    //   1. Call SetNodalFixed for truly fixed (clamped) nodes.
+    //   2. Call SetPrescribedVelocityBC for driven nodes with their target v_z.
+    //   3. Call SetNodalVelocity with the same values to seed da_v_.
+    //   4. Call InitialHalfKick() to stagger the initial velocity correctly.
+    //   5. Run Solve() — positions of driven nodes advance naturally via
+    //      x += dt * v without any external position-update call.
+    //
+    // Must be called after Setup() and before the first Solve().
+    // Replaces the old AdvanceDrivenNodesZ() position-update pattern.
+    void SetPrescribedVelocityBC(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        n_prescribed_vel_ = static_cast<int>(node_indices.size());
+        da_pvel_nodes_.resize(n_prescribed_vel_);
+        da_pvel_nodes_.BindDevicePointer(&d_pvel_nodes_);
+        da_pvel_values_.resize(n_prescribed_vel_ * 3);
+        da_pvel_values_.BindDevicePointer(&d_pvel_values_);
+        std::copy(node_indices.data(), node_indices.data() + n_prescribed_vel_, da_pvel_nodes_.host());
+        std::copy(vel_values_3n.data(), vel_values_3n.data() + n_prescribed_vel_ * 3, da_pvel_values_.host());
+        da_pvel_nodes_.ToDevice();
+        da_pvel_values_.ToDevice();
+    }
+
     // Advance one leapfrog time step.
     void OneStepLeapfrog();
 
@@ -212,6 +269,17 @@ class LeapfrogSolver : public SolverBase {
 
     // Physical simulation time step stored on device for kernel access.
     Real* d_time_step_;
+
+    // Prescribed-velocity BC: nodes whose translational velocity is clamped to
+    // a constant value after every velocity update step.
+    // n_prescribed_vel_: number of prescribed-velocity nodes (0 = none).
+    // da_pvel_nodes_: node indices, length n_prescribed_vel_.
+    // da_pvel_values_: velocity values [vx,vy,vz] per node, length 3*n_prescribed_vel_.
+    int n_prescribed_vel_ = 0;
+    mophi::DualArray<int> da_pvel_nodes_;
+    mophi::DualArray<Real> da_pvel_values_;
+    int* d_pvel_nodes_ = nullptr;
+    Real* d_pvel_values_ = nullptr;
 
     // Shared implementation for InitialHalfKick() and FinalHalfKick().
     // sign = -1: backward half-kick; sign = +1: forward half-kick.
