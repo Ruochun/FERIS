@@ -251,6 +251,16 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     void CalcP() override;
 
     void RetrieveInternalForceToCPU(VectorXR& internal_force) override;
+    void RetrieveInternalForceToCPU(VectorReal3& internal_force) {
+        VectorXR flat;
+        RetrieveInternalForceToCPU(flat);
+        if (!UnflattenVectorReal3(flat, internal_force)) {
+            MOPHI_ERROR(
+                "GPU_LDPMTet4_Data::RetrieveInternalForceToCPU: internal force size (%d) is not divisible by 3.",
+                static_cast<int>(flat.size()));
+            return;
+        }
+    }
     void RetrieveConstraintDataToCPU(VectorXR&) override {}
     void RetrieveConstraintJacobianToCPU(MatrixXR&) override {}
     void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) override;
@@ -309,9 +319,27 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     void SetDensity(Real rho_val);
     void SetExternalForce(const VectorXR& h_f_ext);
+    void SetExternalForce(const VectorReal3& h_f_ext) {
+        if (static_cast<int>(h_f_ext.size()) != n_nodes) {
+            MOPHI_ERROR("GPU_LDPMTet4_Data::SetExternalForce: force vector size mismatch.");
+            return;
+        }
+        VectorXR flat = FlattenVectorReal3(h_f_ext);
+        SetExternalForce(flat);
+    }
     void SetNodalFixed(const VectorXi& fixed_nodes_in);
 
     void RetrieveExternalForceToCPU(VectorXR& f_ext_out);
+    void RetrieveExternalForceToCPU(VectorReal3& f_ext_out) {
+        VectorXR flat;
+        RetrieveExternalForceToCPU(flat);
+        if (!UnflattenVectorReal3(flat, f_ext_out)) {
+            MOPHI_ERROR(
+                "GPU_LDPMTet4_Data::RetrieveExternalForceToCPU: external force size (%d) is not divisible by 3.",
+                static_cast<int>(flat.size()));
+            return;
+        }
+    }
 
     // Retrieve per-edge damage state from GPU to host.
     // omega_out : size n_edge, omega ∈ [0, 1] (0 = undamaged, 1 = fully failed)

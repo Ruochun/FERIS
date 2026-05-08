@@ -63,7 +63,7 @@ element.SetDensity(rho);
 
 // Boundary conditions
 element.SetNodalFixed(fixed_nodes);     // clamp nodes
-element.SetExternalForce(h_f_ext);      // translational force [n_nodes * 3]
+element.SetExternalForce(h_f_ext);      // preferred user-facing form: VectorReal3 (one Real3 per node)
 
 // Build lumped mass + rotational inertia
 element.CalcMassMatrix();

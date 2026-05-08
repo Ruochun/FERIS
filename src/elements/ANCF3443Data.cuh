@@ -776,6 +776,14 @@ struct GPU_ANCF3443_Data : public ElementBase {
         std::copy(f_ext.data(), f_ext.data() + n_coef * 3, da_f_ext.host());
         da_f_ext.ToDevice();
     }
+    void SetExternalForce(const VectorReal3& f_ext) {
+        if (static_cast<int>(f_ext.size()) != n_coef) {
+            MOPHI_ERROR("External force vector size mismatch.");
+            return;
+        }
+        VectorXR flat = FlattenVectorReal3(f_ext);
+        SetExternalForce(flat);
+    }
 
     void SetNodalFixed(const VectorXi& fixed_nodes) {
         if (is_constraints_setup) {
@@ -1062,6 +1070,15 @@ struct GPU_ANCF3443_Data : public ElementBase {
     void RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>& p_from_F);
 
     void RetrieveInternalForceToCPU(VectorXR& internal_force);
+    void RetrieveInternalForceToCPU(VectorReal3& internal_force) {
+        VectorXR flat;
+        RetrieveInternalForceToCPU(flat);
+        if (!UnflattenVectorReal3(flat, internal_force)) {
+            MOPHI_ERROR("GPU_ANCF3443_Data::RetrieveInternalForceToCPU: internal force size (%d) is not divisible by 3.",
+                        static_cast<int>(flat.size()));
+            return;
+        }
+    }
 
     void RetrieveConstraintDataToCPU(VectorXR& constraint);
 

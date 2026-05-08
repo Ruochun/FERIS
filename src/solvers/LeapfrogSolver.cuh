@@ -174,16 +174,16 @@ class LeapfrogSolver : public SolverBase {
     // conditions.
     //
     // node_indices  – global node indices, length n.
-    // vel_values_3n – flat array of 3n values, layout [vx0, vy0, vz0, ...].
+    // vel_values    – one Real3 velocity per node index.
     //
     // Note: this writes only the translational part (first 3*n_coef_ entries of
     // da_v_).  Rotational velocities (TYPE_LDPM_TET4 only) are unchanged.
-    void SetNodalVelocity(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+    void SetNodalVelocity(const VectorXi& node_indices, const VectorReal3& vel_values) {
         const int n = static_cast<int>(node_indices.size());
-        if (vel_values_3n.size() != n * 3) {
-            MOPHI_ERROR("LeapfrogSolver::SetNodalVelocity: vel_values_3n.size() (%d) must equal "
-                        "3 * node_indices.size() (%d).",
-                        static_cast<int>(vel_values_3n.size()), n * 3);
+        if (static_cast<int>(vel_values.size()) != n) {
+            MOPHI_ERROR("LeapfrogSolver::SetNodalVelocity: vel_values.size() (%d) must equal "
+                        "node_indices.size() (%d).",
+                        static_cast<int>(vel_values.size()), n);
             return;
         }
         Real* h_v = da_v_.host();
@@ -194,11 +194,23 @@ class LeapfrogSolver : public SolverBase {
                             node, n_coef_);
                 return;
             }
-            h_v[node * 3 + 0] = vel_values_3n(i * 3 + 0);
-            h_v[node * 3 + 1] = vel_values_3n(i * 3 + 1);
-            h_v[node * 3 + 2] = vel_values_3n(i * 3 + 2);
+            const Vector3R& v = vel_values[static_cast<size_t>(i)];
+            h_v[node * 3 + 0] = v(0);
+            h_v[node * 3 + 1] = v(1);
+            h_v[node * 3 + 2] = v(2);
         }
         da_v_.ToDevice();
+    }
+
+    // Backward-compatible overload (flat 3*n layout).
+    void SetNodalVelocity(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        VectorReal3 vel_values;
+        if (!UnflattenVectorReal3(vel_values_3n, vel_values)) {
+            MOPHI_ERROR("LeapfrogSolver::SetNodalVelocity: flat velocity size (%d) is not divisible by 3.",
+                        static_cast<int>(vel_values_3n.size()));
+            return;
+        }
+        SetNodalVelocity(node_indices, vel_values);
     }
 
     // Register a set of nodes whose translational velocity is re-imposed to a
@@ -208,7 +220,7 @@ class LeapfrogSolver : public SolverBase {
     // their prescribed velocity after the half-kick.
     //
     // node_indices  – global node indices, length n.
-    // vel_values_3n – flat array of 3n values, layout [vx0, vy0, vz0, ...].
+    // vel_values    – one Real3 velocity per node index.
     //
     // Typical use (velocity-driven tensile test):
     //   1. Call SetNodalFixed for truly fixed (clamped) nodes.
@@ -220,12 +232,12 @@ class LeapfrogSolver : public SolverBase {
     //
     // Must be called after Setup() and before the first Solve().
     // Replaces the old AdvanceDrivenNodesZ() position-update pattern.
-    void SetPrescribedVelocityBC(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+    void SetPrescribedVelocityBC(const VectorXi& node_indices, const VectorReal3& vel_values) {
         const int n = static_cast<int>(node_indices.size());
-        if (vel_values_3n.size() != n * 3) {
-            MOPHI_ERROR("LeapfrogSolver::SetPrescribedVelocityBC: vel_values_3n.size() (%d) must equal "
-                        "3 * node_indices.size() (%d).",
-                        static_cast<int>(vel_values_3n.size()), n * 3);
+        if (static_cast<int>(vel_values.size()) != n) {
+            MOPHI_ERROR("LeapfrogSolver::SetPrescribedVelocityBC: vel_values.size() (%d) must equal "
+                        "node_indices.size() (%d).",
+                        static_cast<int>(vel_values.size()), n);
             return;
         }
         for (int i = 0; i < n; ++i) {
@@ -242,9 +254,25 @@ class LeapfrogSolver : public SolverBase {
         da_pvel_values_.resize(n_prescribed_vel_ * 3);
         da_pvel_values_.BindDevicePointer(&d_pvel_values_);
         std::copy(node_indices.data(), node_indices.data() + n_prescribed_vel_, da_pvel_nodes_.host());
-        std::copy(vel_values_3n.data(), vel_values_3n.data() + n_prescribed_vel_ * 3, da_pvel_values_.host());
+        for (int i = 0; i < n_prescribed_vel_; ++i) {
+            const Vector3R& v = vel_values[static_cast<size_t>(i)];
+            da_pvel_values_.host()[i * 3 + 0] = v(0);
+            da_pvel_values_.host()[i * 3 + 1] = v(1);
+            da_pvel_values_.host()[i * 3 + 2] = v(2);
+        }
         da_pvel_nodes_.ToDevice();
         da_pvel_values_.ToDevice();
+    }
+
+    // Backward-compatible overload (flat 3*n layout).
+    void SetPrescribedVelocityBC(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        VectorReal3 vel_values;
+        if (!UnflattenVectorReal3(vel_values_3n, vel_values)) {
+            MOPHI_ERROR("LeapfrogSolver::SetPrescribedVelocityBC: flat velocity size (%d) is not divisible by 3.",
+                        static_cast<int>(vel_values_3n.size()));
+            return;
+        }
+        SetPrescribedVelocityBC(node_indices, vel_values);
     }
 
     // Advance one leapfrog time step.

@@ -339,8 +339,26 @@ struct GPU_FEAT10_Data : public ElementBase {
     void RetrieveMassCSRToCPU(std::vector<int>& offsets, std::vector<int>& columns, std::vector<Real>& values);
 
     void RetrieveInternalForceToCPU(VectorXR& internal_force) override;
+    void RetrieveInternalForceToCPU(VectorReal3& internal_force) {
+        VectorXR flat;
+        RetrieveInternalForceToCPU(flat);
+        if (!UnflattenVectorReal3(flat, internal_force)) {
+            MOPHI_ERROR("GPU_FEAT10_Data::RetrieveInternalForceToCPU: internal force size (%d) is not divisible by 3.",
+                        static_cast<int>(flat.size()));
+            return;
+        }
+    }
 
     void RetrieveExternalForceToCPU(VectorXR& external_force);
+    void RetrieveExternalForceToCPU(VectorReal3& external_force) {
+        VectorXR flat;
+        RetrieveExternalForceToCPU(flat);
+        if (!UnflattenVectorReal3(flat, external_force)) {
+            MOPHI_ERROR("GPU_FEAT10_Data::RetrieveExternalForceToCPU: external force size (%d) is not divisible by 3.",
+                        static_cast<int>(flat.size()));
+            return;
+        }
+    }
 
     void RetrieveConstraintDataToCPU(VectorXR& constraint) override {}
 
@@ -604,6 +622,14 @@ struct GPU_FEAT10_Data : public ElementBase {
 
         std::copy(h_f_ext.data(), h_f_ext.data() + n_coef * 3, da_f_ext.host());
         da_f_ext.ToDevice();
+    }
+    void SetExternalForce(const VectorReal3& h_f_ext) {
+        if (static_cast<int>(h_f_ext.size()) != n_coef) {
+            MOPHI_ERROR("External force vector size mismatch.");
+            return;
+        }
+        VectorXR flat = FlattenVectorReal3(h_f_ext);
+        SetExternalForce(flat);
     }
 
     const Real* GetX12DevicePtr() const {
