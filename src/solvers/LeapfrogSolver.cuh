@@ -177,7 +177,8 @@ class LeapfrogSolver : public SolverBase {
     // vel_values    – one Real3 velocity per node index.
     //
     // Note: this writes only the translational part (first 3*n_coef_ entries of
-    // da_v_).  Rotational velocities (TYPE_LDPM_TET4 only) are unchanged.
+    // da_v_).  For TYPE_LDPM_TET4, rotational half-step velocities stored in
+    // the second 3*n_coef_ entries are left unchanged.
     void SetNodalVelocity(const VectorXi& node_indices, const VectorReal3& vel_values) {
         const int n = static_cast<int>(node_indices.size());
         if (static_cast<int>(vel_values.size()) != n) {

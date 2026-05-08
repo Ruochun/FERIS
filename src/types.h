@@ -62,7 +62,7 @@ inline bool UnflattenVectorReal3(const VectorXR& flat, VectorReal3& v3) {
     if (flat.size() % 3 != 0) {
         return false;
     }
-    const int n = static_cast<int>(flat.size() / 3);
+    const int n = static_cast<int>(flat.size()) / 3;
     v3.resize(static_cast<size_t>(n));
     for (int i = 0; i < n; ++i) {
         v3[static_cast<size_t>(i)](0) = flat(i * 3 + 0);

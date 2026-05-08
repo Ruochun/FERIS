@@ -219,9 +219,10 @@ int main() {
 
     // Prescribed z-velocity for driven nodes: one Real3 = [0, 0, V_PLATE] per node.
     VectorXi h_driven(n_driven);
-    VectorReal3 h_driven_vel(static_cast<size_t>(n_driven), Vector3R::Zero());
+    VectorReal3 h_driven_vel(static_cast<size_t>(n_driven));
     for (int i = 0; i < n_driven; ++i) {
         h_driven(i) = driven_idx[i];
+        h_driven_vel[static_cast<size_t>(i)] = Vector3R::Zero();
         h_driven_vel[static_cast<size_t>(i)](2) = V_PLATE;  // z-velocity only
     }
 
