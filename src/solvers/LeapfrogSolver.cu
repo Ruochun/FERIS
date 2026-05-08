@@ -277,11 +277,7 @@ __global__ void leapfrog_apply_prescribed_vel_kernel(Real* d_v, const int* d_nod
 
 // ---------------------------------------------------------------------------
 // leapfrog_half_kick_kernel
-//   v += sign * (dt/2) * M_lump^{-1} * (f_ext - f_int)
-//
-// sign = -1: backward half-kick — InitialHalfKick, converts v_0 → v_{-1/2}
-// sign = +1: forward  half-kick — FinalHalfKick,   converts v_{N-1/2} → v_N
-//
+// Applies the per-DOF half-kick update used by LeapfrogSolver::HalfKickImpl().
 // One thread per global DOF (node * 3 + direction).
 // ---------------------------------------------------------------------------
 template <typename ElemType>

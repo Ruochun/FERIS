@@ -103,10 +103,8 @@ class LeapfrogSolver : public SolverBase {
     ~LeapfrogSolver() {
         da_v_.free();
         da_mass_lump_.free();
-        if (n_prescribed_vel_ > 0) {
-            da_pvel_nodes_.free();
-            da_pvel_values_.free();
-        }
+        da_pvel_nodes_.free();
+        da_pvel_values_.free();
 
         cudaFree(d_time_step_);
         cudaFree(d_leapfrog_solver_);
