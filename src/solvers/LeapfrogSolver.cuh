@@ -50,7 +50,7 @@ struct LeapfrogParams {
 //     3. a_n = M_lump^{-1} * (f_ext - f_int)
 //     4. v_{n+1/2} = v_{n-1/2} + dt * a_n
 //     5. Enforce BCs: zero velocity at fixed nodes;
-//                    set prescribed velocity at driven nodes (SetPrescribedVelocityBC)
+//        set prescribed velocity at driven nodes (SetPrescribedVelocityBC)
 //     6. x_{n+1} = x_n + dt * v_{n+1/2}
 //
 // The lumped (row-sum) mass matrix is computed once in Setup() from the
