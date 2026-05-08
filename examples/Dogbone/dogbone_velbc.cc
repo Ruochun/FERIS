@@ -239,8 +239,9 @@ int main() {
     element_data.SetDensity(RHO_VAL);
 
     // No external forces — the top plate is driven kinematically.
-    VectorXR h_f_ext(mesh.n_particles * 3);
-    h_f_ext.setZero();
+    VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
     element_data.SetExternalForce(h_f_ext);
 
     // Only the fixed (bottom) nodes are registered with SetNodalFixed.
@@ -364,7 +365,7 @@ int main() {
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
             // Internal forces for stress computation.
-            VectorXR f_int;
+            VectorReal3 f_int;
             element_data.RetrieveInternalForceToCPU(f_int);
 
             // Mean actual z-displacement of driven nodes.
@@ -379,7 +380,7 @@ int main() {
             // pulls it; negate to get the compressive reaction (tensile = positive).
             Real f_reaction_z = Real(0);
             for (int i : fixed_idx)
-                f_reaction_z += f_int(i * 3 + 2);
+                f_reaction_z += f_int[static_cast<size_t>(i)](2);
             const Real stress = -f_reaction_z / A_cross_approx;
 
             // Write to stress-displacement CSV at high frequency.

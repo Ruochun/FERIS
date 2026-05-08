@@ -93,10 +93,11 @@ int main() {
     cube->SetNodalFixed(h_fixed_nodes);
 
     // set external force
-    VectorXR h_f_ext(cube->get_n_coef() * 3);
+    VectorReal3 h_f_ext(static_cast<size_t>(cube->get_n_coef()));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
     // set external force applied at the end of the beam to be 0,0,3100
-    h_f_ext.setZero();
-    h_f_ext(3 * 6 + 0) = 1000.0;
+    h_f_ext[6](0) = 1000.0;
     cube->SetExternalForce(h_f_ext);
 
     // Get quadrature data from quadrature_utils.h
@@ -176,10 +177,12 @@ int main() {
     MOPHI_INFO("done CalcInternalForce");
 
     // retrieve internal force
-    VectorXR f_int;
+    VectorReal3 f_int;
     cube->RetrieveInternalForceToCPU(f_int);
-    std::cout << "Internal force vector (size: " << f_int.size() << "):" << std::endl;
-    std::cout << f_int.transpose() << std::endl;
+    std::cout << "Internal force vector (size: " << f_int.size() << " Real3 entries):" << std::endl;
+    for (const auto& f : f_int)
+        std::cout << f.transpose() << " ";
+    std::cout << std::endl;
     std::cout << "done retrieving internal force vector" << std::endl;
 
     SyncedNesterovParams params = {1.0e-8, 1e14, 1.0e-6, 1.0e-6, 5, 300, 1.0e-3};

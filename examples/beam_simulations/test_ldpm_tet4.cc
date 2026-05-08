@@ -188,10 +188,11 @@ int main() {
     // External force: 1000 N downward distributed across all tip-face particles
     const Real F_total = -1000.0;  // N, in -z direction
     const Real F_per_node = F_total / static_cast<Real>(load_idx.size());
-    VectorXR h_f_ext(n_nodes * 3);
-    h_f_ext.setZero();
+    VectorReal3 h_f_ext(static_cast<size_t>(n_nodes));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
     for (int i : load_idx) {
-        h_f_ext(i * 3 + 2) = F_per_node;
+        h_f_ext[static_cast<size_t>(i)](2) = F_per_node;
     }
     element_data.SetExternalForce(h_f_ext);
 

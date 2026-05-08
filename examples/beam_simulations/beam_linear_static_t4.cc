@@ -157,8 +157,9 @@ int main() {
     beam->SetNodalFixed(h_fixed);
     std::cout << "  Fixed " << fixed_idx.size() << " nodes at x ≈ " << x_min << "\n";
 
-    VectorXR h_f_ext(n_nodes * 3);
-    h_f_ext.setZero();
+    VectorReal3 h_f_ext(static_cast<size_t>(n_nodes));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
 
     const Real tol_load = BOUNDARY_TOLERANCE_FRACTION * L;
     std::vector<int> load_idx;
@@ -168,7 +169,7 @@ int main() {
 
     const Real load_per_node = TOTAL_LOAD / static_cast<Real>(load_idx.size());
     for (int i : load_idx)
-        h_f_ext(3 * i + 2) = load_per_node;  // force in −z direction
+        h_f_ext[static_cast<size_t>(i)](2) = load_per_node;  // force in −z direction
 
     beam->SetExternalForce(h_f_ext);
     std::cout << "  Load: " << TOTAL_LOAD << " N distributed over " << load_idx.size() << " nodes at x ≈ " << x_max

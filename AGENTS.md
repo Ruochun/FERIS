@@ -101,6 +101,11 @@ When adding a new solver, you must:
 - Keep the `namespace feris {` wrapping around all library code.
 - Prefer `__host__ __device__` accessors over raw member access for portability.
 - Add `override` to every virtual method in derived classes.
+- For user-facing methods that accept or return collections of 3D quantities
+  (for example forces, velocities, moments, or displacements), prefer
+  `Real3` / `VectorReal3`-based APIs rather than flat `VectorXR` arrays of
+  length `3*n`. Keep flat `VectorXR` layouts for internal storage, solver-side
+  buffers, or backward-compatible overloads only.
 
 ---
 
