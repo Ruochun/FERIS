@@ -789,8 +789,8 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
 
     MOPHI_GPU_CALL(cudaMemcpy(d_csr_offsets, h_offsets.data(), static_cast<size_t>(n_nodes + 1) * sizeof(int),
                               cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(
-        cudaMemcpy(d_csr_columns, h_columns.data(), static_cast<size_t>(n_nodes) * sizeof(int), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_csr_columns, h_columns.data(), static_cast<size_t>(n_nodes) * sizeof(int),
+                              cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(
         cudaMemcpy(d_csr_values, h_values.data(), static_cast<size_t>(n_nodes) * sizeof(Real), cudaMemcpyHostToDevice));
 

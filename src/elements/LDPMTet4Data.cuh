@@ -54,194 +54,94 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── Translational nodal positions ────────────────────────────────────────
 
-    __device__ Map<VectorXR> x12() {
-        return Map<VectorXR>(d_x12, n_nodes);
-    }
-    __device__ const Map<VectorXR> x12() const {
-        return Map<VectorXR>(d_x12, n_nodes);
-    }
-    __device__ Map<VectorXR> y12() {
-        return Map<VectorXR>(d_y12, n_nodes);
-    }
-    __device__ const Map<VectorXR> y12() const {
-        return Map<VectorXR>(d_y12, n_nodes);
-    }
-    __device__ Map<VectorXR> z12() {
-        return Map<VectorXR>(d_z12, n_nodes);
-    }
-    __device__ const Map<VectorXR> z12() const {
-        return Map<VectorXR>(d_z12, n_nodes);
-    }
+    __device__ Map<VectorXR> x12() { return Map<VectorXR>(d_x12, n_nodes); }
+    __device__ const Map<VectorXR> x12() const { return Map<VectorXR>(d_x12, n_nodes); }
+    __device__ Map<VectorXR> y12() { return Map<VectorXR>(d_y12, n_nodes); }
+    __device__ const Map<VectorXR> y12() const { return Map<VectorXR>(d_y12, n_nodes); }
+    __device__ Map<VectorXR> z12() { return Map<VectorXR>(d_z12, n_nodes); }
+    __device__ const Map<VectorXR> z12() const { return Map<VectorXR>(d_z12, n_nodes); }
 
     // ── Rotational nodal positions (θ_x, θ_y, θ_z per node) ─────────────────
 
-    __device__ Map<VectorXR> rx12() {
-        return Map<VectorXR>(d_rx12, n_nodes);
-    }
-    __device__ const Map<VectorXR> rx12() const {
-        return Map<VectorXR>(d_rx12, n_nodes);
-    }
-    __device__ Map<VectorXR> ry12() {
-        return Map<VectorXR>(d_ry12, n_nodes);
-    }
-    __device__ const Map<VectorXR> ry12() const {
-        return Map<VectorXR>(d_ry12, n_nodes);
-    }
-    __device__ Map<VectorXR> rz12() {
-        return Map<VectorXR>(d_rz12, n_nodes);
-    }
-    __device__ const Map<VectorXR> rz12() const {
-        return Map<VectorXR>(d_rz12, n_nodes);
-    }
+    __device__ Map<VectorXR> rx12() { return Map<VectorXR>(d_rx12, n_nodes); }
+    __device__ const Map<VectorXR> rx12() const { return Map<VectorXR>(d_rx12, n_nodes); }
+    __device__ Map<VectorXR> ry12() { return Map<VectorXR>(d_ry12, n_nodes); }
+    __device__ const Map<VectorXR> ry12() const { return Map<VectorXR>(d_ry12, n_nodes); }
+    __device__ Map<VectorXR> rz12() { return Map<VectorXR>(d_rz12, n_nodes); }
+    __device__ const Map<VectorXR> rz12() const { return Map<VectorXR>(d_rz12, n_nodes); }
 
     // ── Translational nodal forces ───────────────────────────────────────────
 
-    __device__ Map<VectorXR> f_int() {
-        return Map<VectorXR>(d_f_int_t, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_int() const {
-        return Map<VectorXR>(d_f_int_t, n_nodes * 3);
-    }
-    __device__ Map<VectorXR> f_ext() {
-        return Map<VectorXR>(d_f_ext_t, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_ext() const {
-        return Map<VectorXR>(d_f_ext_t, n_nodes * 3);
-    }
+    __device__ Map<VectorXR> f_int() { return Map<VectorXR>(d_f_int_t, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_int() const { return Map<VectorXR>(d_f_int_t, n_nodes * 3); }
+    __device__ Map<VectorXR> f_ext() { return Map<VectorXR>(d_f_ext_t, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_ext() const { return Map<VectorXR>(d_f_ext_t, n_nodes * 3); }
 
     // ── Rotational nodal moments ─────────────────────────────────────────────
 
-    __device__ Map<VectorXR> f_int_r() {
-        return Map<VectorXR>(d_f_int_r, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_int_r() const {
-        return Map<VectorXR>(d_f_int_r, n_nodes * 3);
-    }
-    __device__ Map<VectorXR> f_ext_r() {
-        return Map<VectorXR>(d_f_ext_r, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_ext_r() const {
-        return Map<VectorXR>(d_f_ext_r, n_nodes * 3);
-    }
+    __device__ Map<VectorXR> f_int_r() { return Map<VectorXR>(d_f_int_r, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_int_r() const { return Map<VectorXR>(d_f_int_r, n_nodes * 3); }
+    __device__ Map<VectorXR> f_ext_r() { return Map<VectorXR>(d_f_ext_r, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_ext_r() const { return Map<VectorXR>(d_f_ext_r, n_nodes * 3); }
 
     // ── Boundary conditions ──────────────────────────────────────────────────
 
-    __device__ Map<VectorXi> fixed_nodes() {
-        return Map<VectorXi>(d_fixed_nodes, n_constraint / 6);
-    }
-    __device__ int gpu_n_constraint() const {
-        return n_constraint;
-    }
-    __device__ int gpu_n_coef() const {
-        return n_nodes;
-    }
-    __device__ int gpu_n_edge() const {
-        return n_edge;
-    }
+    __device__ Map<VectorXi> fixed_nodes() { return Map<VectorXi>(d_fixed_nodes, n_constraint / 6); }
+    __device__ int gpu_n_constraint() const { return n_constraint; }
+    __device__ int gpu_n_coef() const { return n_nodes; }
+    __device__ int gpu_n_edge() const { return n_edge; }
 
     // ── Edge geometry ────────────────────────────────────────────────────────
 
-    __device__ int edge_node(int edge_idx, int local_node) const {
-        return d_edge_nodes[edge_idx * 2 + local_node];
-    }
-    __device__ Real edge_l0(int edge_idx) const {
-        return d_l0[edge_idx];
-    }
-    __device__ Real facet_area(int edge_idx) const {
-        return d_facet_area[edge_idx];
-    }
-    __device__ Real edge_n_comp(int edge_idx, int k) const {
-        return d_edge_n[edge_idx * 3 + k];
-    }
-    __device__ Real edge_m_comp(int edge_idx, int k) const {
-        return d_edge_m[edge_idx * 3 + k];
-    }
-    __device__ Real edge_lv_comp(int edge_idx, int k) const {
-        return d_edge_lv[edge_idx * 3 + k];
-    }
+    __device__ int edge_node(int edge_idx, int local_node) const { return d_edge_nodes[edge_idx * 2 + local_node]; }
+    __device__ Real edge_l0(int edge_idx) const { return d_l0[edge_idx]; }
+    __device__ Real facet_area(int edge_idx) const { return d_facet_area[edge_idx]; }
+    __device__ Real edge_n_comp(int edge_idx, int k) const { return d_edge_n[edge_idx * 3 + k]; }
+    __device__ Real edge_m_comp(int edge_idx, int k) const { return d_edge_m[edge_idx * 3 + k]; }
+    __device__ Real edge_lv_comp(int edge_idx, int k) const { return d_edge_lv[edge_idx * 3 + k]; }
 
     // ── Per-step facet tractions and moments ─────────────────────────────────
     // Layout per edge: [t_N, t_M, t_L, m_T, m_M, m_L]  (6 components)
 
-    __device__ Real& facet_t(int edge_idx, int comp) {
-        return d_facet_t[edge_idx * 6 + comp];
-    }
-    __device__ Real facet_t(int edge_idx, int comp) const {
-        return d_facet_t[edge_idx * 6 + comp];
-    }
+    __device__ Real& facet_t(int edge_idx, int comp) { return d_facet_t[edge_idx * 6 + comp]; }
+    __device__ Real facet_t(int edge_idx, int comp) const { return d_facet_t[edge_idx * 6 + comp]; }
 
     // ── Per-edge damage state ─────────────────────────────────────────────────
     // kappa : max effective damage-driving strain (history variable, grows only)
     // omega : current damage variable ∈ [0, 1]
 
-    __device__ Real& edge_kappa(int edge_idx) {
-        return d_kappa[edge_idx];
-    }
-    __device__ Real edge_kappa(int edge_idx) const {
-        return d_kappa[edge_idx];
-    }
-    __device__ Real& edge_omega(int edge_idx) {
-        return d_omega[edge_idx];
-    }
-    __device__ Real edge_omega(int edge_idx) const {
-        return d_omega[edge_idx];
-    }
+    __device__ Real& edge_kappa(int edge_idx) { return d_kappa[edge_idx]; }
+    __device__ Real edge_kappa(int edge_idx) const { return d_kappa[edge_idx]; }
+    __device__ Real& edge_omega(int edge_idx) { return d_omega[edge_idx]; }
+    __device__ Real edge_omega(int edge_idx) const { return d_omega[edge_idx]; }
 
     // ── Material parameters ──────────────────────────────────────────────────
 
-    __device__ Real E_N() const {
-        return *d_E_N;
-    }
-    __device__ Real E_T() const {
-        return *d_E_T;
-    }
-    __device__ Real E_kT() const {
-        return *d_E_kT;
-    }
-    __device__ Real E_kM() const {
-        return *d_E_kM;
-    }
-    __device__ Real E_kL() const {
-        return *d_E_kL;
-    }
-    __device__ Real sigma_t() const {
-        return *d_sigma_t;
-    }
-    __device__ Real H_t() const {
-        return *d_H_t;
-    }
+    __device__ Real E_N() const { return *d_E_N; }
+    __device__ Real E_T() const { return *d_E_T; }
+    __device__ Real E_kT() const { return *d_E_kT; }
+    __device__ Real E_kM() const { return *d_E_kM; }
+    __device__ Real E_kL() const { return *d_E_kL; }
+    __device__ Real sigma_t() const { return *d_sigma_t; }
+    __device__ Real H_t() const { return *d_H_t; }
 
     // ── Per-node rotational inertia ──────────────────────────────────────────
 
-    __device__ Real I_lump(int node_i) const {
-        return d_I_lump[node_i];
-    }
+    __device__ Real I_lump(int node_i) const { return d_I_lump[node_i]; }
 
     // ── Diagonal CSR mass matrix ─────────────────────────────────────────────
 
-    __device__ int* csr_offsets() {
-        return d_csr_offsets;
-    }
-    __device__ int* csr_columns() {
-        return d_csr_columns;
-    }
-    __device__ Real* csr_values() {
-        return d_csr_values;
-    }
-    __device__ int nnz() {
-        return *d_nnz;
-    }
+    __device__ int* csr_offsets() { return d_csr_offsets; }
+    __device__ int* csr_columns() { return d_csr_columns; }
+    __device__ Real* csr_values() { return d_csr_values; }
+    __device__ int nnz() { return *d_nnz; }
 
 #endif  // __CUDACC__
 
     // ── Host/device scalar accessors ─────────────────────────────────────────
 
-    __host__ __device__ int get_n_coef() const override {
-        return n_nodes;
-    }
-    __host__ __device__ int get_n_beam() const override {
-        return n_edge;
-    }
+    __host__ __device__ int get_n_coef() const override { return n_nodes; }
+    __host__ __device__ int get_n_beam() const override { return n_edge; }
 
     // ── Virtual method implementations ───────────────────────────────────────
 
@@ -270,16 +170,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── ElementBase dispatch helpers ─────────────────────────────────────────
 
-    ElementBase* GetDevicePtr() override {
-        return d_data;
-    }
+    ElementBase* GetDevicePtr() override { return d_data; }
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
     // Default constructor: mesh counts are set later by SetupFromMesh() or Setup().
-    GPU_LDPMTet4_Data() : n_nodes(0), n_elem(0), n_edge(0), n_constraint(0), h_rho(0) {
-        type = TYPE_LDPM_TET4;
-    }
+    GPU_LDPMTet4_Data() : n_nodes(0), n_elem(0), n_edge(0), n_constraint(0), h_rho(0) { type = TYPE_LDPM_TET4; }
 
     // Parameterized constructor: use when calling Setup() directly.
     GPU_LDPMTet4_Data(int num_nodes, int num_elems)
@@ -352,9 +248,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Expose edge connectivity for visualization (e.g. VTK line-segment mesh).
     // Returns a reference to the host-side edge node array (size 2 * n_edge):
     //   h_edge_nodes_vec[2*e+0] = node i,  h_edge_nodes_vec[2*e+1] = node j.
-    const std::vector<int>& GetEdgeNodes() const {
-        return h_edge_nodes_vec;
-    }
+    const std::vector<int>& GetEdgeNodes() const { return h_edge_nodes_vec; }
 
     // Project per-edge damage ω onto the sub-facet mesh.
     //
@@ -406,28 +300,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Must be called after SetupFromMesh().
     void AdvanceDrivenNodesZ(const int* d_driven_idx, int n_driven, Real dz);
 
-    const Real* GetX12DevicePtr() const {
-        return d_x12;
-    }
-    const Real* GetY12DevicePtr() const {
-        return d_y12;
-    }
-    const Real* GetZ12DevicePtr() const {
-        return d_z12;
-    }
+    const Real* GetX12DevicePtr() const { return d_x12; }
+    const Real* GetY12DevicePtr() const { return d_y12; }
+    const Real* GetZ12DevicePtr() const { return d_z12; }
     // Non-const accessors for externally driven (kinematic BC) position updates.
-    Real* GetX12WritableDevicePtr() {
-        return d_x12;
-    }
-    Real* GetY12WritableDevicePtr() {
-        return d_y12;
-    }
-    Real* GetZ12WritableDevicePtr() {
-        return d_z12;
-    }
-    Real* GetExternalForceDevicePtr() {
-        return d_f_ext_t;
-    }
+    Real* GetX12WritableDevicePtr() { return d_x12; }
+    Real* GetY12WritableDevicePtr() { return d_y12; }
+    Real* GetZ12WritableDevicePtr() { return d_z12; }
+    Real* GetExternalForceDevicePtr() { return d_f_ext_t; }
 
     void Destroy();
 

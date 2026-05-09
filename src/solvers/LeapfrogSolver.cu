@@ -274,7 +274,6 @@ __global__ void leapfrog_apply_prescribed_vel_kernel(Real* d_v, const int* d_nod
     d_v[node_idx * 3 + 2] = d_vel[tid * 3 + 2];
 }
 
-
 // ---------------------------------------------------------------------------
 // leapfrog_half_kick_kernel
 // Applies the per-DOF half-kick update used by LeapfrogSolver::HalfKickImpl():
@@ -429,8 +428,8 @@ void LeapfrogSolver::OneStepLeapfrog() {
         // Step 4b: Re-impose prescribed (non-zero) velocities on driven nodes.
         if (n_prescribed_vel_ > 0) {
             const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
-            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
-                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(d_v_, d_pvel_nodes_, d_pvel_values_,
+                                                                                 n_prescribed_vel_);
         }
 
         // Step 5: Advance positions: x += dt * v.
@@ -469,8 +468,8 @@ void LeapfrogSolver::OneStepLeapfrog() {
         // Step 4b: Re-impose prescribed (non-zero) translational velocities.
         if (n_prescribed_vel_ > 0) {
             const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
-            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
-                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(d_v_, d_pvel_nodes_, d_pvel_values_,
+                                                                                 n_prescribed_vel_);
         }
 
         // Step 5a: Advance translational positions.
@@ -536,8 +535,8 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
         // their target velocity after the half-kick.
         if (n_prescribed_vel_ > 0) {
             const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
-            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
-                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(d_v_, d_pvel_nodes_, d_pvel_values_,
+                                                                                 n_prescribed_vel_);
         }
     };
 
@@ -567,8 +566,8 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
         // Re-impose prescribed translational velocities on driven nodes.
         if (n_prescribed_vel_ > 0) {
             const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
-            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(
-                d_v_, d_pvel_nodes_, d_pvel_values_, n_prescribed_vel_);
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(d_v_, d_pvel_nodes_, d_pvel_values_,
+                                                                                 n_prescribed_vel_);
         }
     }
 

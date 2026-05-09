@@ -94,8 +94,10 @@ When adding a new solver, you must:
 
 ## 5. Code Style
 
-- Follow the existing `.clang-format` configuration (run `.format_all` before
-  committing if in doubt).
+- Follow the existing `.clang-format` configuration.
+- After making changes, run `/home/runner/work/FERIS/FERIS/.format_all` before
+  committing so all formatted source files stay consistent with the repository
+  style.
 - File header comments (`Project`, `File`, `Brief`) must be updated when the
   file's purpose or public interface changes significantly.
 - Keep the `namespace feris {` wrapping around all library code.

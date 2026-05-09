@@ -213,8 +213,7 @@ int main() {
         z_max = std::max(z_max, mesh.particle_z(i));
     }
 
-    std::cout << "  Bounding box  x=[" << x_min << ", " << x_max << "]"
-              << "  y=[" << y_min << ", " << y_max << "]"
+    std::cout << "  Bounding box  x=[" << x_min << ", " << x_max << "]" << "  y=[" << y_min << ", " << y_max << "]"
               << "  z=[" << z_min << ", " << z_max << "]\n";
 
     // Minimum edge length across the entire mesh (needed for CFL and E_k*).
