@@ -17,14 +17,15 @@
  *   2. Initialise GPU_LDPMTet4_Data via SetupFromMesh().
  *   3. Set elastic moduli and Cusatis tensile damage parameters.
  *   4. Fix particles on the z = z_min face (clamped bottom end).
- *   5. Mark particles on the z = z_max face as "kinematically driven"
- *      — they are also added to the fixed-node list so the leapfrog
- *      solver zeros their velocity each step; their positions are then
- *      advanced by an externally prescribed displacement increment
- *      v_prescribed(t) * dt after every solver step via
- *      GPU_LDPMTet4_Data::AdvanceDrivenNodesZ().
+ *   5. Mark particles on the z = z_max face as velocity-driven:
+ *      — SetPrescribedVelocityBC registers a constant z-velocity = V_PLATE.
+ *      — SetNodalVelocity seeds the initial velocity in the leapfrog array.
+ *      — InitialHalfKick staggers v_0 → v_{-1/2} (trivial here since f_0 = 0,
+ *        but this is the correct pattern whenever v_0 ≠ 0).
  *   6. Prescribed velocity: constant V_PLATE from t = 0.
  *   7. Time-march with LeapfrogSolver; at each output interval write VTK.
+ *      The leapfrog naturally advances driven-node z-positions by V_PLATE*dt
+ *      each step — no explicit position-update call needed.
  *
  * Differences from dogbone_forcebc.cc (force-BC GPU demo)
  * ───────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@
  *  ──────────────────────────┼────────────────────────────────────
  *  External force on top     │ No external forces
  *  Bottom nodes: fixed       │ Bottom nodes: fixed (same)
- *  Top nodes: loaded (free)  │ Top nodes: kinematically driven
+ *  Top nodes: loaded (free)  │ Top nodes: velocity-driven
  *  Physics drives top motion │ Prescribed velocity drives top motion
  *
  * Physics: Cusatis LDPM (2011) — same constitutive model as the load demo.
@@ -205,21 +206,25 @@ int main() {
     std::cout << "  Fixed particles (z ≈ " << z_min << "):  " << fixed_idx.size() << "\n";
     std::cout << "  Driven particles (z ≈ " << z_max << "): " << driven_idx.size() << "\n";
 
-    // Both fixed AND driven nodes are passed to SetNodalFixed() so that the
-    // leapfrog solver zeros their velocity every step.  The driven nodes then
-    // receive their prescribed displacement increment via AdvanceDrivenNodesZ().
     const int n_fixed = static_cast<int>(fixed_idx.size());
     const int n_driven = static_cast<int>(driven_idx.size());
-    VectorXi h_constrained(n_fixed + n_driven);
-    for (int i = 0; i < n_fixed; ++i)
-        h_constrained(i) = fixed_idx[i];
-    for (int i = 0; i < n_driven; ++i)
-        h_constrained(n_fixed + i) = driven_idx[i];
 
-    // Copy driven node index list to device for use in AdvanceDrivenNodesZ().
-    int* d_driven_idx = nullptr;
-    MOPHI_GPU_CALL(cudaMalloc(&d_driven_idx, n_driven * sizeof(int)));
-    MOPHI_GPU_CALL(cudaMemcpy(d_driven_idx, driven_idx.data(), n_driven * sizeof(int), cudaMemcpyHostToDevice));
+    // Fixed nodes are passed to SetNodalFixed so the leapfrog zeros their
+    // velocity every step.  Driven (top-plate) nodes are NOT fixed; instead
+    // their z-velocity is prescribed via SetPrescribedVelocityBC so the
+    // leapfrog naturally advances their z-position by V_PLATE * dt each step.
+    VectorXi h_fixed(n_fixed);
+    for (int i = 0; i < n_fixed; ++i)
+        h_fixed(i) = fixed_idx[i];
+
+    // Prescribed z-velocity for driven nodes: one Real3 = [0, 0, V_PLATE] per node.
+    VectorXi h_driven(n_driven);
+    VectorReal3 h_driven_vel(static_cast<size_t>(n_driven));
+    for (int i = 0; i < n_driven; ++i) {
+        h_driven(i) = driven_idx[i];
+        h_driven_vel[static_cast<size_t>(i)] = Vector3R::Zero();
+        h_driven_vel[static_cast<size_t>(i)](2) = V_PLATE;  // z-velocity only
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
     // 4. Create and configure GPU_LDPMTet4_Data
@@ -234,12 +239,15 @@ int main() {
     element_data.SetDensity(RHO_VAL);
 
     // No external forces — the top plate is driven kinematically.
-    VectorXR h_f_ext(mesh.n_particles * 3);
-    h_f_ext.setZero();
+    VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
     element_data.SetExternalForce(h_f_ext);
 
-    // Register both fixed and driven nodes as "solver-fixed" (velocity = 0).
-    element_data.SetNodalFixed(h_constrained);
+    // Only the fixed (bottom) nodes are registered with SetNodalFixed.
+    // Driven (top-plate) nodes will have their velocity prescribed via
+    // SetPrescribedVelocityBC on the solver after Setup().
+    element_data.SetNodalFixed(h_fixed);
 
     // ──────────────────────────────────────────────────────────────────────────
     // 5. Compute lumped mass
@@ -264,6 +272,19 @@ int main() {
     LeapfrogParams params{dt};
     solver.SetParameters(&params);
     solver.Setup();
+
+    // Register driven nodes' prescribed z-velocity with the solver.
+    // After every velocity update the solver re-imposes v_z = V_PLATE at these
+    // nodes, so their z-position advances naturally by V_PLATE * dt each step.
+    solver.SetPrescribedVelocityBC(h_driven, h_driven_vel);
+
+    // Seed the initial translational velocity (v_0 = V_PLATE in z) for driven
+    // nodes, then stagger it to the half-step value required by the leapfrog.
+    // At the undeformed reference configuration f_int = 0 and f_ext = 0, so the
+    // backward half-kick is a no-op — but calling it is the correct pattern for
+    // any simulation that starts with non-zero nodal velocities.
+    solver.SetNodalVelocity(h_driven, h_driven_vel);
+    solver.InitialHalfKick();
 
     // Step count and output intervals derived from CFL dt so the simulation
     // always runs for T_SIM seconds regardless of mesh refinement.
@@ -331,25 +352,20 @@ int main() {
     Real prescribed_z_total = Real(0);  // cumulative prescribed displacement
 
     for (int step = 0; step < n_steps; ++step) {
-        // Prescribed velocity: constant V_PLATE from t = 0.
-        const Real dz = V_PLATE * dt;
-        prescribed_z_total += dz;
+        // Accumulate the nominal prescribed displacement for console output.
+        prescribed_z_total += V_PLATE * dt;
 
-        // Leapfrog step: computes tractions, updates velocities (zeroed at
-        // constrained nodes), and advances unconstrained particle positions.
+        // One leapfrog step: computes tractions, updates velocities, re-imposes
+        // prescribed v_z = V_PLATE at driven nodes, then advances all positions.
+        // Driven-node z-positions advance by V_PLATE * dt naturally via x += dt * v.
         solver.Solve();
-
-        // Kinematic BC: advance driven (top-plate) particle z-positions by the
-        // prescribed displacement increment.  These nodes had their velocity
-        // zeroed by the solver, so this is their only source of z-motion.
-        element_data.AdvanceDrivenNodesZ(d_driven_idx, n_driven, dz);
 
         if ((step + 1) % csv_interval == 0 || (step + 1) % vtk_interval == 0) {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
             // Internal forces for stress computation.
-            VectorXR f_int;
+            VectorReal3 f_int;
             element_data.RetrieveInternalForceToCPU(f_int);
 
             // Mean actual z-displacement of driven nodes.
@@ -364,7 +380,7 @@ int main() {
             // pulls it; negate to get the compressive reaction (tensile = positive).
             Real f_reaction_z = Real(0);
             for (int i : fixed_idx)
-                f_reaction_z += f_int(i * 3 + 2);
+                f_reaction_z += f_int[static_cast<size_t>(i)](2);
             const Real stress = -f_reaction_z / A_cross_approx;
 
             // Write to stress-displacement CSV at high frequency.
@@ -457,7 +473,6 @@ int main() {
     }
 
     // Cleanup.
-    MOPHI_GPU_CALL(cudaFree(d_driven_idx));
     element_data.Destroy();
 
     std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";

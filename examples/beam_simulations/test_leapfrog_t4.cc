@@ -118,9 +118,10 @@ int main() {
 
     element_data.SetNodalFixed(h_fixed_nodes);
 
-    VectorXR h_f_ext(n_nodes * 3);
-    h_f_ext.setZero();
-    h_f_ext(load_node * 3 + 2) = -1000.0;  // 1 kN downward
+    VectorReal3 h_f_ext(static_cast<size_t>(n_nodes));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
+    h_f_ext[static_cast<size_t>(load_node)](2) = -1000.0;  // 1 kN downward
     element_data.SetExternalForce(h_f_ext);
 
     const VectorXR& quad_x = Quadrature::tet1pt_x;

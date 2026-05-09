@@ -156,8 +156,9 @@ int main() {
     // Apply external forces
     // ==========================================================================
 
-    VectorXR h_f_ext(beam->get_n_coef() * 3);
-    h_f_ext.setZero();
+    VectorReal3 h_f_ext(static_cast<size_t>(beam->get_n_coef()));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
 
     // Apply a concentrated load at x ≈ x_max (the right end of the beam)
     // This simulates a load applied to the free end of a cantilever beam
@@ -175,7 +176,7 @@ int main() {
     Real load_per_node = total_load / loaded_node_indices.size();
 
     for (int i : loaded_node_indices) {
-        h_f_ext(3 * i + 2) = load_per_node;  // Apply force in z-direction (index 2)
+        h_f_ext[static_cast<size_t>(i)](2) = load_per_node;  // Apply force in z-direction (index 2)
     }
 
     beam->SetExternalForce(h_f_ext);
@@ -309,11 +310,15 @@ int main() {
             }
 
             // SE = (1/2) f_int · (h·v) = (1/2) f_int · Δx  (linearized work estimate)
-            VectorXR f_int_cpu;
+            VectorReal3 f_int_cpu;
             beam->RetrieveInternalForceToCPU(f_int_cpu);
             Real SE = 0.0;
-            for (int i = 0; i < n_dof; ++i)
-                SE += 0.5 * f_int_cpu(i) * STEP_SIZE * v_cpu(i);
+            for (int i = 0; i < beam->get_n_coef(); ++i) {
+                const Real3& f_i = f_int_cpu[static_cast<size_t>(i)];
+                SE += 0.5 * f_i(0) * STEP_SIZE * v_cpu(i * 3 + 0);
+                SE += 0.5 * f_i(1) * STEP_SIZE * v_cpu(i * 3 + 1);
+                SE += 0.5 * f_i(2) * STEP_SIZE * v_cpu(i * 3 + 2);
+            }
 
             Real TE = KE + SE;
 

@@ -292,10 +292,11 @@ int main() {
 
     // External force: F_TOTAL distributed equally as tensile (+z) load.
     const Real F_per_node = F_TOTAL / static_cast<Real>(load_idx.size());
-    VectorXR h_f_ext(mesh.n_particles * 3);
-    h_f_ext.setZero();
+    VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
     for (int i : load_idx)
-        h_f_ext(i * 3 + 2) = F_per_node;  // +z direction
+        h_f_ext[static_cast<size_t>(i)](2) = F_per_node;  // +z direction
 
     // ──────────────────────────────────────────────────────────────────────────
     // 4. Create and configure GPU_LDPMTet4_Data via SetupFromMesh
@@ -419,7 +420,7 @@ int main() {
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
             // Internal forces for stress computation.
-            VectorXR f_int;
+            VectorReal3 f_int;
             element_data.RetrieveInternalForceToCPU(f_int);
 
             // Mean z-displacement of loaded nodes.
@@ -431,7 +432,7 @@ int main() {
             // Reaction stress at the fixed (bottom) face.
             Real f_reaction_z = Real(0);
             for (int i : fixed_idx)
-                f_reaction_z += f_int(i * 3 + 2);
+                f_reaction_z += f_int[static_cast<size_t>(i)](2);
             const Real stress = -f_reaction_z / A_cross_approx;
 
             // Write to stress-displacement CSV at high frequency.

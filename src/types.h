@@ -4,6 +4,9 @@
  * File:    types.h
  * Brief:   Defines the Real type as an alias for double and provides
  *          type aliases for Eigen matrix and vector types using Real.
+ *          Also provides a user-facing 3D-vector container alias
+ *          (`Real3` + `VectorReal3`) and helpers to convert
+ *          between VectorReal3 and flattened 3*n VectorXR arrays.
  *          This allows easy switching between different floating-point
  *          precisions throughout the codebase.
  *==============================================================
@@ -12,6 +15,8 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <Eigen/StdVector>
+#include <vector>
 
 namespace feris {
 
@@ -38,7 +43,33 @@ typedef Matrix<Real, DynamicMatrix, DynamicMatrix> MatrixXR;
 typedef Matrix<Real, DynamicMatrix, 1> VectorXR;
 typedef Matrix<Real, 3, 3> Matrix3R;
 typedef Matrix<Real, 3, 1> Vector3R;
+typedef Vector3R Real3;
 typedef Matrix<int, DynamicMatrix, DynamicMatrix> MatrixXi;
 typedef Matrix<int, DynamicMatrix, 1> VectorXi;
+typedef std::vector<Real3, Eigen::aligned_allocator<Real3>> VectorReal3;
+
+inline VectorXR FlattenVectorReal3(const VectorReal3& v3) {
+    VectorXR flat(static_cast<int>(v3.size()) * 3);
+    for (int i = 0; i < static_cast<int>(v3.size()); ++i) {
+        flat(i * 3 + 0) = v3[static_cast<size_t>(i)](0);
+        flat(i * 3 + 1) = v3[static_cast<size_t>(i)](1);
+        flat(i * 3 + 2) = v3[static_cast<size_t>(i)](2);
+    }
+    return flat;
+}
+
+inline bool UnflattenVectorReal3(const VectorXR& flat, VectorReal3& v3) {
+    if (flat.size() % 3 != 0) {
+        return false;
+    }
+    const int n = static_cast<int>(flat.size()) / 3;
+    v3.resize(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        v3[static_cast<size_t>(i)](0) = flat(i * 3 + 0);
+        v3[static_cast<size_t>(i)](1) = flat(i * 3 + 1);
+        v3[static_cast<size_t>(i)](2) = flat(i * 3 + 2);
+    }
+    return true;
+}
 
 }  // namespace feris
