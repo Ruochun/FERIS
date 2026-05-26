@@ -877,6 +877,12 @@ void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
     std::copy(da_omega.host(), da_omega.host() + n_edge, omega_out.data());
 }
 
+void GPU_LDPMTet4_Data::RetrieveFacetTractionToCPU(VectorXR& out) {
+    out.resize(n_edge * 6);
+    da_facet_t.ToHost();
+    std::copy(da_facet_t.host(), da_facet_t.host() + n_edge * 6, out.data());
+}
+
 void GPU_LDPMTet4_Data::RetrieveFacetKappaToCPU(VectorXR& kappa_out) {
     kappa_out.resize(n_edge);
     da_kappa.ToHost();

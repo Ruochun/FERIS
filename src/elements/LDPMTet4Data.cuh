@@ -345,6 +345,11 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // omega_out : size n_edge, omega ∈ [0, 1] (0 = undamaged, 1 = fully failed)
     void RetrieveFacetDamageToCPU(VectorXR& omega_out);
 
+    // Retrieve per-edge facet traction/moment components from GPU to host.
+    // out size: 6 * n_edge, layout per edge:
+    // [t_N, t_M, t_L, m_T, m_M, m_L].
+    void RetrieveFacetTractionToCPU(VectorXR& out);
+
     // Retrieve per-edge max effective strain history (κ) from GPU to host.
     // kappa_out : size n_edge, κ ≥ 0 (max damage-driving strain ever reached)
     void RetrieveFacetKappaToCPU(VectorXR& kappa_out);

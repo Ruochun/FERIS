@@ -27,6 +27,7 @@
 #include <cuda_runtime.h>
 
 #include <MoPhiEssentials.h>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 
@@ -56,6 +57,13 @@ static const Real TOTAL_LOAD = -1000.0;  // Total transverse force [N] (negative
 static constexpr Real BOUNDARY_TOLERANCE_FRACTION = 0.0005;
 
 int main() {
+    const std::string output_dir = "beam_linear_static";
+    std::filesystem::remove_all(output_dir);
+    if (!std::filesystem::create_directories(output_dir)) {
+        std::cerr << "Failed to create output directory: " << output_dir << "\n";
+        return 1;
+    }
+
     std::cout << "=======================================================\n"
               << "  Linear Static FEA – TET10 Cantilever Beam\n"
               << "=======================================================\n";
@@ -114,8 +122,7 @@ int main() {
     const Real h = z_max - z_min;  // cross-section height
 
     std::cout << std::fixed << std::setprecision(4) << "  Bounding box:  x∈[" << x_min << ", " << x_max << "]  "
-              << "y∈[" << y_min << ", " << y_max << "]  "
-              << "z∈[" << z_min << ", " << z_max << "]\n"
+              << "y∈[" << y_min << ", " << y_max << "]  " << "z∈[" << z_min << ", " << z_max << "]\n"
               << "  L = " << L << "  b = " << b << "  h = " << h << "\n";
 
     // -----------------------------------------------------------------------
@@ -233,8 +240,9 @@ int main() {
     // -----------------------------------------------------------------------
     // Write output VTK
     // -----------------------------------------------------------------------
-    ANCFCPUUtils::WriteFEAT10ToVTK("output_beam_linear_static.vtk", nodes, elements, x12, y12, z12);
-    std::cout << "\n  Deformed mesh written to: output_beam_linear_static.vtk\n";
+    const std::string output_vtk = output_dir + "/output_beam_linear_static.vtk";
+    ANCFCPUUtils::WriteFEAT10ToVTK(output_vtk, nodes, elements, x12, y12, z12);
+    std::cout << "\n  Deformed mesh written to: " << output_vtk << "\n";
 
     // -----------------------------------------------------------------------
     // Cleanup

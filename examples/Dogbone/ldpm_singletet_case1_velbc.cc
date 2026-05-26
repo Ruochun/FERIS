@@ -17,9 +17,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -49,6 +52,7 @@ static constexpr std::array<Real, 5> kDispPts = {Real(0.0), Real(0.02), Real(-0.
 
 static constexpr Real T_SIM = Real(4.8);
 static constexpr Real T_VTK = Real(0.1);
+static constexpr Real T_CSV = Real(1.0e-3);
 
 Real Case1VelocityX(Real t) {
     if (t >= kTimePts.back())
@@ -75,10 +79,22 @@ std::string SubfacetVtkName(int frame) {
     return s.str();
 }
 
+const int kLocalEdges[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+
+std::string JoinPath(const std::string& dir, const std::string& file) {
+    return (std::filesystem::path(dir) / file).string();
+}
+
 }  // namespace
 
 int main() {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
+    const std::string output_dir = "ldpm_singletet_case1_velbc";
+    std::filesystem::remove_all(output_dir);
+    if (!std::filesystem::create_directories(output_dir)) {
+        std::cerr << "Failed to create output directory: " << output_dir << "\n";
+        return 1;
+    }
 
     const std::string prefix = "data/meshes/LDPMTet4/SingleTet/LDPM_debugRegTet";
     LDPMTet4Mesh mesh;
@@ -141,6 +157,7 @@ int main() {
     const Real dt = Real(0.5) * (l_min / c_N);
     const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
     const int vtk_interval = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
+    const int csv_interval = std::max(1, static_cast<int>(std::round(T_CSV / dt)));
 
     // Ensure outputs at key tabulated times in addition to regular cadence.
     std::vector<int> key_steps;
@@ -171,15 +188,131 @@ int main() {
     std::cout << std::fixed << std::setprecision(9);
     std::cout << "Single-tet Case 1: dt=" << dt << " s, steps=" << n_steps << "\n";
     std::cout << "  E_N=" << E_N_VAL << ", E_T=" << E_T_VAL << ", H_t=" << H_T_VAL << ", l_min=" << l_min << "\n";
+    std::cout << "  Output directory: " << output_dir << "\n";
+
+    const std::string node_force_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_forces.csv");
+    const std::string subfacet_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_subfacet_stress_strain.csv");
+    std::ofstream node_force_csv(node_force_csv_name);
+    std::ofstream subfacet_csv(subfacet_csv_name);
+    if (!node_force_csv.is_open() || !subfacet_csv.is_open()) {
+        std::cerr << "Failed to open CSV outputs in " << output_dir << "\n";
+        return 1;
+    }
+    node_force_csv << "time_s,node,force_mag,force_x,force_y,force_z\n";
+    subfacet_csv << "time_s,subfacet,edge,node_i,node_j,stress_n,stress_m,stress_l,strain_n,strain_m,strain_l\n";
+
+    const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
+    std::map<std::pair<int, int>, int> edge_index_map;
+    for (int e = 0; e < element_data.n_edge; ++e) {
+        const int ni = edge_nodes[2 * e + 0];
+        const int nj = edge_nodes[2 * e + 1];
+        edge_index_map[{std::min(ni, nj), std::max(ni, nj)}] = e;
+    }
+
+    std::vector<int> subfacet_edge_idx(static_cast<size_t>(mesh.n_subfacets), -1);
+    std::vector<int> subfacet_node_i(static_cast<size_t>(mesh.n_subfacets), -1);
+    std::vector<int> subfacet_node_j(static_cast<size_t>(mesh.n_subfacets), -1);
+    for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
+        const int t = mesh.subfacet_tet(sf);
+        const int local_sf = sf % 12;
+        const int edge_slot = local_sf / 2;
+        const int a = kLocalEdges[edge_slot][0];
+        const int b = kLocalEdges[edge_slot][1];
+        const int ni = mesh.tet_connectivity(t, a);
+        const int nj = mesh.tet_connectivity(t, b);
+        const std::pair<int, int> key = {std::min(ni, nj), std::max(ni, nj)};
+        auto it = edge_index_map.find(key);
+        if (it != edge_index_map.end())
+            subfacet_edge_idx[static_cast<size_t>(sf)] = it->second;
+        subfacet_node_i[static_cast<size_t>(sf)] = ni;
+        subfacet_node_j[static_cast<size_t>(sf)] = nj;
+    }
+
+    auto write_csv_metrics = [&](Real time_s) {
+        VectorReal3 f_int;
+        element_data.RetrieveInternalForceToCPU(f_int);
+        for (int node = 0; node < mesh.n_particles; ++node) {
+            const Real fx = f_int[static_cast<size_t>(node)](0);
+            const Real fy = f_int[static_cast<size_t>(node)](1);
+            const Real fz = f_int[static_cast<size_t>(node)](2);
+            const Real fmag = std::sqrt(fx * fx + fy * fy + fz * fz);
+            node_force_csv << time_s << "," << node << "," << fmag << "," << fx << "," << fy << "," << fz << "\n";
+        }
+
+        VectorXR x_cur, y_cur, z_cur, rx_cur, ry_cur, rz_cur;
+        element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
+        element_data.RetrieveRotationToCPU(rx_cur, ry_cur, rz_cur);
+
+        VectorXR edge_traction;
+        element_data.RetrieveFacetTractionToCPU(edge_traction);
+        for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
+            const int ni = subfacet_node_i[static_cast<size_t>(sf)];
+            const int nj = subfacet_node_j[static_cast<size_t>(sf)];
+            if (ni < 0 || nj < 0)
+                continue;
+            const Real dx0 = mesh.particle_x(nj) - mesh.particle_x(ni);
+            const Real dy0 = mesh.particle_y(nj) - mesh.particle_y(ni);
+            const Real dz0 = mesh.particle_z(nj) - mesh.particle_z(ni);
+            const Real dx = x_cur(nj) - x_cur(ni);
+            const Real dy = y_cur(nj) - y_cur(ni);
+            const Real dz = z_cur(nj) - z_cur(ni);
+
+            const Real rix = rx_cur(ni), riy = ry_cur(ni), riz = rz_cur(ni);
+            const Real rjx = rx_cur(nj), rjy = ry_cur(nj), rjz = rz_cur(nj);
+            const Real rax = Real(0.5) * (rix + rjx);
+            const Real ray = Real(0.5) * (riy + rjy);
+            const Real raz = Real(0.5) * (riz + rjz);
+            const Real rotx = ray * dz0 - raz * dy0;
+            const Real roty = raz * dx0 - rax * dz0;
+            const Real rotz = rax * dy0 - ray * dx0;
+
+            const Real dux = dx - dx0 - rotx;
+            const Real duy = dy - dy0 - roty;
+            const Real duz = dz - dz0 - rotz;
+            const Real l0 = std::sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
+            if (l0 <= Real(0))
+                continue;
+            const Real inv_l0 = Real(1) / l0;
+
+            const Real n0 = mesh.subfacet_normal(sf * 3 + 0);
+            const Real n1 = mesh.subfacet_normal(sf * 3 + 1);
+            const Real n2 = mesh.subfacet_normal(sf * 3 + 2);
+            const Real m0 = mesh.subfacet_tangent_q(sf * 3 + 0);
+            const Real m1 = mesh.subfacet_tangent_q(sf * 3 + 1);
+            const Real m2 = mesh.subfacet_tangent_q(sf * 3 + 2);
+            const Real l0v = mesh.subfacet_tangent_s(sf * 3 + 0);
+            const Real l1v = mesh.subfacet_tangent_s(sf * 3 + 1);
+            const Real l2v = mesh.subfacet_tangent_s(sf * 3 + 2);
+
+            const Real strain_n = (dux * n0 + duy * n1 + duz * n2) * inv_l0;
+            const Real strain_m = (dux * m0 + duy * m1 + duz * m2) * inv_l0;
+            const Real strain_l = (dux * l0v + duy * l1v + duz * l2v) * inv_l0;
+
+            Real stress_n = Real(0), stress_m = Real(0), stress_l = Real(0);
+            const int eidx = subfacet_edge_idx[static_cast<size_t>(sf)];
+            if (eidx >= 0) {
+                stress_n = edge_traction(eidx * 6 + 0);
+                stress_m = edge_traction(eidx * 6 + 1);
+                stress_l = edge_traction(eidx * 6 + 2);
+            }
+            subfacet_csv << time_s << "," << sf << "," << eidx << "," << ni << "," << nj << "," << stress_n << ","
+                         << stress_m << "," << stress_l << "," << strain_n << "," << strain_m << "," << strain_l
+                         << "\n";
+        }
+    };
+
+    write_csv_metrics(Real(0));
 
     int frame = 0;
     {
-        if (!WriteLDPMTet4TetMeshToVTK(TetVtkName(frame), mesh, mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
+        if (!WriteLDPMTet4TetMeshToVTK(JoinPath(output_dir, TetVtkName(frame)), mesh, mesh.particle_x, mesh.particle_y,
+                                       mesh.particle_z)) {
             std::cerr << "Failed writing initial tet VTK\n";
             return 1;
         }
         VectorXR crack0 = VectorXR::Zero(mesh.n_subfacets);
-        if (!WriteLDPMTet4SubfacetMeshToVTK(SubfacetVtkName(frame), mesh, "crack_distance", crack0)) {
+        if (!WriteLDPMTet4SubfacetMeshToVTK(JoinPath(output_dir, SubfacetVtkName(frame)), mesh, "crack_distance",
+                                            crack0)) {
             std::cerr << "Failed writing initial subfacet VTK\n";
             return 1;
         }
@@ -201,21 +334,27 @@ int main() {
 
         const int step_1 = step + 1;
         const bool periodic_output = (step_1 % vtk_interval == 0);
+        const bool csv_output = (step_1 % csv_interval == 0);
         const bool key_output = std::binary_search(key_steps.begin(), key_steps.end(), step_1);
         const bool last_output = (step_1 == n_steps);
+
+        if (csv_output || last_output) {
+            write_csv_metrics(static_cast<Real>(step_1) * dt);
+        }
 
         if (periodic_output || key_output || last_output) {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-            if (!WriteLDPMTet4TetMeshToVTK(TetVtkName(frame), mesh, x_cur, y_cur, z_cur)) {
+            if (!WriteLDPMTet4TetMeshToVTK(JoinPath(output_dir, TetVtkName(frame)), mesh, x_cur, y_cur, z_cur)) {
                 std::cerr << "Failed writing tet VTK at step " << step_1 << "\n";
                 return 1;
             }
 
             VectorXR sf_crack;
             element_data.ProjectEdgeCrackDistanceToSubfacets(sf_crack);
-            if (!WriteLDPMTet4SubfacetMeshToVTK(SubfacetVtkName(frame), mesh, "crack_distance", sf_crack)) {
+            if (!WriteLDPMTet4SubfacetMeshToVTK(JoinPath(output_dir, SubfacetVtkName(frame)), mesh, "crack_distance",
+                                                sf_crack)) {
                 std::cerr << "Failed writing subfacet VTK at step " << step_1 << "\n";
                 return 1;
             }
@@ -231,7 +370,10 @@ int main() {
     element_data.Destroy();
 
     std::cout << "Done. Wrote " << frame << " frame(s).\n";
+    std::cout << "  Output directory: " << output_dir << "\n";
     std::cout << "  ldpm_singletet_case1_tet4_NNNNN.vtk\n";
     std::cout << "  ldpm_singletet_case1_subfacets_NNNNN.vtk\n";
+    std::cout << "  ldpm_singletet_case1_node_forces.csv\n";
+    std::cout << "  ldpm_singletet_case1_subfacet_stress_strain.csv\n";
     return 0;
 }
