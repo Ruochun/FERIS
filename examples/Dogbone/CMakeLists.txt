@@ -27,3 +27,9 @@ add_executable(dogbone_velbc dogbone_velbc.cc)
 target_link_libraries(dogbone_velbc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(dogbone_velbc PRIVATE ${DOGBONE_INCLUDE_DIRS})
 set_target_properties(dogbone_velbc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# ── LDPM-TET4 single-tet Case 1 velocity-history benchmark ───────────────────
+add_executable(ldpm_singletet_case1_velbc ldpm_singletet_case1_velbc.cc)
+target_link_libraries(ldpm_singletet_case1_velbc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_include_directories(ldpm_singletet_case1_velbc PRIVATE ${DOGBONE_INCLUDE_DIRS})
+set_target_properties(ldpm_singletet_case1_velbc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
