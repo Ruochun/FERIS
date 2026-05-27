@@ -5,9 +5,9 @@
 #                        and all supported solvers.
 #   solver_tests/      – focused tests of the gradient-based solvers
 #                        (Nesterov, AdamW) on a simple solid block.
-#   Dogbone/           – LDPM Dogbone specimen demos, starting with a
-#                        VTK mesh export for visual validation.
+#   ldmp_tests/        – LDPM demos and benchmark cases, including Dogbone
+#                        specimen simulations and single-tet unit tests.
 
 add_subdirectory(beam_simulations)
 add_subdirectory(solver_tests)
-add_subdirectory(Dogbone)
+add_subdirectory(ldmp_tests)

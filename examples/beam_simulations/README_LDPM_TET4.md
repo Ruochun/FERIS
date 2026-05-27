@@ -49,8 +49,8 @@ element.SetupFromMesh(mesh);
 - **m-vector** per edge ← first-tangent `q` from the file (sign-adjusted)
 - **l-vector** per edge ← second-tangent `s` from the file
 
-See `examples/Dogbone/dogbone_forcebc.cc` (force-BC) and
-`examples/Dogbone/dogbone_velbc.cc` (velocity-BC) for complete tensile-loading demos.
+See `examples/ldmp_tests/dogbone_forcebc.cc` (force-BC) and
+`examples/ldmp_tests/dogbone_velbc.cc` (velocity-BC) for complete tensile-loading demos.
 
 ### Shared steps (both paths)
 
