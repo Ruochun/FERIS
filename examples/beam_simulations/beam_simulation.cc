@@ -17,6 +17,7 @@
 #include <cuda_runtime.h>
 
 #include <MoPhiEssentials.h>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -45,6 +46,13 @@ const int OUTPUT_FREQUENCY = (int)(1. / STEP_SIZE) / 100;  // Output every N tim
 const int TOTAL_FRAME = (int)(TOTAL_TIME * FPS);           // Total number of frames output
 
 int main() {
+    const std::string output_dir = "beam_simulation";
+    std::filesystem::remove_all(output_dir);
+    if (!std::filesystem::create_directories(output_dir)) {
+        std::cerr << "Failed to create output directory: " << output_dir << std::endl;
+        return 1;
+    }
+
     std::cout << "=======================================================" << std::endl;
     std::cout << "  Beam Simulation" << std::endl;
     std::cout << "=======================================================" << std::endl;
@@ -246,8 +254,7 @@ int main() {
     // Print energy table header
     std::cout << "\n"
               << std::setw(10) << "Time [s]" << std::setw(18) << "KE [J]" << std::setw(18) << "SE [J]" << std::setw(18)
-              << "Total E [J]"
-              << "\n"
+              << "Total E [J]" << "\n"
               << std::string(64, '-') << "\n";
 
     // Output initial configuration
@@ -255,7 +262,7 @@ int main() {
         VectorXR x12, y12, z12;
         beam->RetrievePositionToCPU(x12, y12, z12);
         std::stringstream ss;
-        ss << "output_beam_" << std::setfill('0') << std::setw(5) << 0 << ".vtk";
+        ss << output_dir << "/output_beam_" << std::setfill('0') << std::setw(5) << 0 << ".vtk";
         ANCFCPUUtils::WriteFEAT10ToVTK(ss.str(), nodes, elements, x12, y12, z12);
         std::cout << std::setw(10) << std::fixed << std::setprecision(4) << 0.0 << std::setw(18) << std::scientific
                   << std::setprecision(6) << 0.0 << std::setw(18) << 0.0 << std::setw(18) << 0.0 << "  [frame 0 → "
@@ -286,7 +293,7 @@ int main() {
 
             // Write VTK
             std::stringstream filename;
-            filename << "output_beam_" << std::setfill('0') << std::setw(5) << curr_frame << ".vtk";
+            filename << output_dir << "/output_beam_" << std::setfill('0') << std::setw(5) << curr_frame << ".vtk";
             ANCFCPUUtils::WriteFEAT10ToVTK(filename.str(), nodes, elements, x12, y12, z12);
 
             // Estimate velocity: v ≈ (x_{n+1} − x_n) / h
@@ -336,7 +343,7 @@ int main() {
 
     std::cout << "\n=======================================================\n"
               << "  Simulation Complete!\n"
-              << "  ParaView output: output_beam_*.vtk\n"
+              << "  ParaView output: " << output_dir << "/output_beam_*.vtk\n"
               << "=======================================================\n";
 
     return 0;

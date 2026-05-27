@@ -100,6 +100,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -177,6 +178,12 @@ static constexpr Real BC_TOL_FRAC = Real(1e-3);
 
 int main() {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
+    const std::string output_dir = "dogbone_forcebc";
+    std::filesystem::remove_all(output_dir);
+    if (!std::filesystem::create_directories(output_dir)) {
+        std::cerr << "Failed to create output directory: " << output_dir << "\n";
+        return 1;
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
     // 1. Read all six LDPM mesh data files
@@ -213,8 +220,7 @@ int main() {
         z_max = std::max(z_max, mesh.particle_z(i));
     }
 
-    std::cout << "  Bounding box  x=[" << x_min << ", " << x_max << "]"
-              << "  y=[" << y_min << ", " << y_max << "]"
+    std::cout << "  Bounding box  x=[" << x_min << ", " << x_max << "]" << "  y=[" << y_min << ", " << y_max << "]"
               << "  z=[" << z_min << ", " << z_max << "]\n";
 
     // Minimum edge length across the entire mesh (needed for CFL and E_k*).
@@ -361,20 +367,20 @@ int main() {
     std::cout << std::fixed << std::setprecision(6);
 
     // Helpers: build numbered VTK filenames for TET4 and sub-facet outputs.
-    auto tet4_vtk_name = [](int f) {
+    auto tet4_vtk_name = [&output_dir](int f) {
         std::ostringstream s;
-        s << "dogbone_forcebc_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << output_dir << "/dogbone_forcebc_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
-    auto subfacet_vtk_name = [](int f) {
+    auto subfacet_vtk_name = [&output_dir](int f) {
         std::ostringstream s;
-        s << "dogbone_forcebc_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << output_dir << "/dogbone_forcebc_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
 
     // Open stress-displacement CSV for writing.
     // Each row: displacement_mm,stress_MPa
-    std::ofstream stress_disp_csv("dogbone_forcebc_stress_disp.csv");
+    std::ofstream stress_disp_csv(output_dir + "/dogbone_forcebc_stress_disp.csv");
     if (!stress_disp_csv.is_open()) {
         std::cerr << "Warning: could not open dogbone_forcebc_stress_disp.csv for writing.\n";
     } else {
@@ -523,13 +529,14 @@ int main() {
     element_data.Destroy();
 
     std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";
+    std::cout << "Output directory: " << output_dir << "\n";
     std::cout << "\nOutput files (two sets per frame + stress-displacement CSV):\n";
-    std::cout << "  dogbone_forcebc_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
+    std::cout << "  " << output_dir << "/dogbone_forcebc_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
     std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
-    std::cout << "  dogbone_forcebc_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh\n";
+    std::cout << "  " << output_dir << "/dogbone_forcebc_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh\n";
     std::cout << "    → Color by 'crack_distance' [mm] (ω×κ×l₀) to visualise fracture.\n";
     std::cout << "    → Use Threshold filter (crack_distance > 0) to show cracked facets.\n";
-    std::cout << "  dogbone_forcebc_stress_disp.csv         — stress [MPa] vs displacement [mm]\n";
+    std::cout << "  " << output_dir << "/dogbone_forcebc_stress_disp.csv         — stress [MPa] vs displacement [mm]\n";
     std::cout << "    → Plot displacement_mm vs stress_MPa for the load-displacement curve.\n";
     std::cout << "  Load each series: File → Open → select group → Apply → Animation View.\n";
     return 0;

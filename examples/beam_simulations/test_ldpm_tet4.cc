@@ -46,6 +46,7 @@
 #include <cuda_runtime.h>
 
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -78,6 +79,12 @@ static constexpr Real BOUNDARY_TOLERANCE_FRACTION = 0.0005;
 
 int main() {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
+    const std::string output_dir = "test_ldpm_tet4";
+    std::filesystem::remove_all(output_dir);
+    if (!std::filesystem::create_directories(output_dir)) {
+        std::cerr << "Failed to create output directory: " << output_dir << "\n";
+        return 1;
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
     // 1. Load mesh
@@ -254,7 +261,7 @@ int main() {
     // Write initial (undeformed) state as frame 0.
     {
         std::ostringstream fname;
-        fname << "output_ldpm_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+        fname << output_dir << "/output_ldpm_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
         ANCFCPUUtils::WriteFEAT4ToVTK(fname.str(), nodes_ref, elements, h_x, h_y, h_z);
         std::cout << "Wrote: " << fname.str() << "  (initial configuration)\n";
         ++frame;
@@ -277,7 +284,7 @@ int main() {
 
             // VTK snapshot
             std::ostringstream fname;
-            fname << "output_ldpm_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+            fname << output_dir << "/output_ldpm_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
             ANCFCPUUtils::WriteFEAT4ToVTK(fname.str(), nodes_ref, elements, x_cur, y_cur, z_cur);
             std::cout << "Wrote: " << fname.str() << "\n";
             ++frame;
@@ -285,7 +292,8 @@ int main() {
     }
 
     std::cout << "\nSimulation complete.  " << frame << " VTK file(s) written.\n";
-    std::cout << "Open output_ldpm_tet4_*.vtk in ParaView to visualize the deformed configuration.\n";
+    std::cout << "Open " << output_dir
+              << "/output_ldpm_tet4_*.vtk in ParaView to visualize the deformed configuration.\n";
 
     element_data.Destroy();
     MOPHI_INFO("Done");

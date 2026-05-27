@@ -132,7 +132,18 @@ When adding a new solver, you must:
 
 ---
 
-## 8. Deprecation
+## 8. Demo Output Directory Rule
+
+- Every demo/example that writes output files (VTK, CSV, or similar) must write
+  them into a dedicated output folder named after that executable/demo.
+- The folder must be created under the current working directory where the
+  executable is run.
+- Before writing new outputs, remove any existing folder with that same name,
+  then create a clean folder and write all outputs there.
+
+---
+
+## 9. Deprecation
 
 - Deprecated elements/solvers must be clearly marked with `[DEPRECATED]` in
   their file header comment and in the compatibility matrix.

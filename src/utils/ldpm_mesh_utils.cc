@@ -527,7 +527,7 @@ bool ReadLDPMTet4FacetVerticesFile(const std::string& path, LDPMTet4Mesh& out, s
 }
 
 // ============================================================
-// ReadLDPMTet4MeshFromFiles — read all six files using a common
+// ReadLDPMTet4MeshFromFiles — read all required files using a common
 // filename prefix.
 // ============================================================
 bool ReadLDPMTet4MeshFromFiles(const std::string& prefix, LDPMTet4Mesh& out, std::string* error) {
@@ -541,8 +541,15 @@ bool ReadLDPMTet4MeshFromFiles(const std::string& prefix, LDPMTet4Mesh& out, std
         return false;
     if (!ReadLDPMTet4FacetsFile(prefix + "-data-facets.dat", out, error))
         return false;
-    if (!ReadLDPMTet4FaceFacetsFile(prefix + "-data-faceFacets.dat", out, error))
-        return false;
+    const std::string face_facets_path = prefix + "-data-faceFacets.dat";
+    {
+        std::ifstream face_facets_file(face_facets_path);
+        if (face_facets_file.is_open()) {
+            face_facets_file.close();
+            if (!ReadLDPMTet4FaceFacetsFile(face_facets_path, out, error))
+                return false;
+        }
+    }
     if (!ReadLDPMTet4FacetVerticesFile(prefix + "-data-facetsVertices.dat", out, error))
         return false;
 
