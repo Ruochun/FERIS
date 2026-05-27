@@ -198,8 +198,27 @@ int main() {
         std::cerr << "Failed to open CSV outputs in " << output_dir << "\n";
         return 1;
     }
-    node_force_csv << "time_s,node,force_mag,force_x,force_y,force_z\n";
-    subfacet_csv << "time_s,subfacet,edge,node_i,node_j,stress_n,stress_m,stress_l,strain_n,strain_m,strain_l\n";
+    node_force_csv << "# time_s";
+    for (int node = 0; node < mesh.n_particles; ++node) {
+        const int node_label = node + 1;
+        node_force_csv << ",node_" << node_label << "_f_mag"
+                       << ",node_" << node_label << "_f_x"
+                       << ",node_" << node_label << "_f_y"
+                       << ",node_" << node_label << "_f_z";
+    }
+    node_force_csv << "\n";
+
+    subfacet_csv << "# time_s";
+    for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
+        const int sf_label = sf + 1;
+        subfacet_csv << ",facet_" << sf_label << "_stress_n"
+                     << ",facet_" << sf_label << "_stress_m"
+                     << ",facet_" << sf_label << "_stress_l"
+                     << ",facet_" << sf_label << "_strain_n"
+                     << ",facet_" << sf_label << "_strain_m"
+                     << ",facet_" << sf_label << "_strain_l";
+    }
+    subfacet_csv << "\n";
 
     const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
     std::map<std::pair<int, int>, int> edge_index_map;
@@ -231,13 +250,15 @@ int main() {
     auto write_csv_metrics = [&](Real time_s) {
         VectorReal3 f_int;
         element_data.RetrieveInternalForceToCPU(f_int);
+        node_force_csv << time_s;
         for (int node = 0; node < mesh.n_particles; ++node) {
             const Real fx = f_int[static_cast<size_t>(node)](0);
             const Real fy = f_int[static_cast<size_t>(node)](1);
             const Real fz = f_int[static_cast<size_t>(node)](2);
             const Real fmag = std::sqrt(fx * fx + fy * fy + fz * fz);
-            node_force_csv << time_s << "," << node << "," << fmag << "," << fx << "," << fy << "," << fz << "\n";
+            node_force_csv << "," << fmag << "," << fx << "," << fy << "," << fz;
         }
+        node_force_csv << "\n";
 
         VectorXR x_cur, y_cur, z_cur, rx_cur, ry_cur, rz_cur;
         element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
@@ -245,6 +266,14 @@ int main() {
 
         VectorXR edge_traction;
         element_data.RetrieveFacetTractionToCPU(edge_traction);
+
+        std::vector<Real> stress_n_vals(static_cast<size_t>(mesh.n_subfacets), Real(0));
+        std::vector<Real> stress_m_vals(static_cast<size_t>(mesh.n_subfacets), Real(0));
+        std::vector<Real> stress_l_vals(static_cast<size_t>(mesh.n_subfacets), Real(0));
+        std::vector<Real> strain_n_vals(static_cast<size_t>(mesh.n_subfacets), Real(0));
+        std::vector<Real> strain_m_vals(static_cast<size_t>(mesh.n_subfacets), Real(0));
+        std::vector<Real> strain_l_vals(static_cast<size_t>(mesh.n_subfacets), Real(0));
+
         for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
             const int ni = subfacet_node_i[static_cast<size_t>(sf)];
             const int nj = subfacet_node_j[static_cast<size_t>(sf)];
@@ -295,10 +324,21 @@ int main() {
                 stress_m = edge_traction(eidx * 6 + 1);
                 stress_l = edge_traction(eidx * 6 + 2);
             }
-            subfacet_csv << time_s << "," << sf << "," << eidx << "," << ni << "," << nj << "," << stress_n << ","
-                         << stress_m << "," << stress_l << "," << strain_n << "," << strain_m << "," << strain_l
-                         << "\n";
+            stress_n_vals[static_cast<size_t>(sf)] = stress_n;
+            stress_m_vals[static_cast<size_t>(sf)] = stress_m;
+            stress_l_vals[static_cast<size_t>(sf)] = stress_l;
+            strain_n_vals[static_cast<size_t>(sf)] = strain_n;
+            strain_m_vals[static_cast<size_t>(sf)] = strain_m;
+            strain_l_vals[static_cast<size_t>(sf)] = strain_l;
         }
+
+        subfacet_csv << time_s;
+        for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
+            const size_t idx = static_cast<size_t>(sf);
+            subfacet_csv << "," << stress_n_vals[idx] << "," << stress_m_vals[idx] << "," << stress_l_vals[idx]
+                         << "," << strain_n_vals[idx] << "," << strain_m_vals[idx] << "," << strain_l_vals[idx];
+        }
+        subfacet_csv << "\n";
     };
 
     write_csv_metrics(Real(0));
