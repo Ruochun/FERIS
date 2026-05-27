@@ -1,8 +1,9 @@
-# examples/Dogbone/CMakeLists.txt
+# examples/ldmp_tests/CMakeLists.txt
 #
-# Dogbone specimen demo using the LDPM-TET4 element.
+# LDPM demos and benchmark cases: Dogbone tensile simulations and
+# single-tet unit tests.
 
-set(DOGBONE_INCLUDE_DIRS
+set(LDMP_TESTS_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/external/MoPhiEssentials/src
 )
@@ -15,7 +16,7 @@ set(DOGBONE_INCLUDE_DIRS
 # Step count and output intervals are computed from the CFL time step.
 add_executable(dogbone_forcebc dogbone_forcebc.cc)
 target_link_libraries(dogbone_forcebc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
-target_include_directories(dogbone_forcebc PRIVATE ${DOGBONE_INCLUDE_DIRS})
+target_include_directories(dogbone_forcebc PRIVATE ${LDMP_TESTS_INCLUDE_DIRS})
 set_target_properties(dogbone_forcebc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── LDPM-TET4 Dogbone velocity-driven (kinematic BC) simulation ───────────────
@@ -25,5 +26,11 @@ set_target_properties(dogbone_forcebc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAK
 # step count and output intervals computed from the CFL time step.
 add_executable(dogbone_velbc dogbone_velbc.cc)
 target_link_libraries(dogbone_velbc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
-target_include_directories(dogbone_velbc PRIVATE ${DOGBONE_INCLUDE_DIRS})
+target_include_directories(dogbone_velbc PRIVATE ${LDMP_TESTS_INCLUDE_DIRS})
 set_target_properties(dogbone_velbc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# ── LDPM-TET4 single-tet Case 1 velocity-history benchmark ───────────────────
+add_executable(ldpm_singletet_case1_velbc ldpm_singletet_case1_velbc.cc)
+target_link_libraries(ldpm_singletet_case1_velbc feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_include_directories(ldpm_singletet_case1_velbc PRIVATE ${LDMP_TESTS_INCLUDE_DIRS})
+set_target_properties(ldpm_singletet_case1_velbc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

@@ -3,14 +3,14 @@
  * Project: FERIS
  * File:    ldpm_mesh_utils.h
  * Brief:   Declares data structures and reader functions for the
- *          six Chrono Workbench / LDPM mesh data files produced
+ *          Chrono Workbench / LDPM mesh data files produced
  *          by the chrono-preprocessor tool:
  *
  *    <prefix>-data-nodes.dat          — particle XYZ (no index/diameter)
  *    <prefix>-data-particles.dat      — particle index, XYZ, diameter
  *    <prefix>-data-tets.dat           — TET4 connectivity (4 node indices)
  *    <prefix>-data-facets.dat         — Voronoi sub-facet geometry
- *    <prefix>-data-faceFacets.dat     — surface boundary triangles
+ *    <prefix>-data-faceFacets.dat     — surface boundary triangles (optional)
  *    <prefix>-data-facetsVertices.dat — exact sub-facet triangle vertices
  *
  *  All readers skip lines that begin with "//" (C-style comments) and
@@ -25,7 +25,7 @@
  *            "data/meshes/LDPMTet4/Dogbone/LDPMgeo000", mesh, &err)) {
  *        std::cerr << err << "\n";
  *    }
- *    // mesh now holds all six files' data.
+ *    // mesh now holds all required files' data (and faceFacets if present).
  *    // Pass to GPU_LDPMTet4_Data::SetupFromMesh(mesh) to initialize the
  *    // element and store the extra precomputed fields.
  *==============================================================
@@ -110,12 +110,17 @@ struct LDPMTet4Mesh {
 };
 
 // ============================================================
-// Combined reader — reads all six files from a common prefix.
+// Combined reader — reads all required LDPM files from a common prefix.
 //
 // The prefix is the path up to and not including "-data-particles.dat".
 // Example: "data/meshes/LDPMTet4/Dogbone/LDPMgeo000"
 //
-// Returns true if all files were read successfully.
+// Required files:
+//   nodes, particles, tets, facets, facetsVertices
+// Optional file:
+//   faceFacets
+//
+// Returns true if all required files were read successfully.
 // On failure the partially filled mesh and an error message are available.
 // ============================================================
 bool ReadLDPMTet4MeshFromFiles(const std::string& prefix, LDPMTet4Mesh& out, std::string* error = nullptr);

@@ -261,6 +261,17 @@ struct GPU_LDPMTet4_Data : public ElementBase {
             return;
         }
     }
+    void RetrieveInternalMomentToCPU(VectorXR& internal_moment);
+    void RetrieveInternalMomentToCPU(VectorReal3& internal_moment) {
+        VectorXR flat;
+        RetrieveInternalMomentToCPU(flat);
+        if (!UnflattenVectorReal3(flat, internal_moment)) {
+            MOPHI_ERROR(
+                "GPU_LDPMTet4_Data::RetrieveInternalMomentToCPU: internal moment size (%d) is not divisible by 3.",
+                static_cast<int>(flat.size()));
+            return;
+        }
+    }
     void RetrieveConstraintDataToCPU(VectorXR&) override {}
     void RetrieveConstraintJacobianToCPU(MatrixXR&) override {}
     void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) override;
@@ -344,6 +355,11 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Retrieve per-edge damage state from GPU to host.
     // omega_out : size n_edge, omega ∈ [0, 1] (0 = undamaged, 1 = fully failed)
     void RetrieveFacetDamageToCPU(VectorXR& omega_out);
+
+    // Retrieve per-edge facet traction/moment components from GPU to host.
+    // out size: 6 * n_edge, layout per edge:
+    // [t_N, t_M, t_L, m_T, m_M, m_L].
+    void RetrieveFacetTractionToCPU(VectorXR& out);
 
     // Retrieve per-edge max effective strain history (κ) from GPU to host.
     // kappa_out : size n_edge, κ ≥ 0 (max damage-driving strain ever reached)

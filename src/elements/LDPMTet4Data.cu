@@ -865,6 +865,12 @@ void GPU_LDPMTet4_Data::RetrieveInternalForceToCPU(VectorXR& f_out) {
     std::copy(da_f_int_t.host(), da_f_int_t.host() + n_nodes * 3, f_out.data());
 }
 
+void GPU_LDPMTet4_Data::RetrieveInternalMomentToCPU(VectorXR& m_out) {
+    m_out.resize(n_nodes * 3);
+    da_f_int_r.ToHost();
+    std::copy(da_f_int_r.host(), da_f_int_r.host() + n_nodes * 3, m_out.data());
+}
+
 void GPU_LDPMTet4_Data::RetrieveExternalForceToCPU(VectorXR& f_out) {
     f_out.resize(n_nodes * 3);
     da_f_ext_t.ToHost();
@@ -875,6 +881,12 @@ void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
     omega_out.resize(n_edge);
     da_omega.ToHost();
     std::copy(da_omega.host(), da_omega.host() + n_edge, omega_out.data());
+}
+
+void GPU_LDPMTet4_Data::RetrieveFacetTractionToCPU(VectorXR& out) {
+    out.resize(n_edge * 6);
+    da_facet_t.ToHost();
+    std::copy(da_facet_t.host(), da_facet_t.host() + n_edge * 6, out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveFacetKappaToCPU(VectorXR& kappa_out) {
