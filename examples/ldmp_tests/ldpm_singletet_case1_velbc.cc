@@ -250,9 +250,12 @@ int main() {
     subfacet_csv << "# time_s";
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
         const int sf_label = sf + 1;
-        subfacet_csv << ",facet_" << sf_label << "_stress_n" << ",facet_" << sf_label << "_stress_m" << ",facet_"
-                     << sf_label << "_stress_l" << ",facet_" << sf_label << "_strain_n" << ",facet_" << sf_label
-                     << "_strain_m" << ",facet_" << sf_label << "_strain_l";
+        subfacet_csv << ",facet_" << sf_label << "_stress_n"
+                     << ",facet_" << sf_label << "_stress_m"
+                     << ",facet_" << sf_label << "_stress_l"
+                     << ",facet_" << sf_label << "_strain_n"
+                     << ",facet_" << sf_label << "_strain_m"
+                     << ",facet_" << sf_label << "_strain_l";
     }
     subfacet_csv << "\n";
 

@@ -177,8 +177,8 @@ int main() {
         if ((step + 1) % print_interval == 0) {
             VectorXR x12, y12, z12;
             element_data.RetrievePositionToCPU(x12, y12, z12);
-            std::cout << "Step " << step + 1
-                      << " | load node displacement:" << "  dx = " << (x12(load_node) - h_x12(load_node))
+            std::cout << "Step " << step + 1 << " | load node displacement:"
+                      << "  dx = " << (x12(load_node) - h_x12(load_node))
                       << "  dy = " << (y12(load_node) - h_y12(load_node))
                       << "  dz = " << (z12(load_node) - h_z12(load_node)) << "\n";
         }
