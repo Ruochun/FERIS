@@ -68,57 +68,31 @@ struct GPU_FEAT10_Data : public ElementBase {
         return d_detJ_ref[elem_idx * Quadrature::N_QP_T10_5 + qp_idx];
     }
 
-    __device__ Real tet5pt_x(int qp_idx) {
-        return d_tet5pt_x[qp_idx];
-    }
+    __device__ Real tet5pt_x(int qp_idx) { return d_tet5pt_x[qp_idx]; }
 
-    __device__ Real tet5pt_y(int qp_idx) {
-        return d_tet5pt_y[qp_idx];
-    }
+    __device__ Real tet5pt_y(int qp_idx) { return d_tet5pt_y[qp_idx]; }
 
-    __device__ Real tet5pt_z(int qp_idx) {
-        return d_tet5pt_z[qp_idx];
-    }
+    __device__ Real tet5pt_z(int qp_idx) { return d_tet5pt_z[qp_idx]; }
 
-    __device__ Real tet5pt_weights(int qp_idx) {
-        return d_tet5pt_weights[qp_idx];
-    }
+    __device__ Real tet5pt_weights(int qp_idx) { return d_tet5pt_weights[qp_idx]; }
 
-    __device__ Map<VectorXR> x12() {
-        return Map<VectorXR>(d_h_x12, n_coef);
-    }
+    __device__ Map<VectorXR> x12() { return Map<VectorXR>(d_h_x12, n_coef); }
 
-    __device__ Map<VectorXR> const x12() const {
-        return Map<VectorXR>(d_h_x12, n_coef);
-    }
+    __device__ Map<VectorXR> const x12() const { return Map<VectorXR>(d_h_x12, n_coef); }
 
-    __device__ Map<VectorXR> y12() {
-        return Map<VectorXR>(d_h_y12, n_coef);
-    }
+    __device__ Map<VectorXR> y12() { return Map<VectorXR>(d_h_y12, n_coef); }
 
-    __device__ Map<VectorXR> const y12() const {
-        return Map<VectorXR>(d_h_y12, n_coef);
-    }
+    __device__ Map<VectorXR> const y12() const { return Map<VectorXR>(d_h_y12, n_coef); }
 
-    __device__ Map<VectorXR> z12() {
-        return Map<VectorXR>(d_h_z12, n_coef);
-    }
+    __device__ Map<VectorXR> z12() { return Map<VectorXR>(d_h_z12, n_coef); }
 
-    __device__ Map<VectorXR> const z12() const {
-        return Map<VectorXR>(d_h_z12, n_coef);
-    }
+    __device__ Map<VectorXR> const z12() const { return Map<VectorXR>(d_h_z12, n_coef); }
 
-    __device__ Map<VectorXR> const x12_jac() const {
-        return Map<VectorXR>(d_h_x12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const x12_jac() const { return Map<VectorXR>(d_h_x12_jac, n_coef); }
 
-    __device__ Map<VectorXR> const y12_jac() const {
-        return Map<VectorXR>(d_h_y12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const y12_jac() const { return Map<VectorXR>(d_h_y12_jac, n_coef); }
 
-    __device__ Map<VectorXR> const z12_jac() const {
-        return Map<VectorXR>(d_h_z12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const z12_jac() const { return Map<VectorXR>(d_h_z12_jac, n_coef); }
 
     __device__ Map<MatrixXR> F(int elem_idx, int qp_idx) {
         return Map<MatrixXR>(d_F + (elem_idx * Quadrature::N_QP_T10_5 + qp_idx) * 9, 3, 3);
@@ -154,163 +128,89 @@ struct GPU_FEAT10_Data : public ElementBase {
         return Map<MatrixXR>(d_P_vis + (elem_idx * Quadrature::N_QP_T10_5 + qp_idx) * 9, 3, 3);
     }
 
-    __device__ Map<VectorXR> f_int(int global_node_idx) {
-        return Map<VectorXR>(d_f_int + global_node_idx * 3, 3);
-    }
+    __device__ Map<VectorXR> f_int(int global_node_idx) { return Map<VectorXR>(d_f_int + global_node_idx * 3, 3); }
 
     __device__ const Map<VectorXR> f_int(int global_node_idx) const {
         return Map<VectorXR>(d_f_int + global_node_idx * 3, 3);
     }
 
-    __device__ Map<VectorXR> f_int() {
-        return Map<VectorXR>(d_f_int, n_coef * 3);
-    }
+    __device__ Map<VectorXR> f_int() { return Map<VectorXR>(d_f_int, n_coef * 3); }
 
-    __device__ const Map<VectorXR> f_int() const {
-        return Map<VectorXR>(d_f_int, n_coef * 3);
-    }
+    __device__ const Map<VectorXR> f_int() const { return Map<VectorXR>(d_f_int, n_coef * 3); }
 
-    __device__ Map<VectorXR> f_ext(int global_node_idx) {
-        return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3);
-    }
+    __device__ Map<VectorXR> f_ext(int global_node_idx) { return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3); }
 
     __device__ const Map<VectorXR> f_ext(int global_node_idx) const {
         return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3);
     }
 
-    __device__ Map<VectorXR> f_ext() {
-        return Map<VectorXR>(d_f_ext, n_coef * 3);
-    }
+    __device__ Map<VectorXR> f_ext() { return Map<VectorXR>(d_f_ext, n_coef * 3); }
 
-    __device__ const Map<VectorXR> f_ext() const {
-        return Map<VectorXR>(d_f_ext, n_coef * 3);
-    }
+    __device__ const Map<VectorXR> f_ext() const { return Map<VectorXR>(d_f_ext, n_coef * 3); }
 
-    __device__ Map<VectorXR> constraint() {
-        return Map<VectorXR>(d_constraint, n_constraint);
-    }
+    __device__ Map<VectorXR> constraint() { return Map<VectorXR>(d_constraint, n_constraint); }
 
-    __device__ const Map<VectorXR> constraint() const {
-        return Map<VectorXR>(d_constraint, n_constraint);
-    }
+    __device__ const Map<VectorXR> constraint() const { return Map<VectorXR>(d_constraint, n_constraint); }
 
-    __device__ Map<VectorXi> fixed_nodes() {
-        return Map<VectorXi>(d_fixed_nodes, n_constraint / 3);
-    }
+    __device__ Map<VectorXi> fixed_nodes() { return Map<VectorXi>(d_fixed_nodes, n_constraint / 3); }
 
     // ================================
-    __device__ Real rho0() const {
-        return *d_rho0;
-    }
+    __device__ Real rho0() const { return *d_rho0; }
 
-    __device__ Real nu() const {
-        return *d_nu;
-    }
+    __device__ Real nu() const { return *d_nu; }
 
-    __device__ Real E() const {
-        return *d_E;
-    }
+    __device__ Real E() const { return *d_E; }
 
-    __device__ Real lambda() const {
-        return *d_lambda;
-    }
+    __device__ Real lambda() const { return *d_lambda; }
 
-    __device__ Real eta_damp() const {
-        return *d_eta_damp;
-    }
+    __device__ Real eta_damp() const { return *d_eta_damp; }
 
-    __device__ Real lambda_damp() const {
-        return *d_lambda_damp;
-    }
+    __device__ Real lambda_damp() const { return *d_lambda_damp; }
 
-    __device__ Real mu() const {
-        return *d_mu;
-    }
+    __device__ Real mu() const { return *d_mu; }
 
-    __device__ int material_model() const {
-        return *d_material_model;
-    }
+    __device__ int material_model() const { return *d_material_model; }
 
-    __device__ Real mu10() const {
-        return *d_mu10;
-    }
+    __device__ Real mu10() const { return *d_mu10; }
 
-    __device__ Real mu01() const {
-        return *d_mu01;
-    }
+    __device__ Real mu01() const { return *d_mu01; }
 
-    __device__ Real kappa() const {
-        return *d_kappa;
-    }
+    __device__ Real kappa() const { return *d_kappa; }
 
-    __device__ int gpu_n_elem() const {
-        return n_elem;
-    }
+    __device__ int gpu_n_elem() const { return n_elem; }
 
-    __device__ int gpu_n_coef() const {
-        return n_coef;
-    }
+    __device__ int gpu_n_coef() const { return n_coef; }
 
-    __device__ int gpu_n_constraint() const {
-        return n_constraint;
-    }
+    __device__ int gpu_n_constraint() const { return n_constraint; }
 
     // ======================================================
 
-    __device__ int* csr_offsets() {
-        return d_csr_offsets;
-    }
+    __device__ int* csr_offsets() { return d_csr_offsets; }
 
-    __device__ int* csr_columns() {
-        return d_csr_columns;
-    }
+    __device__ int* csr_columns() { return d_csr_columns; }
 
-    __device__ Real* csr_values() {
-        return d_csr_values;
-    }
+    __device__ Real* csr_values() { return d_csr_values; }
 
-    __device__ int* cj_csr_offsets() {
-        return d_cj_csr_offsets;
-    }
+    __device__ int* cj_csr_offsets() { return d_cj_csr_offsets; }
 
-    __device__ int* cj_csr_columns() {
-        return d_cj_csr_columns;
-    }
+    __device__ int* cj_csr_columns() { return d_cj_csr_columns; }
 
-    __device__ Real* cj_csr_values() {
-        return d_cj_csr_values;
-    }
+    __device__ Real* cj_csr_values() { return d_cj_csr_values; }
 
-    __device__ int* j_csr_offsets() {
-        return d_j_csr_offsets;
-    }
+    __device__ int* j_csr_offsets() { return d_j_csr_offsets; }
 
-    __device__ int* j_csr_columns() {
-        return d_j_csr_columns;
-    }
+    __device__ int* j_csr_columns() { return d_j_csr_columns; }
 
-    __device__ Real* j_csr_values() {
-        return d_j_csr_values;
-    }
+    __device__ Real* j_csr_values() { return d_j_csr_values; }
 
-    __device__ int nnz() {
-        return *d_nnz;
-    }
+    __device__ int nnz() { return *d_nnz; }
 #endif
 
-    __host__ __device__ int get_n_elem() const {
-        return n_elem;
-    }
-    __host__ __device__ int get_n_coef() const {
-        return n_coef;
-    }
-    __host__ __device__ int get_n_constraint() const {
-        return n_constraint;
-    }
+    __host__ __device__ int get_n_elem() const { return n_elem; }
+    __host__ __device__ int get_n_coef() const { return n_coef; }
+    __host__ __device__ int get_n_constraint() const { return n_constraint; }
 
-    __host__ __device__ int get_n_beam() const override {
-        return n_elem;
-    }
+    __host__ __device__ int get_n_beam() const override { return n_elem; }
 
     void CalcDnDuPre();
 
@@ -320,15 +220,11 @@ struct GPU_FEAT10_Data : public ElementBase {
 
     void ConvertToCSR_ConstraintJacT();
 
-    void BuildConstraintJacobianTransposeCSR() {
-        ConvertToCSR_ConstraintJacT();
-    }
+    void BuildConstraintJacobianTransposeCSR() { ConvertToCSR_ConstraintJacT(); }
 
     void ConvertToCSR_ConstraintJac();
 
-    void BuildConstraintJacobianCSR() {
-        ConvertToCSR_ConstraintJac();
-    }
+    void BuildConstraintJacobianCSR() { ConvertToCSR_ConstraintJac(); }
 
     void CalcInternalForce() override;
 
@@ -379,9 +275,7 @@ struct GPU_FEAT10_Data : public ElementBase {
     void WriteOutputVTK(const std::string& filename);
 
     // Constructor
-    GPU_FEAT10_Data(int num_elements, int num_nodes) : n_elem(num_elements), n_coef(num_nodes) {
-        type = TYPE_T10;
-    }
+    GPU_FEAT10_Data(int num_elements, int num_nodes) : n_elem(num_elements), n_coef(num_nodes) { type = TYPE_T10; }
 
     void Initialize() {
         // Long arrays: use DualArray (manages both pinned host and device memory).
@@ -632,25 +526,15 @@ struct GPU_FEAT10_Data : public ElementBase {
         SetExternalForce(flat);
     }
 
-    const Real* GetX12DevicePtr() const {
-        return d_h_x12;
-    }
+    const Real* GetX12DevicePtr() const { return d_h_x12; }
 
-    const Real* GetY12DevicePtr() const {
-        return d_h_y12;
-    }
+    const Real* GetY12DevicePtr() const { return d_h_y12; }
 
-    const Real* GetZ12DevicePtr() const {
-        return d_h_z12;
-    }
+    const Real* GetZ12DevicePtr() const { return d_h_z12; }
 
-    Real* GetExternalForceDevicePtr() {
-        return d_f_ext;
-    }
+    Real* GetExternalForceDevicePtr() { return d_f_ext; }
 
-    const Real* GetExternalForceDevicePtr() const {
-        return d_f_ext;
-    }
+    const Real* GetExternalForceDevicePtr() const { return d_f_ext; }
 
     /**
      * Update node positions on GPU (for prescribed motion of fixed nodes).
@@ -761,27 +645,17 @@ struct GPU_FEAT10_Data : public ElementBase {
     // ── Legacy accessors (kept for backward compatibility) ───────────────────
     // Prefer the virtual base-class methods IsConstraintSetup() and
     // GetConstraintDevicePtr() when working through an ElementBase pointer.
-    Real* Get_Constraint_Ptr() {
-        return d_constraint;
-    }
+    Real* Get_Constraint_Ptr() { return d_constraint; }
 
-    bool Get_Is_Constraint_Setup() {
-        return is_constraints_setup;
-    }
+    bool Get_Is_Constraint_Setup() { return is_constraints_setup; }
 
     // ── ElementBase dispatch helpers ─────────────────────────────────────────
 
-    ElementBase* GetDevicePtr() override {
-        return d_data;
-    }
+    ElementBase* GetDevicePtr() override { return d_data; }
 
-    bool IsConstraintSetup() override {
-        return is_constraints_setup;
-    }
+    bool IsConstraintSetup() override { return is_constraints_setup; }
 
-    Real* GetConstraintDevicePtr() override {
-        return d_constraint;
-    }
+    Real* GetConstraintDevicePtr() override { return d_constraint; }
 
     GPU_FEAT10_Data* d_data;  // Storing GPU copy of SAPGPUData
 

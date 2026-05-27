@@ -201,22 +201,17 @@ int main() {
     node_force_csv << "# time_s";
     for (int node = 0; node < mesh.n_particles; ++node) {
         const int node_label = node + 1;
-        node_force_csv << ",node_" << node_label << "_f_mag"
-                       << ",node_" << node_label << "_f_x"
-                       << ",node_" << node_label << "_f_y"
-                       << ",node_" << node_label << "_f_z";
+        node_force_csv << ",node_" << node_label << "_f_mag" << ",node_" << node_label << "_f_x" << ",node_"
+                       << node_label << "_f_y" << ",node_" << node_label << "_f_z";
     }
     node_force_csv << "\n";
 
     subfacet_csv << "# time_s";
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
         const int sf_label = sf + 1;
-        subfacet_csv << ",facet_" << sf_label << "_stress_n"
-                     << ",facet_" << sf_label << "_stress_m"
-                     << ",facet_" << sf_label << "_stress_l"
-                     << ",facet_" << sf_label << "_strain_n"
-                     << ",facet_" << sf_label << "_strain_m"
-                     << ",facet_" << sf_label << "_strain_l";
+        subfacet_csv << ",facet_" << sf_label << "_stress_n" << ",facet_" << sf_label << "_stress_m" << ",facet_"
+                     << sf_label << "_stress_l" << ",facet_" << sf_label << "_strain_n" << ",facet_" << sf_label
+                     << "_strain_m" << ",facet_" << sf_label << "_strain_l";
     }
     subfacet_csv << "\n";
 
@@ -335,8 +330,8 @@ int main() {
         subfacet_csv << time_s;
         for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
             const size_t idx = static_cast<size_t>(sf);
-            subfacet_csv << "," << stress_n_vals[idx] << "," << stress_m_vals[idx] << "," << stress_l_vals[idx]
-                         << "," << strain_n_vals[idx] << "," << strain_m_vals[idx] << "," << strain_l_vals[idx];
+            subfacet_csv << "," << stress_n_vals[idx] << "," << stress_m_vals[idx] << "," << stress_l_vals[idx] << ","
+                         << strain_n_vals[idx] << "," << strain_m_vals[idx] << "," << strain_l_vals[idx];
         }
         subfacet_csv << "\n";
     };
