@@ -199,11 +199,14 @@ int main() {
         return 1;
     }
     node_force_csv << "# time_s";
-    for (int node = 0; node < mesh.n_particles; ++node) {
-        const int node_label = node + 1;
-        node_force_csv << ",node_" << node_label << "_f_mag" << ",node_" << node_label << "_f_x" << ",node_"
-                       << node_label << "_f_y" << ",node_" << node_label << "_f_z";
-    }
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_force_csv << ",node_" << (node + 1) << "_f_mag";
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_force_csv << ",node_" << (node + 1) << "_f_x";
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_force_csv << ",node_" << (node + 1) << "_f_y";
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_force_csv << ",node_" << (node + 1) << "_f_z";
     node_force_csv << "\n";
 
     subfacet_csv << "# time_s";
@@ -245,14 +248,29 @@ int main() {
     auto write_csv_metrics = [&](Real time_s) {
         VectorReal3 f_int;
         element_data.RetrieveInternalForceToCPU(f_int);
-        node_force_csv << time_s;
+        std::vector<Real> fmag_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> fx_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> fy_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> fz_vals(static_cast<size_t>(mesh.n_particles));
         for (int node = 0; node < mesh.n_particles; ++node) {
-            const Real fx = f_int[static_cast<size_t>(node)](0);
-            const Real fy = f_int[static_cast<size_t>(node)](1);
-            const Real fz = f_int[static_cast<size_t>(node)](2);
-            const Real fmag = std::sqrt(fx * fx + fy * fy + fz * fz);
-            node_force_csv << "," << fmag << "," << fx << "," << fy << "," << fz;
+            const size_t idx = static_cast<size_t>(node);
+            const Real fx = f_int[idx](0);
+            const Real fy = f_int[idx](1);
+            const Real fz = f_int[idx](2);
+            fmag_vals[idx] = std::sqrt(fx * fx + fy * fy + fz * fz);
+            fx_vals[idx] = fx;
+            fy_vals[idx] = fy;
+            fz_vals[idx] = fz;
         }
+        node_force_csv << time_s;
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_force_csv << "," << fmag_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_force_csv << "," << fx_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_force_csv << "," << fy_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_force_csv << "," << fz_vals[static_cast<size_t>(node)];
         node_force_csv << "\n";
 
         VectorXR x_cur, y_cur, z_cur, rx_cur, ry_cur, rz_cur;
