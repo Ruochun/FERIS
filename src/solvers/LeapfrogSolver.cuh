@@ -105,6 +105,8 @@ class LeapfrogSolver : public SolverBase {
         da_mass_lump_.free();
         da_pvel_nodes_.free();
         da_pvel_values_.free();
+        da_prot_vel_nodes_.free();
+        da_prot_vel_values_.free();
 
         cudaFree(d_time_step_);
         cudaFree(d_leapfrog_solver_);
@@ -127,44 +129,26 @@ class LeapfrogSolver : public SolverBase {
 
 #if defined(__CUDACC__)
     // Half-step nodal velocity vector (length 3*n_coef_).
-    __device__ Map<VectorXR> v() {
-        return Map<VectorXR>(d_v_, n_coef_ * 3);
-    }
+    __device__ Map<VectorXR> v() { return Map<VectorXR>(d_v_, n_coef_ * 3); }
 
     // Lumped nodal mass vector (length n_coef_).
-    __device__ Map<VectorXR> mass_lump() {
-        return Map<VectorXR>(d_mass_lump_, n_coef_);
-    }
+    __device__ Map<VectorXR> mass_lump() { return Map<VectorXR>(d_mass_lump_, n_coef_); }
 
     // Half-step rotational velocity vector for TYPE_LDPM_TET4 (length 3*n_coef_).
     // Stored immediately after the translational velocities in da_v_.
-    __device__ Map<VectorXR> v_rot() {
-        return Map<VectorXR>(d_v_ + n_coef_ * 3, n_coef_ * 3);
-    }
+    __device__ Map<VectorXR> v_rot() { return Map<VectorXR>(d_v_ + n_coef_ * 3, n_coef_ * 3); }
 
     // Per-node rotational inertia for TYPE_LDPM_TET4 (length n_coef_).
     // Stored immediately after the translational masses in da_mass_lump_.
-    __device__ Map<VectorXR> mass_inertia() {
-        return Map<VectorXR>(d_mass_lump_ + n_coef_, n_coef_);
-    }
+    __device__ Map<VectorXR> mass_inertia() { return Map<VectorXR>(d_mass_lump_ + n_coef_, n_coef_); }
 
-    __device__ Real solver_time_step() const {
-        return *d_time_step_;
-    }
+    __device__ Real solver_time_step() const { return *d_time_step_; }
 #endif
 
-    __host__ __device__ int get_n_coef() const {
-        return n_coef_;
-    }
-    __host__ __device__ int get_n_beam() const {
-        return n_beam_;
-    }
-    __host__ __device__ int get_n_total_qp() const {
-        return n_total_qp_;
-    }
-    __host__ __device__ int get_n_shape() const {
-        return n_shape_;
-    }
+    __host__ __device__ int get_n_coef() const { return n_coef_; }
+    __host__ __device__ int get_n_beam() const { return n_beam_; }
+    __host__ __device__ int get_n_total_qp() const { return n_total_qp_; }
+    __host__ __device__ int get_n_shape() const { return n_shape_; }
 
     // Seed specific nodal translational velocities into the leapfrog velocity
     // array (da_v_).  Call after SetParameters() (which zeroes all velocities)
@@ -210,6 +194,48 @@ class LeapfrogSolver : public SolverBase {
             return;
         }
         SetNodalVelocity(node_indices, vel_values);
+    }
+
+    // Seed specific nodal rotational velocities (TYPE_LDPM_TET4 only).
+    void SetNodalAngularVelocity(const VectorXi& node_indices, const VectorReal3& vel_values) {
+        if (type_ != TYPE_LDPM_TET4) {
+            MOPHI_ERROR("LeapfrogSolver::SetNodalAngularVelocity is only valid for TYPE_LDPM_TET4.");
+            return;
+        }
+        const int n = static_cast<int>(node_indices.size());
+        if (static_cast<int>(vel_values.size()) != n) {
+            MOPHI_ERROR(
+                "LeapfrogSolver::SetNodalAngularVelocity: vel_values.size() (%d) must equal "
+                "node_indices.size() (%d).",
+                static_cast<int>(vel_values.size()), n);
+            return;
+        }
+        Real* h_v = da_v_.host();
+        const int rot_offset = n_coef_ * 3;
+        for (int i = 0; i < n; ++i) {
+            const int node = node_indices(i);
+            if (node < 0 || node >= n_coef_) {
+                MOPHI_ERROR("LeapfrogSolver::SetNodalAngularVelocity: node index %d out of range [0, %d).", node,
+                            n_coef_);
+                return;
+            }
+            const Vector3R& v = vel_values[static_cast<size_t>(i)];
+            h_v[rot_offset + node * 3 + 0] = v(0);
+            h_v[rot_offset + node * 3 + 1] = v(1);
+            h_v[rot_offset + node * 3 + 2] = v(2);
+        }
+        da_v_.ToDevice();
+    }
+
+    // Backward-compatible overload (flat 3*n layout).
+    void SetNodalAngularVelocity(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        VectorReal3 vel_values;
+        if (!UnflattenVectorReal3(vel_values_3n, vel_values)) {
+            MOPHI_ERROR("LeapfrogSolver::SetNodalAngularVelocity: flat velocity size (%d) is not divisible by 3.",
+                        static_cast<int>(vel_values_3n.size()));
+            return;
+        }
+        SetNodalAngularVelocity(node_indices, vel_values);
     }
 
     // Register a set of nodes whose translational velocity is re-imposed to a
@@ -275,12 +301,60 @@ class LeapfrogSolver : public SolverBase {
         SetPrescribedVelocityBC(node_indices, vel_values);
     }
 
+    // Register nodes with prescribed rotational velocity (TYPE_LDPM_TET4 only).
+    void SetPrescribedAngularVelocityBC(const VectorXi& node_indices, const VectorReal3& vel_values) {
+        if (type_ != TYPE_LDPM_TET4) {
+            MOPHI_ERROR("LeapfrogSolver::SetPrescribedAngularVelocityBC is only valid for TYPE_LDPM_TET4.");
+            return;
+        }
+        const int n = static_cast<int>(node_indices.size());
+        if (static_cast<int>(vel_values.size()) != n) {
+            MOPHI_ERROR(
+                "LeapfrogSolver::SetPrescribedAngularVelocityBC: vel_values.size() (%d) must equal "
+                "node_indices.size() (%d).",
+                static_cast<int>(vel_values.size()), n);
+            return;
+        }
+        for (int i = 0; i < n; ++i) {
+            const int node = node_indices(i);
+            if (node < 0 || node >= n_coef_) {
+                MOPHI_ERROR("LeapfrogSolver::SetPrescribedAngularVelocityBC: node index %d out of range [0, %d).", node,
+                            n_coef_);
+                return;
+            }
+        }
+        n_prescribed_rot_vel_ = n;
+        da_prot_vel_nodes_.resize(n_prescribed_rot_vel_);
+        da_prot_vel_nodes_.BindDevicePointer(&d_prot_vel_nodes_);
+        da_prot_vel_values_.resize(n_prescribed_rot_vel_ * 3);
+        da_prot_vel_values_.BindDevicePointer(&d_prot_vel_values_);
+        std::copy(node_indices.data(), node_indices.data() + n_prescribed_rot_vel_, da_prot_vel_nodes_.host());
+        for (int i = 0; i < n_prescribed_rot_vel_; ++i) {
+            const Vector3R& v = vel_values[static_cast<size_t>(i)];
+            da_prot_vel_values_.host()[i * 3 + 0] = v(0);
+            da_prot_vel_values_.host()[i * 3 + 1] = v(1);
+            da_prot_vel_values_.host()[i * 3 + 2] = v(2);
+        }
+        da_prot_vel_nodes_.ToDevice();
+        da_prot_vel_values_.ToDevice();
+    }
+
+    // Backward-compatible overload (flat 3*n layout).
+    void SetPrescribedAngularVelocityBC(const VectorXi& node_indices, const VectorXR& vel_values_3n) {
+        VectorReal3 vel_values;
+        if (!UnflattenVectorReal3(vel_values_3n, vel_values)) {
+            MOPHI_ERROR(
+                "LeapfrogSolver::SetPrescribedAngularVelocityBC: flat velocity size (%d) is not divisible by 3.",
+                static_cast<int>(vel_values_3n.size()));
+            return;
+        }
+        SetPrescribedAngularVelocityBC(node_indices, vel_values);
+    }
+
     // Advance one leapfrog time step.
     void OneStepLeapfrog();
 
-    void Solve() override {
-        OneStepLeapfrog();
-    }
+    void Solve() override { OneStepLeapfrog(); }
 
     // Backward half-kick to initialize the staggered leapfrog from a
     // full-step initial velocity v_0 stored in da_v_:
@@ -335,6 +409,12 @@ class LeapfrogSolver : public SolverBase {
     mophi::DualArray<Real> da_pvel_values_;
     int* d_pvel_nodes_ = nullptr;
     Real* d_pvel_values_ = nullptr;
+
+    int n_prescribed_rot_vel_ = 0;
+    mophi::DualArray<int> da_prot_vel_nodes_;
+    mophi::DualArray<Real> da_prot_vel_values_;
+    int* d_prot_vel_nodes_ = nullptr;
+    Real* d_prot_vel_values_ = nullptr;
 
     // Shared implementation for InitialHalfKick() and FinalHalfKick().
     // sign = -1: backward half-kick; sign = +1: forward half-kick.
