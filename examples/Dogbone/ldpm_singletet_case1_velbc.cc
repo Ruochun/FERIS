@@ -191,10 +191,14 @@ int main() {
     std::cout << "  Output directory: " << output_dir << "\n";
 
     const std::string node_force_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_forces.csv");
+    const std::string node_rm_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_rotational_moments.csv");
+    const std::string node_u_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_displacements.csv");
     const std::string subfacet_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_subfacet_stress_strain.csv");
     std::ofstream node_force_csv(node_force_csv_name);
+    std::ofstream node_rm_csv(node_rm_csv_name);
+    std::ofstream node_u_csv(node_u_csv_name);
     std::ofstream subfacet_csv(subfacet_csv_name);
-    if (!node_force_csv.is_open() || !subfacet_csv.is_open()) {
+    if (!node_force_csv.is_open() || !node_rm_csv.is_open() || !node_u_csv.is_open() || !subfacet_csv.is_open()) {
         std::cerr << "Failed to open CSV outputs in " << output_dir << "\n";
         return 1;
     }
@@ -208,6 +212,28 @@ int main() {
     for (int node = 0; node < mesh.n_particles; ++node)
         node_force_csv << ",node_" << (node + 1) << "_f_z";
     node_force_csv << "\n";
+
+    node_rm_csv << "# time_s";
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_rm_csv << ",Rm_mag_node_" << (node + 1);
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_rm_csv << ",Rm_x_node_" << (node + 1);
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_rm_csv << ",Rm_y_node_" << (node + 1);
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_rm_csv << ",Rm_z_node_" << (node + 1);
+    node_rm_csv << "\n";
+
+    node_u_csv << "# time_s";
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_u_csv << ",U_mag_node_" << (node + 1);
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_u_csv << ",U_x_node_" << (node + 1);
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_u_csv << ",U_y_node_" << (node + 1);
+    for (int node = 0; node < mesh.n_particles; ++node)
+        node_u_csv << ",U_z_node_" << (node + 1);
+    node_u_csv << "\n";
 
     subfacet_csv << "# time_s";
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
@@ -273,9 +299,61 @@ int main() {
             node_force_csv << "," << fz_vals[static_cast<size_t>(node)];
         node_force_csv << "\n";
 
+        VectorReal3 rm_int;
+        element_data.RetrieveInternalMomentToCPU(rm_int);
+        std::vector<Real> rmmag_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> rmx_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> rmy_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> rmz_vals(static_cast<size_t>(mesh.n_particles));
+        for (int node = 0; node < mesh.n_particles; ++node) {
+            const size_t idx = static_cast<size_t>(node);
+            const Real rmx = rm_int[idx](0);
+            const Real rmy = rm_int[idx](1);
+            const Real rmz = rm_int[idx](2);
+            rmmag_vals[idx] = std::sqrt(rmx * rmx + rmy * rmy + rmz * rmz);
+            rmx_vals[idx] = rmx;
+            rmy_vals[idx] = rmy;
+            rmz_vals[idx] = rmz;
+        }
+        node_rm_csv << time_s;
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_rm_csv << "," << rmmag_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_rm_csv << "," << rmx_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_rm_csv << "," << rmy_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_rm_csv << "," << rmz_vals[static_cast<size_t>(node)];
+        node_rm_csv << "\n";
+
         VectorXR x_cur, y_cur, z_cur, rx_cur, ry_cur, rz_cur;
         element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
         element_data.RetrieveRotationToCPU(rx_cur, ry_cur, rz_cur);
+
+        std::vector<Real> umag_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> ux_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> uy_vals(static_cast<size_t>(mesh.n_particles));
+        std::vector<Real> uz_vals(static_cast<size_t>(mesh.n_particles));
+        for (int node = 0; node < mesh.n_particles; ++node) {
+            const size_t idx = static_cast<size_t>(node);
+            const Real ux = x_cur(node) - mesh.particle_x(node);
+            const Real uy = y_cur(node) - mesh.particle_y(node);
+            const Real uz = z_cur(node) - mesh.particle_z(node);
+            umag_vals[idx] = std::sqrt(ux * ux + uy * uy + uz * uz);
+            ux_vals[idx] = ux;
+            uy_vals[idx] = uy;
+            uz_vals[idx] = uz;
+        }
+        node_u_csv << time_s;
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_u_csv << "," << umag_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_u_csv << "," << ux_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_u_csv << "," << uy_vals[static_cast<size_t>(node)];
+        for (int node = 0; node < mesh.n_particles; ++node)
+            node_u_csv << "," << uz_vals[static_cast<size_t>(node)];
+        node_u_csv << "\n";
 
         VectorXR edge_traction;
         element_data.RetrieveFacetTractionToCPU(edge_traction);
@@ -427,6 +505,8 @@ int main() {
     std::cout << "  ldpm_singletet_case1_tet4_NNNNN.vtk\n";
     std::cout << "  ldpm_singletet_case1_subfacets_NNNNN.vtk\n";
     std::cout << "  ldpm_singletet_case1_node_forces.csv\n";
+    std::cout << "  ldpm_singletet_case1_node_rotational_moments.csv\n";
+    std::cout << "  ldpm_singletet_case1_node_displacements.csv\n";
     std::cout << "  ldpm_singletet_case1_subfacet_stress_strain.csv\n";
     return 0;
 }
