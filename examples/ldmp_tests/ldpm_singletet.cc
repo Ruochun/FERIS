@@ -1,15 +1,16 @@
 /**
- * ldpm_singletet_case1_velbc.cc
+ * ldpm_singletet.cc
  *
- * LDPM single regular tetrahedron benchmark (Case 1 from the uploaded document)
- * using LeapfrogSolver with prescribed translational velocity BC.
+ * LDPM single regular tetrahedron benchmark (Cases 1–7 from the uploaded
+ * document) using LeapfrogSolver with prescribed translational/rotational
+ * velocity BC selected from a command-line case id.
  *
  * Mesh:
  *   data/meshes/LDPMTet4/SingleTet/LDPM_debugRegTet-*.dat
  *
  * Required output series:
- *   ldpm_singletet_case1_tet4_NNNNN.vtk
- *   ldpm_singletet_case1_subfacets_NNNNN.vtk
+ *   ldpm_singletet_case{N}_tet4_NNNNN.vtk
+ *   ldpm_singletet_case{N}_subfacets_NNNNN.vtk
  */
 
 #include <cuda_runtime.h>
@@ -23,6 +24,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <stdexcept>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -46,36 +48,139 @@ static constexpr Real BETA_K = Real(0.25);      // rotational coupling
 static constexpr Real SIGMA_T_VAL = Real(3.0);  // MPa
 static constexpr Real G_T_VAL = Real(0.0375);   // N/mm
 
-// Case-1 displacement history (Table 5), node index 1 in +x.
-static constexpr std::array<Real, 5> kTimePts = {Real(0.0), Real(0.2), Real(2.4), Real(4.6), Real(4.8)};
-static constexpr std::array<Real, 5> kDispPts = {Real(0.0), Real(0.02), Real(-0.2), Real(0.02), Real(0.0)};
+static constexpr std::array<Real, 5> kDispTimePts = {Real(0.0), Real(0.2), Real(2.4), Real(4.6), Real(4.8)};
+static constexpr std::array<Real, 5> kRotTimePts = {Real(0.0), Real(0.5), Real(1.5), Real(2.5), Real(3.0)};
 
-static constexpr Real T_SIM = Real(4.8);
+static constexpr std::array<Real, 5> kDisp1 = {Real(0.0), Real(0.02), Real(-0.2), Real(0.02), Real(0.0)};
+static constexpr std::array<Real, 5> kDisp2 = {Real(0.0), Real(0.01632993162), Real(-0.1632993162), Real(0.01632993162),
+                                               Real(0.0)};
+static constexpr std::array<Real, 5> kDisp3 = {Real(0.0), Real(-0.00942809042), Real(0.0942809042),
+                                               Real(-0.00942809042), Real(0.0)};
+static constexpr std::array<Real, 5> kDisp4 = {Real(0.0), Real(-0.006666666667), Real(0.06666666667),
+                                               Real(-0.006666666667), Real(0.0)};
+static constexpr std::array<Real, 5> kDisp5 = {Real(0.0), Real(0.01885618083), Real(-0.1885618083), Real(0.01885618083),
+                                               Real(0.0)};
+static constexpr std::array<Real, 5> kRot1 = {Real(0.0), Real(0.2), Real(-0.2), Real(0.2), Real(0.0)};
+
 static constexpr Real T_VTK = Real(0.1);
 static constexpr Real T_CSV = Real(1.0e-3);
 
-Real Case1VelocityX(Real t) {
-    if (t >= kTimePts.back())
+enum class HistoryType { DISP_1, DISP_2, DISP_3, DISP_4, DISP_5, ROT_1 };
+
+struct DrivenBC {
+    int node = 0;
+    bool rotational = false;
+    int component = 0;
+    HistoryType history = HistoryType::DISP_1;
+    Real scale = Real(1);
+};
+
+struct CaseDefinition {
+    int id = 1;
+    std::string description;
+    std::vector<DrivenBC> bc;
+    const std::array<Real, 5>* key_times = &kDispTimePts;
+};
+
+const std::array<Real, 5>& HistoryValues(HistoryType h) {
+    switch (h) {
+        case HistoryType::DISP_1:
+            return kDisp1;
+        case HistoryType::DISP_2:
+            return kDisp2;
+        case HistoryType::DISP_3:
+            return kDisp3;
+        case HistoryType::DISP_4:
+            return kDisp4;
+        case HistoryType::DISP_5:
+            return kDisp5;
+        case HistoryType::ROT_1:
+            return kRot1;
+    }
+    return kDisp1;
+}
+
+const std::array<Real, 5>& HistoryTimes(HistoryType h) {
+    return (h == HistoryType::ROT_1) ? kRotTimePts : kDispTimePts;
+}
+
+Real HistoryRate(HistoryType h, Real t) {
+    const auto& times = HistoryTimes(h);
+    const auto& values = HistoryValues(h);
+    if (t >= times.back())
         return Real(0);
 
-    for (size_t i = 0; i + 1 < kTimePts.size(); ++i) {
-        if (t >= kTimePts[i] && t < kTimePts[i + 1]) {
-            const Real dt = kTimePts[i + 1] - kTimePts[i];
-            return (kDispPts[i + 1] - kDispPts[i]) / dt;
+    for (size_t i = 0; i + 1 < times.size(); ++i) {
+        if (t >= times[i] && t < times[i + 1]) {
+            const Real dt = times[i + 1] - times[i];
+            return (values[i + 1] - values[i]) / dt;
         }
     }
     return Real(0);
 }
 
-std::string TetVtkName(int frame) {
+CaseDefinition BuildCaseDefinition(int case_id) {
+    CaseDefinition c;
+    c.id = case_id;
+    switch (case_id) {
+        case 1:
+            c.description = "Node 2: UX = Disp1";
+            c.bc.push_back({1, false, 0, HistoryType::DISP_1, Real(1)});
+            c.key_times = &kDispTimePts;
+            break;
+        case 2:
+            c.description = "Node 3: UY = Disp1";
+            c.bc.push_back({2, false, 1, HistoryType::DISP_1, Real(1)});
+            c.key_times = &kDispTimePts;
+            break;
+        case 3:
+            c.description = "Node 4: UZ = Disp1";
+            c.bc.push_back({3, false, 2, HistoryType::DISP_1, Real(1)});
+            c.key_times = &kDispTimePts;
+            break;
+        case 4:
+            c.description = "Volumetric loading (Disp1..Disp5)";
+            c.bc.push_back({0, false, 0, HistoryType::DISP_2, Real(-1)});
+            c.bc.push_back({0, false, 1, HistoryType::DISP_3, Real(1)});
+            c.bc.push_back({0, false, 2, HistoryType::DISP_4, Real(1)});
+            c.bc.push_back({1, false, 0, HistoryType::DISP_2, Real(1)});
+            c.bc.push_back({1, false, 1, HistoryType::DISP_3, Real(1)});
+            c.bc.push_back({1, false, 2, HistoryType::DISP_4, Real(1)});
+            c.bc.push_back({2, false, 1, HistoryType::DISP_5, Real(1)});
+            c.bc.push_back({2, false, 2, HistoryType::DISP_4, Real(1)});
+            c.bc.push_back({3, false, 2, HistoryType::DISP_1, Real(1)});
+            c.key_times = &kDispTimePts;
+            break;
+        case 5:
+            c.description = "Node 2: RX = Rot1";
+            c.bc.push_back({1, true, 0, HistoryType::ROT_1, Real(1)});
+            c.key_times = &kRotTimePts;
+            break;
+        case 6:
+            c.description = "Node 3: RY = Rot1";
+            c.bc.push_back({2, true, 1, HistoryType::ROT_1, Real(1)});
+            c.key_times = &kRotTimePts;
+            break;
+        case 7:
+            c.description = "Node 3: RZ = Rot1";
+            c.bc.push_back({2, true, 2, HistoryType::ROT_1, Real(1)});
+            c.key_times = &kRotTimePts;
+            break;
+        default:
+            break;
+    }
+    return c;
+}
+
+std::string TetVtkName(int case_id, int frame) {
     std::ostringstream s;
-    s << "ldpm_singletet_case1_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+    s << "ldpm_singletet_case" << case_id << "_tet4_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
     return s.str();
 }
 
-std::string SubfacetVtkName(int frame) {
+std::string SubfacetVtkName(int case_id, int frame) {
     std::ostringstream s;
-    s << "ldpm_singletet_case1_subfacets_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
+    s << "ldpm_singletet_case" << case_id << "_subfacets_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
     return s.str();
 }
 
@@ -99,9 +204,33 @@ void write_csv_metrics(Real time_s,
 
 }  // namespace
 
-int main() {
+int main(int argc, char* argv[]) {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
-    const std::string output_dir = "ldpm_singletet_case1_velbc";
+    int case_id = 1;
+    if (argc > 2) {
+        std::cerr << "Usage: ldpm_singletet [case_id]\n";
+        std::cerr << "  case_id must be in [1, 7]. Default is 1.\n";
+        return 1;
+    }
+    if (argc == 2) {
+        try {
+            size_t parsed = 0;
+            case_id = std::stoi(argv[1], &parsed);
+            if (parsed != std::string(argv[1]).size())
+                throw std::invalid_argument("Trailing characters");
+        } catch (const std::exception&) {
+            std::cerr << "Invalid case_id '" << argv[1] << "'. Valid values are integers in [1, 7].\n";
+            return 1;
+        }
+    }
+    if (case_id < 1 || case_id > 7) {
+        std::cerr << "Invalid case_id " << case_id << ". Valid values are integers in [1, 7].\n";
+        return 1;
+    }
+
+    const CaseDefinition case_def = BuildCaseDefinition(case_id);
+    const std::string case_tag = "case" + std::to_string(case_id);
+    const std::string output_dir = "ldpm_singletet_" + case_tag;
     std::filesystem::remove_all(output_dir);
     if (!std::filesystem::create_directories(output_dir)) {
         std::cerr << "Failed to create output directory: " << output_dir << "\n";
@@ -154,11 +283,8 @@ int main() {
     VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles), Real3::Zero());
     element_data.SetExternalForce(h_f_ext);
 
-    // Case 1 constraints:
-    // - node 1 is driven in x only
-    // - all other translational and rotational DOFs are fixed to zero
-    // To also constrain rotation of node 1, mark all nodes fixed and re-impose
-    // node-1 translational prescribed velocity [vx,0,0] in the solver.
+    // Constrain all nodes by default and re-impose the selected prescribed
+    // translational/rotational velocity components for the active case.
     VectorXi h_fixed(4);
     h_fixed << 0, 1, 2, 3;
     element_data.SetNodalFixed(h_fixed);
@@ -167,14 +293,15 @@ int main() {
 
     const Real c_N = std::sqrt(E_N_VAL / RHO_VAL);
     const Real dt = Real(0.5) * (l_min / c_N);
+    const Real T_SIM = case_def.key_times->back();
     const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
     const int vtk_interval = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
     const int csv_interval = std::max(1, static_cast<int>(std::round(T_CSV / dt)));
 
     // Ensure outputs at key tabulated times in addition to regular cadence.
     std::vector<int> key_steps;
-    key_steps.reserve(kTimePts.size());
-    for (Real t_key : kTimePts) {
+    key_steps.reserve(case_def.key_times->size());
+    for (Real t_key : *case_def.key_times) {
         if (t_key <= Real(0))
             continue;
         const int s = std::max(1, std::min(n_steps, static_cast<int>(std::round(t_key / dt))));
@@ -188,24 +315,85 @@ int main() {
     solver.SetParameters(&params);
     solver.Setup();
 
-    VectorXi h_driven(1);
-    h_driven(0) = 1;
-    VectorReal3 h_driven_vel(1, Real3::Zero());
-    h_driven_vel[0](0) = Case1VelocityX(Real(0));
+    std::vector<int> driven_trans_nodes;
+    std::vector<int> driven_rot_nodes;
+    for (const auto& bc : case_def.bc) {
+        auto& nodes = bc.rotational ? driven_rot_nodes : driven_trans_nodes;
+        if (std::find(nodes.begin(), nodes.end(), bc.node) == nodes.end())
+            nodes.push_back(bc.node);
+    }
+    std::sort(driven_trans_nodes.begin(), driven_trans_nodes.end());
+    std::sort(driven_rot_nodes.begin(), driven_rot_nodes.end());
 
-    solver.SetPrescribedVelocityBC(h_driven, h_driven_vel);
-    solver.SetNodalVelocity(h_driven, h_driven_vel);
+    VectorXi h_driven_trans(static_cast<int>(driven_trans_nodes.size()));
+    for (int i = 0; i < static_cast<int>(driven_trans_nodes.size()); ++i)
+        h_driven_trans(i) = driven_trans_nodes[static_cast<size_t>(i)];
+    VectorXi h_driven_rot(static_cast<int>(driven_rot_nodes.size()));
+    for (int i = 0; i < static_cast<int>(driven_rot_nodes.size()); ++i)
+        h_driven_rot(i) = driven_rot_nodes[static_cast<size_t>(i)];
+
+    VectorReal3 h_driven_vel(static_cast<size_t>(h_driven_trans.size()), Real3::Zero());
+    VectorReal3 h_driven_rot_vel(static_cast<size_t>(h_driven_rot.size()), Real3::Zero());
+
+    auto fill_driven_velocities = [&](Real t_now) {
+        std::fill(h_driven_vel.begin(), h_driven_vel.end(), Real3::Zero());
+        std::fill(h_driven_rot_vel.begin(), h_driven_rot_vel.end(), Real3::Zero());
+        for (const auto& bc : case_def.bc) {
+            const Real rate = bc.scale * HistoryRate(bc.history, t_now);
+            if (bc.rotational) {
+                for (int i = 0; i < h_driven_rot.size(); ++i) {
+                    if (h_driven_rot(i) == bc.node) {
+                        h_driven_rot_vel[static_cast<size_t>(i)](bc.component) = rate;
+                        break;
+                    }
+                }
+            } else {
+                for (int i = 0; i < h_driven_trans.size(); ++i) {
+                    if (h_driven_trans(i) == bc.node) {
+                        h_driven_vel[static_cast<size_t>(i)](bc.component) = rate;
+                        break;
+                    }
+                }
+            }
+        }
+    };
+
+    fill_driven_velocities(Real(0));
+    if (h_driven_trans.size() > 0) {
+        solver.SetPrescribedVelocityBC(h_driven_trans, h_driven_vel);
+        solver.SetNodalVelocity(h_driven_trans, h_driven_vel);
+    }
+    if (h_driven_rot.size() > 0) {
+        solver.SetPrescribedAngularVelocityBC(h_driven_rot, h_driven_rot_vel);
+        solver.SetNodalAngularVelocity(h_driven_rot, h_driven_rot_vel);
+    }
+    VectorReal3 last_driven_vel = h_driven_vel;
+    VectorReal3 last_driven_rot_vel = h_driven_rot_vel;
+    auto velocities_changed = [](const VectorReal3& a, const VectorReal3& b) {
+        if (a.size() != b.size())
+            return true;
+        for (size_t i = 0; i < a.size(); ++i) {
+            if ((a[i] - b[i]).norm() > Real(1e-15))
+                return true;
+        }
+        return false;
+    };
     solver.InitialHalfKick();
 
     std::cout << std::fixed << std::setprecision(9);
-    std::cout << "Single-tet Case 1: dt=" << dt << " s, steps=" << n_steps << "\n";
+    std::cout << "Single-tet Case " << case_id << ": " << case_def.description << "\n";
+    std::cout << "  dt=" << dt << " s, steps=" << n_steps << "\n";
     std::cout << "  E_N=" << E_N_VAL << ", E_T=" << E_T_VAL << ", H_t=" << H_T_VAL << ", l_min=" << l_min << "\n";
     std::cout << "  Output directory: " << output_dir << "\n";
 
-    const std::string node_force_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_forces.csv");
-    const std::string node_rm_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_rotational_moments.csv");
-    const std::string node_u_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_node_displacements.csv");
-    const std::string subfacet_csv_name = JoinPath(output_dir, "ldpm_singletet_case1_subfacet_stress_strain.csv");
+    const std::string node_force_csv_name =
+        JoinPath(output_dir, "ldpm_singletet_case" + std::to_string(case_id) + "_node_forces.csv");
+    const std::string node_rm_csv_name =
+        JoinPath(output_dir, "ldpm_singletet_case" + std::to_string(case_id) + "_node_rotational_moments.csv");
+    const std::string node_u_csv_name =
+        JoinPath(output_dir, "ldpm_singletet_case" + std::to_string(case_id) + "_node_displacements.csv");
+    const std::string subfacet_csv_name =
+        JoinPath(output_dir, "ldpm_singletet_case" + std::to_string(case_id) + "_subfacet_stress_strain.csv");
     std::ofstream node_force_csv(node_force_csv_name);
     std::ofstream node_rm_csv(node_rm_csv_name);
     std::ofstream node_u_csv(node_u_csv_name);
@@ -295,29 +483,30 @@ int main() {
 
     int frame = 0;
     {
-        if (!WriteLDPMTet4TetMeshToVTK(JoinPath(output_dir, TetVtkName(frame)), mesh, mesh.particle_x, mesh.particle_y,
-                                       mesh.particle_z)) {
+        if (!WriteLDPMTet4TetMeshToVTK(JoinPath(output_dir, TetVtkName(case_id, frame)), mesh, mesh.particle_x,
+                                       mesh.particle_y, mesh.particle_z)) {
             std::cerr << "Failed writing initial tet VTK\n";
             return 1;
         }
         VectorXR crack0 = VectorXR::Zero(mesh.n_subfacets);
-        if (!WriteLDPMTet4SubfacetMeshToVTK(JoinPath(output_dir, SubfacetVtkName(frame)), mesh, "crack_distance",
-                                            crack0)) {
+        if (!WriteLDPMTet4SubfacetMeshToVTK(JoinPath(output_dir, SubfacetVtkName(case_id, frame)), mesh,
+                                            "crack_distance", crack0)) {
             std::cerr << "Failed writing initial subfacet VTK\n";
             return 1;
         }
         ++frame;
     }
 
-    Real last_vx = h_driven_vel[0](0);
-
     for (int step = 0; step < n_steps; ++step) {
         const Real t_n = static_cast<Real>(step) * dt;
-        const Real v_now = Case1VelocityX(t_n);
-        if (std::abs(v_now - last_vx) > Real(1e-15)) {
-            h_driven_vel[0](0) = v_now;
-            solver.SetPrescribedVelocityBC(h_driven, h_driven_vel);
-            last_vx = v_now;
+        fill_driven_velocities(t_n);
+        if (h_driven_trans.size() > 0 && velocities_changed(h_driven_vel, last_driven_vel)) {
+            solver.SetPrescribedVelocityBC(h_driven_trans, h_driven_vel);
+            last_driven_vel = h_driven_vel;
+        }
+        if (h_driven_rot.size() > 0 && velocities_changed(h_driven_rot_vel, last_driven_rot_vel)) {
+            solver.SetPrescribedAngularVelocityBC(h_driven_rot, h_driven_rot_vel);
+            last_driven_rot_vel = h_driven_rot_vel;
         }
 
         solver.Solve();
@@ -336,23 +525,43 @@ int main() {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-            if (!WriteLDPMTet4TetMeshToVTK(JoinPath(output_dir, TetVtkName(frame)), mesh, x_cur, y_cur, z_cur)) {
+            if (!WriteLDPMTet4TetMeshToVTK(JoinPath(output_dir, TetVtkName(case_id, frame)), mesh, x_cur, y_cur,
+                                           z_cur)) {
                 std::cerr << "Failed writing tet VTK at step " << step_1 << "\n";
                 return 1;
             }
 
             VectorXR sf_crack;
             element_data.ProjectEdgeCrackDistanceToSubfacets(sf_crack);
-            if (!WriteLDPMTet4SubfacetMeshToVTK(JoinPath(output_dir, SubfacetVtkName(frame)), mesh, "crack_distance",
-                                                sf_crack)) {
+            if (!WriteLDPMTet4SubfacetMeshToVTK(JoinPath(output_dir, SubfacetVtkName(case_id, frame)), mesh,
+                                                "crack_distance", sf_crack)) {
                 std::cerr << "Failed writing subfacet VTK at step " << step_1 << "\n";
                 return 1;
             }
 
             const Real t_out = static_cast<Real>(step_1) * dt;
-            const Real ux_node1 = x_cur(1) - mesh.particle_x(1);
+            Real monitor_target = Real(0);
+            if (!case_def.bc.empty())
+                monitor_target = case_def.bc.front().scale * HistoryRate(case_def.bc.front().history, t_n);
+            Real monitor_state = Real(0);
+            if (!case_def.bc.empty()) {
+                const auto& bc0 = case_def.bc.front();
+                if (bc0.rotational) {
+                    VectorXR rx_cur, ry_cur, rz_cur;
+                    element_data.RetrieveRotationToCPU(rx_cur, ry_cur, rz_cur);
+                    const VectorXR* rot_comp =
+                        (bc0.component == 0) ? &rx_cur : ((bc0.component == 1) ? &ry_cur : &rz_cur);
+                    monitor_state = (*rot_comp)(bc0.node);
+                } else {
+                    const VectorXR* pos_comp = (bc0.component == 0) ? &x_cur : ((bc0.component == 1) ? &y_cur : &z_cur);
+                    const VectorXR* pos_ref = (bc0.component == 0)
+                                                  ? &mesh.particle_x
+                                                  : ((bc0.component == 1) ? &mesh.particle_y : &mesh.particle_z);
+                    monitor_state = (*pos_comp)(bc0.node) - (*pos_ref)(bc0.node);
+                }
+            }
             std::cout << "frame=" << std::setw(4) << frame << " step=" << std::setw(8) << step_1 << " t=" << t_out
-                      << " ux(node1)=" << ux_node1 << " vx_target=" << last_vx << "\n";
+                      << " monitor=" << monitor_state << " target_rate=" << monitor_target << "\n";
             ++frame;
         }
     }
@@ -361,12 +570,12 @@ int main() {
 
     std::cout << "Done. Wrote " << frame << " frame(s).\n";
     std::cout << "  Output directory: " << output_dir << "\n";
-    std::cout << "  ldpm_singletet_case1_tet4_NNNNN.vtk\n";
-    std::cout << "  ldpm_singletet_case1_subfacets_NNNNN.vtk\n";
-    std::cout << "  ldpm_singletet_case1_node_forces.csv\n";
-    std::cout << "  ldpm_singletet_case1_node_rotational_moments.csv\n";
-    std::cout << "  ldpm_singletet_case1_node_displacements.csv\n";
-    std::cout << "  ldpm_singletet_case1_subfacet_stress_strain.csv\n";
+    std::cout << "  ldpm_singletet_case" << case_id << "_tet4_NNNNN.vtk\n";
+    std::cout << "  ldpm_singletet_case" << case_id << "_subfacets_NNNNN.vtk\n";
+    std::cout << "  ldpm_singletet_case" << case_id << "_node_forces.csv\n";
+    std::cout << "  ldpm_singletet_case" << case_id << "_node_rotational_moments.csv\n";
+    std::cout << "  ldpm_singletet_case" << case_id << "_node_displacements.csv\n";
+    std::cout << "  ldpm_singletet_case" << case_id << "_subfacet_stress_strain.csv\n";
     return 0;
 }
 

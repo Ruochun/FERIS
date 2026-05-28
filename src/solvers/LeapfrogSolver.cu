@@ -472,6 +472,13 @@ void LeapfrogSolver::OneStepLeapfrog() {
                                                                                  n_prescribed_vel_);
         }
 
+        // Step 4c: Re-impose prescribed (non-zero) rotational velocities.
+        if (n_prescribed_rot_vel_ > 0) {
+            const int blocks_prv = (n_prescribed_rot_vel_ + threadsPerBlock - 1) / threadsPerBlock;
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_prv, threadsPerBlock>>>(
+                d_v_ + n_coef_ * 3, d_prot_vel_nodes_, d_prot_vel_values_, n_prescribed_rot_vel_);
+        }
+
         // Step 5a: Advance translational positions.
         leapfrog_update_position_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
 
@@ -568,6 +575,13 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
             const int blocks_pv = (n_prescribed_vel_ + threadsPerBlock - 1) / threadsPerBlock;
             leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(d_v_, d_pvel_nodes_, d_pvel_values_,
                                                                                  n_prescribed_vel_);
+        }
+
+        // Re-impose prescribed rotational velocities on driven nodes.
+        if (n_prescribed_rot_vel_ > 0) {
+            const int blocks_prv = (n_prescribed_rot_vel_ + threadsPerBlock - 1) / threadsPerBlock;
+            leapfrog_apply_prescribed_vel_kernel<<<blocks_prv, threadsPerBlock>>>(
+                d_v_ + n_coef_ * 3, d_prot_vel_nodes_, d_prot_vel_values_, n_prescribed_rot_vel_);
         }
     }
 
