@@ -431,7 +431,7 @@ void ANCF3443_B12_matrix_flat_per_element(const VectorXR& L,
     }
 }
 
-void ANCF3243_generate_beam_coordinates(int n_beam, VectorXR& x12, VectorXR& y12, VectorXR& z12) {
+void ANCF3243_generate_beam_coordinates(int n_beam, VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) {
     // Initial beam coordinates (first 8 nodes)
     Real x_init[8] = {-1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0};
     Real y_init[8] = {1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0};
@@ -439,9 +439,9 @@ void ANCF3243_generate_beam_coordinates(int n_beam, VectorXR& x12, VectorXR& y12
 
     // Copy initial beam (first 8 nodes)
     for (int i = 0; i < 8; i++) {
-        x12(i) = x_init[i];
-        y12(i) = y_init[i];
-        z12(i) = z_init[i];
+        x_cur(i) = x_init[i];
+        y_cur(i) = y_init[i];
+        z_cur(i) = z_init[i];
     }
 
     // Add additional beams (append new blocks for additional beams)
@@ -452,114 +452,114 @@ void ANCF3243_generate_beam_coordinates(int n_beam, VectorXR& x12, VectorXR& y12
 
         // Copy last 4 nodes from previous section and modify
         for (int i = 0; i < 4; i++) {
-            x12(base_idx + i) = x12(prev_base + i);
-            y12(base_idx + i) = y12(prev_base + i);
-            z12(base_idx + i) = z12(prev_base + i);
+            x_cur(base_idx + i) = x_cur(prev_base + i);
+            y_cur(base_idx + i) = y_cur(prev_base + i);
+            z_cur(base_idx + i) = z_cur(prev_base + i);
         }
 
         // Only shift the first entry of the new beam by x_offset
-        x12(base_idx) += x_offset;
+        x_cur(base_idx) += x_offset;
     }
 }
 
 void ANCF3443_generate_beam_coordinates(int n_beam,
-                                        VectorXR& x12,
-                                        VectorXR& y12,
-                                        VectorXR& z12,
+                                        VectorXR& x_cur,
+                                        VectorXR& y_cur,
+                                        VectorXR& z_cur,
                                         MatrixXi& element_connectivity) {
     int n_nodes = 4 + 2 * (n_beam - 1);
     int N_dof = n_nodes * 4;
 
     // Resize coordinate arrays
-    x12.resize(N_dof);
-    y12.resize(N_dof);
-    z12.resize(N_dof);
+    x_cur.resize(N_dof);
+    y_cur.resize(N_dof);
+    z_cur.resize(N_dof);
 
     // Example: Fill with zeros or your own geometry logic
-    x12.setZero();
-    y12.setZero();
-    z12.setZero();
+    x_cur.setZero();
+    y_cur.setZero();
+    z_cur.setZero();
 
     // Set first 16 elements (4 nodes × 4 DOFs)
-    x12(0) = 0.0;
-    x12(1) = 1.0;
-    x12(2) = 0.0;
-    x12(3) = 0.0;  // Node 0
-    x12(4) = 2.0;
-    x12(5) = 1.0;
-    x12(6) = 0.0;
-    x12(7) = 0.0;  // Node 1
-    x12(8) = 2.0;
-    x12(9) = 1.0;
-    x12(10) = 0.0;
-    x12(11) = 0.0;  // Node 2
-    x12(12) = 0.0;
-    x12(13) = 1.0;
-    x12(14) = 0.0;
-    x12(15) = 0.0;  // Node 3
+    x_cur(0) = 0.0;
+    x_cur(1) = 1.0;
+    x_cur(2) = 0.0;
+    x_cur(3) = 0.0;  // Node 0
+    x_cur(4) = 2.0;
+    x_cur(5) = 1.0;
+    x_cur(6) = 0.0;
+    x_cur(7) = 0.0;  // Node 1
+    x_cur(8) = 2.0;
+    x_cur(9) = 1.0;
+    x_cur(10) = 0.0;
+    x_cur(11) = 0.0;  // Node 2
+    x_cur(12) = 0.0;
+    x_cur(13) = 1.0;
+    x_cur(14) = 0.0;
+    x_cur(15) = 0.0;  // Node 3
 
-    y12(0) = 0.0;
-    y12(1) = 0.0;
-    y12(2) = 1.0;
-    y12(3) = 0.0;  // Node 0
-    y12(4) = 0.0;
-    y12(5) = 0.0;
-    y12(6) = 1.0;
-    y12(7) = 0.0;  // Node 1
-    y12(8) = 1.0;
-    y12(9) = 0.0;
-    y12(10) = 1.0;
-    y12(11) = 0.0;  // Node 2
-    y12(12) = 1.0;
-    y12(13) = 0.0;
-    y12(14) = 1.0;
-    y12(15) = 0.0;  // Node 3
+    y_cur(0) = 0.0;
+    y_cur(1) = 0.0;
+    y_cur(2) = 1.0;
+    y_cur(3) = 0.0;  // Node 0
+    y_cur(4) = 0.0;
+    y_cur(5) = 0.0;
+    y_cur(6) = 1.0;
+    y_cur(7) = 0.0;  // Node 1
+    y_cur(8) = 1.0;
+    y_cur(9) = 0.0;
+    y_cur(10) = 1.0;
+    y_cur(11) = 0.0;  // Node 2
+    y_cur(12) = 1.0;
+    y_cur(13) = 0.0;
+    y_cur(14) = 1.0;
+    y_cur(15) = 0.0;  // Node 3
 
-    z12(0) = 0.0;
-    z12(1) = 0.0;
-    z12(2) = 0.0;
-    z12(3) = 1.0;  // Node 0
-    z12(4) = 0.0;
-    z12(5) = 0.0;
-    z12(6) = 0.0;
-    z12(7) = 1.0;  // Node 1
-    z12(8) = 0.0;
-    z12(9) = 0.0;
-    z12(10) = 0.0;
-    z12(11) = 1.0;  // Node 2
-    z12(12) = 0.0;
-    z12(13) = 0.0;
-    z12(14) = 0.0;
-    z12(15) = 1.0;  // Node 3
+    z_cur(0) = 0.0;
+    z_cur(1) = 0.0;
+    z_cur(2) = 0.0;
+    z_cur(3) = 1.0;  // Node 0
+    z_cur(4) = 0.0;
+    z_cur(5) = 0.0;
+    z_cur(6) = 0.0;
+    z_cur(7) = 1.0;  // Node 1
+    z_cur(8) = 0.0;
+    z_cur(9) = 0.0;
+    z_cur(10) = 0.0;
+    z_cur(11) = 1.0;  // Node 2
+    z_cur(12) = 0.0;
+    z_cur(13) = 0.0;
+    z_cur(14) = 0.0;
+    z_cur(15) = 1.0;  // Node 3
 
     for (int i = 1; i < n_beam; i++) {
         // each new beam has 4 additional nodes
-        x12(16 + (i - 1) * 8) = 2.0 * (i + 1);
-        x12(17 + (i - 1) * 8) = 1.0;
-        x12(18 + (i - 1) * 8) = 0.0;
-        x12(19 + (i - 1) * 8) = 0.0;
-        x12(20 + (i - 1) * 8) = 2.0 * (i + 1);
-        x12(21 + (i - 1) * 8) = 1.0;
-        x12(22 + (i - 1) * 8) = 0.0;
-        x12(23 + (i - 1) * 8) = 0.0;
+        x_cur(16 + (i - 1) * 8) = 2.0 * (i + 1);
+        x_cur(17 + (i - 1) * 8) = 1.0;
+        x_cur(18 + (i - 1) * 8) = 0.0;
+        x_cur(19 + (i - 1) * 8) = 0.0;
+        x_cur(20 + (i - 1) * 8) = 2.0 * (i + 1);
+        x_cur(21 + (i - 1) * 8) = 1.0;
+        x_cur(22 + (i - 1) * 8) = 0.0;
+        x_cur(23 + (i - 1) * 8) = 0.0;
 
-        y12(16 + (i - 1) * 8) = 0.0;
-        y12(17 + (i - 1) * 8) = 0.0;
-        y12(18 + (i - 1) * 8) = 1.0;
-        y12(19 + (i - 1) * 8) = 0.0;
-        y12(20 + (i - 1) * 8) = 1.0;
-        y12(21 + (i - 1) * 8) = 0.0;
-        y12(22 + (i - 1) * 8) = 1.0;
-        y12(23 + (i - 1) * 8) = 0.0;
+        y_cur(16 + (i - 1) * 8) = 0.0;
+        y_cur(17 + (i - 1) * 8) = 0.0;
+        y_cur(18 + (i - 1) * 8) = 1.0;
+        y_cur(19 + (i - 1) * 8) = 0.0;
+        y_cur(20 + (i - 1) * 8) = 1.0;
+        y_cur(21 + (i - 1) * 8) = 0.0;
+        y_cur(22 + (i - 1) * 8) = 1.0;
+        y_cur(23 + (i - 1) * 8) = 0.0;
 
-        z12(16 + (i - 1) * 8) = 0.0;
-        z12(17 + (i - 1) * 8) = 0.0;
-        z12(18 + (i - 1) * 8) = 0.0;
-        z12(19 + (i - 1) * 8) = 1.0;
-        z12(20 + (i - 1) * 8) = 0.0;
-        z12(21 + (i - 1) * 8) = 0.0;
-        z12(22 + (i - 1) * 8) = 0.0;
-        z12(23 + (i - 1) * 8) = 1.0;
+        z_cur(16 + (i - 1) * 8) = 0.0;
+        z_cur(17 + (i - 1) * 8) = 0.0;
+        z_cur(18 + (i - 1) * 8) = 0.0;
+        z_cur(19 + (i - 1) * 8) = 1.0;
+        z_cur(20 + (i - 1) * 8) = 0.0;
+        z_cur(21 + (i - 1) * 8) = 0.0;
+        z_cur(22 + (i - 1) * 8) = 0.0;
+        z_cur(23 + (i - 1) * 8) = 1.0;
     }
 
     // build connectivity matrix

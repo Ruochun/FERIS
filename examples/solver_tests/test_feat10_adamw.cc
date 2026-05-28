@@ -59,19 +59,19 @@ int main() {
     MOPHI_INFO("gpu_t10_data initialized");
 
     // Extract coordinate vectors from nodes matrix
-    VectorXR h_x12(n_nodes), h_y12(n_nodes), h_z12(n_nodes);
+    VectorXR h_x_cur(n_nodes), h_y_cur(n_nodes), h_z_cur(n_nodes);
     for (int i = 0; i < n_nodes; i++) {
-        h_x12(i) = nodes(i, 0);  // X coordinates
-        h_y12(i) = nodes(i, 1);  // Y coordinates
-        h_z12(i) = nodes(i, 2);  // Z coordinates
+        h_x_cur(i) = nodes(i, 0);  // X coordinates
+        h_y_cur(i) = nodes(i, 1);  // Y coordinates
+        h_z_cur(i) = nodes(i, 2);  // Z coordinates
     }
 
     // ==========================================================================
 
     // Find all nodes with z == 0
     std::vector<int> fixed_node_indices;
-    for (int i = 0; i < h_z12.size(); ++i) {
-        if (std::abs(h_z12(i)) < 1e-8) {  // tolerance for floating point
+    for (int i = 0; i < h_z_cur.size(); ++i) {
+        if (std::abs(h_z_cur(i)) < 1e-8) {  // tolerance for floating point
             fixed_node_indices.push_back(i);
         }
     }
@@ -107,7 +107,7 @@ int main() {
     const VectorXR& tet5pt_weights_host = Quadrature::tet5pt_weights;
 
     // Call Setup with all required parameters
-    cube->Setup(tet5pt_x_host, tet5pt_y_host, tet5pt_z_host, tet5pt_weights_host, h_x12, h_y12, h_z12, elements);
+    cube->Setup(tet5pt_x_host, tet5pt_y_host, tet5pt_z_host, tet5pt_weights_host, h_x_cur, h_y_cur, h_z_cur, elements);
 
     cube->SetDensity(rho0);
     cube->SetDamping(0.0, 0.0);
@@ -197,26 +197,26 @@ int main() {
     // // Set highest precision for cout
     std::cout << std::fixed << std::setprecision(17);
 
-    VectorXR x12, y12, z12;
-    cube->RetrievePositionToCPU(x12, y12, z12);
+    VectorXR x_cur, y_cur, z_cur;
+    cube->RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
-    std::cout << "x12:" << std::endl;
-    for (int i = 0; i < x12.size(); i++) {
-        std::cout << x12(i) << " ";
+    std::cout << "x_cur:" << std::endl;
+    for (int i = 0; i < x_cur.size(); i++) {
+        std::cout << x_cur(i) << " ";
     }
 
     std::cout << std::endl;
 
-    std::cout << "y12:" << std::endl;
-    for (int i = 0; i < y12.size(); i++) {
-        std::cout << y12(i) << " ";
+    std::cout << "y_cur:" << std::endl;
+    for (int i = 0; i < y_cur.size(); i++) {
+        std::cout << y_cur(i) << " ";
     }
 
     std::cout << std::endl;
 
-    std::cout << "z12:" << std::endl;
-    for (int i = 0; i < z12.size(); i++) {
-        std::cout << z12(i) << " ";
+    std::cout << "z_cur:" << std::endl;
+    for (int i = 0; i < z_cur.size(); i++) {
+        std::cout << z_cur(i) << " ";
     }
 
     std::cout << std::endl;

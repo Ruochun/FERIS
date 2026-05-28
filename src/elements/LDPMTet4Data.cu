@@ -134,36 +134,36 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 
     // ── 1. Allocate and fill translational position arrays ───────────────────
 
-    da_x12.resize(n_nodes);
-    da_x12.BindDevicePointer(&d_x12);
-    da_y12.resize(n_nodes);
-    da_y12.BindDevicePointer(&d_y12);
-    da_z12.resize(n_nodes);
-    da_z12.BindDevicePointer(&d_z12);
+    da_x_cur.resize(n_nodes);
+    da_x_cur.BindDevicePointer(&d_x_cur);
+    da_y_cur.resize(n_nodes);
+    da_y_cur.BindDevicePointer(&d_y_cur);
+    da_z_cur.resize(n_nodes);
+    da_z_cur.BindDevicePointer(&d_z_cur);
 
-    std::copy(h_x.data(), h_x.data() + n_nodes, da_x12.host());
-    da_x12.ToDevice();
-    std::copy(h_y.data(), h_y.data() + n_nodes, da_y12.host());
-    da_y12.ToDevice();
-    std::copy(h_z.data(), h_z.data() + n_nodes, da_z12.host());
-    da_z12.ToDevice();
+    std::copy(h_x.data(), h_x.data() + n_nodes, da_x_cur.host());
+    da_x_cur.ToDevice();
+    std::copy(h_y.data(), h_y.data() + n_nodes, da_y_cur.host());
+    da_y_cur.ToDevice();
+    std::copy(h_z.data(), h_z.data() + n_nodes, da_z_cur.host());
+    da_z_cur.ToDevice();
 
     // ── 2. Allocate rotation arrays (initialised to zero) ────────────────────
 
-    da_rx12.resize(n_nodes);
-    da_rx12.BindDevicePointer(&d_rx12);
-    da_rx12.SetVal(Real(0));
-    da_rx12.ToDevice();
+    da_rot_x_cur.resize(n_nodes);
+    da_rot_x_cur.BindDevicePointer(&d_rot_x_cur);
+    da_rot_x_cur.SetVal(Real(0));
+    da_rot_x_cur.ToDevice();
 
-    da_ry12.resize(n_nodes);
-    da_ry12.BindDevicePointer(&d_ry12);
-    da_ry12.SetVal(Real(0));
-    da_ry12.ToDevice();
+    da_rot_y_cur.resize(n_nodes);
+    da_rot_y_cur.BindDevicePointer(&d_rot_y_cur);
+    da_rot_y_cur.SetVal(Real(0));
+    da_rot_y_cur.ToDevice();
 
-    da_rz12.resize(n_nodes);
-    da_rz12.BindDevicePointer(&d_rz12);
-    da_rz12.SetVal(Real(0));
-    da_rz12.ToDevice();
+    da_rot_z_cur.resize(n_nodes);
+    da_rot_z_cur.BindDevicePointer(&d_rot_z_cur);
+    da_rot_z_cur.SetVal(Real(0));
+    da_rot_z_cur.ToDevice();
 
     // ── 3. Allocate force / moment arrays ────────────────────────────────────
 
@@ -509,9 +509,9 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     da_subfacet_edge_idx.BindDevicePointer(&d_subfacet_edge_idx);
     std::fill(da_subfacet_edge_idx.host(), da_subfacet_edge_idx.host() + n_subfacet, -1);
 
-    const Real* hx = da_x12.host();
-    const Real* hy = da_y12.host();
-    const Real* hz = da_z12.host();
+    const Real* hx = da_x_cur.host();
+    const Real* hy = da_y_cur.host();
+    const Real* hz = da_z_cur.host();
 
     int n_unmatched = 0;
 
@@ -712,9 +712,9 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
         return;
     }
 
-    const Real* hx = da_x12.host();
-    const Real* hy = da_y12.host();
-    const Real* hz = da_z12.host();
+    const Real* hx = da_x_cur.host();
+    const Real* hy = da_y_cur.host();
+    const Real* hz = da_z_cur.host();
 
     // ── Voronoi volumes → translational lumped mass ───────────────────────────
     std::vector<Real> node_volumes(n_nodes, Real(0));
@@ -839,24 +839,24 @@ void GPU_LDPMTet4_Data::RetrievePositionToCPU(VectorXR& x_out, VectorXR& y_out, 
     x_out.resize(n_nodes);
     y_out.resize(n_nodes);
     z_out.resize(n_nodes);
-    da_x12.ToHost();
-    da_y12.ToHost();
-    da_z12.ToHost();
-    std::copy(da_x12.host(), da_x12.host() + n_nodes, x_out.data());
-    std::copy(da_y12.host(), da_y12.host() + n_nodes, y_out.data());
-    std::copy(da_z12.host(), da_z12.host() + n_nodes, z_out.data());
+    da_x_cur.ToHost();
+    da_y_cur.ToHost();
+    da_z_cur.ToHost();
+    std::copy(da_x_cur.host(), da_x_cur.host() + n_nodes, x_out.data());
+    std::copy(da_y_cur.host(), da_y_cur.host() + n_nodes, y_out.data());
+    std::copy(da_z_cur.host(), da_z_cur.host() + n_nodes, z_out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveRotationToCPU(VectorXR& rx_out, VectorXR& ry_out, VectorXR& rz_out) {
     rx_out.resize(n_nodes);
     ry_out.resize(n_nodes);
     rz_out.resize(n_nodes);
-    da_rx12.ToHost();
-    da_ry12.ToHost();
-    da_rz12.ToHost();
-    std::copy(da_rx12.host(), da_rx12.host() + n_nodes, rx_out.data());
-    std::copy(da_ry12.host(), da_ry12.host() + n_nodes, ry_out.data());
-    std::copy(da_rz12.host(), da_rz12.host() + n_nodes, rz_out.data());
+    da_rot_x_cur.ToHost();
+    da_rot_y_cur.ToHost();
+    da_rot_z_cur.ToHost();
+    std::copy(da_rot_x_cur.host(), da_rot_x_cur.host() + n_nodes, rx_out.data());
+    std::copy(da_rot_y_cur.host(), da_rot_y_cur.host() + n_nodes, ry_out.data());
+    std::copy(da_rot_z_cur.host(), da_rot_z_cur.host() + n_nodes, rz_out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveInternalForceToCPU(VectorXR& f_out) {
@@ -958,19 +958,19 @@ void GPU_LDPMTet4_Data::AdvanceDrivenNodesZ(const int* d_driven_idx, int n_drive
         return;
     constexpr int threads = 256;
     const int blocks = (n_driven + threads - 1) / threads;
-    advance_driven_nodes_z_kernel<<<blocks, threads>>>(d_z12, d_driven_idx, n_driven, dz);
+    advance_driven_nodes_z_kernel<<<blocks, threads>>>(d_z_cur, d_driven_idx, n_driven, dz);
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
 }
 
 // ─── Destroy ─────────────────────────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::Destroy() {
-    da_x12.free();
-    da_y12.free();
-    da_z12.free();
-    da_rx12.free();
-    da_ry12.free();
-    da_rz12.free();
+    da_x_cur.free();
+    da_y_cur.free();
+    da_z_cur.free();
+    da_rot_x_cur.free();
+    da_rot_y_cur.free();
+    da_rot_z_cur.free();
     da_f_int_t.free();
     da_f_ext_t.free();
     da_f_int_r.free();

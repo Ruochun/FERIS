@@ -501,11 +501,11 @@ __device__ __forceinline__ void compute_constraint_data(GPU_ANCF3443_Data* d_dat
     if (mode == GPU_ANCF3443_Data::kConstraintFixedCoefficients) {
         if (thread_idx < d_data->gpu_n_constraint() / 3) {
             d_data->constraint()[thread_idx * 3 + 0] =
-                d_data->x12()(d_data->fixed_nodes()[thread_idx]) - d_data->x12_jac()(d_data->fixed_nodes()[thread_idx]);
+                d_data->x_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->x12_jac()(d_data->fixed_nodes()[thread_idx]);
             d_data->constraint()[thread_idx * 3 + 1] =
-                d_data->y12()(d_data->fixed_nodes()[thread_idx]) - d_data->y12_jac()(d_data->fixed_nodes()[thread_idx]);
+                d_data->y_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->y12_jac()(d_data->fixed_nodes()[thread_idx]);
             d_data->constraint()[thread_idx * 3 + 2] =
-                d_data->z12()(d_data->fixed_nodes()[thread_idx]) - d_data->z12_jac()(d_data->fixed_nodes()[thread_idx]);
+                d_data->z_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->z12_jac()(d_data->fixed_nodes()[thread_idx]);
         }
         return;
     }
@@ -526,11 +526,11 @@ __device__ __forceinline__ void compute_constraint_data(GPU_ANCF3443_Data* d_dat
             const int comp = col - coef * 3;
             Real v = 0.0;
             if (comp == 0)
-                v = d_data->x12()(coef);
+                v = d_data->x_cur()(coef);
             if (comp == 1)
-                v = d_data->y12()(coef);
+                v = d_data->y_cur()(coef);
             if (comp == 2)
-                v = d_data->z12()(coef);
+                v = d_data->z_cur()(coef);
             sum += w * v;
         }
         d_data->constraint()(row) = sum - d_data->constraint_rhs()[row];
@@ -704,9 +704,9 @@ __device__ __forceinline__ void compute_hessian_assemble_csr<GPU_ANCF3443_Data>(
         int dof_local = i % 4;   // which local DOF
         int node_global = d_data->element_connectivity()(elem_idx, node_local);
         int coef_idx = node_global * 4 + dof_local;
-        e[i][0] = d_data->x12()(coef_idx);
-        e[i][1] = d_data->y12()(coef_idx);
-        e[i][2] = d_data->z12()(coef_idx);
+        e[i][0] = d_data->x_cur()(coef_idx);
+        e[i][1] = d_data->y_cur()(coef_idx);
+        e[i][2] = d_data->z_cur()(coef_idx);
     }
 
     Real grad_s[Quadrature::N_SHAPE_3443][3];

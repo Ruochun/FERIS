@@ -69,20 +69,20 @@ int main() {
         }
     }
 
-    VectorXR h_x12(n_nodes), h_y12(n_nodes), h_z12(n_nodes);
+    VectorXR h_x_cur(n_nodes), h_y_cur(n_nodes), h_z_cur(n_nodes);
     for (int i = 0; i < n_nodes; i++) {
-        h_x12(i) = mesh.geom.nodes[i].x();
-        h_y12(i) = mesh.geom.nodes[i].y();
-        h_z12(i) = mesh.geom.nodes[i].z();
+        h_x_cur(i) = mesh.geom.nodes[i].x();
+        h_y_cur(i) = mesh.geom.nodes[i].y();
+        h_z_cur(i) = mesh.geom.nodes[i].z();
     }
 
     // -------------------------------------------------------------------------
     // 2. Identify fixed nodes (clamp at x = x_min)
     // -------------------------------------------------------------------------
-    Real x_min = h_x12.minCoeff();
+    Real x_min = h_x_cur.minCoeff();
     std::vector<int> fixed_idx;
     for (int i = 0; i < n_nodes; i++) {
-        if (std::abs(h_x12(i) - x_min) < 1e-8) {
+        if (std::abs(h_x_cur(i) - x_min) < 1e-8) {
             fixed_idx.push_back(i);
         }
     }
@@ -96,10 +96,10 @@ int main() {
     // -------------------------------------------------------------------------
     // 3. Identify loaded node (first node at x = x_max)
     // -------------------------------------------------------------------------
-    Real x_max = h_x12.maxCoeff();
+    Real x_max = h_x_cur.maxCoeff();
     int load_node = -1;
     for (int i = 0; i < n_nodes; i++) {
-        if (std::abs(h_x12(i) - x_max) < 1e-8) {
+        if (std::abs(h_x_cur(i) - x_max) < 1e-8) {
             load_node = i;
             break;
         }
@@ -129,7 +129,7 @@ int main() {
     const VectorXR& quad_z = Quadrature::tet1pt_z;
     const VectorXR& quad_w = Quadrature::tet1pt_weights;
 
-    element_data.Setup(quad_x, quad_y, quad_z, quad_w, h_x12, h_y12, h_z12, elements);
+    element_data.Setup(quad_x, quad_y, quad_z, quad_w, h_x_cur, h_y_cur, h_z_cur, elements);
 
     element_data.SetSVK(E_mod, nu_val);
     element_data.SetDensity(rho0);
@@ -175,12 +175,12 @@ int main() {
         solver.Solve();
 
         if ((step + 1) % print_interval == 0) {
-            VectorXR x12, y12, z12;
-            element_data.RetrievePositionToCPU(x12, y12, z12);
+            VectorXR x_cur, y_cur, z_cur;
+            element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
             std::cout << "Step " << step + 1 << " | load node displacement:"
-                      << "  dx = " << (x12(load_node) - h_x12(load_node))
-                      << "  dy = " << (y12(load_node) - h_y12(load_node))
-                      << "  dz = " << (z12(load_node) - h_z12(load_node)) << "\n";
+                      << "  dx = " << (x_cur(load_node) - h_x_cur(load_node))
+                      << "  dy = " << (y_cur(load_node) - h_y_cur(load_node))
+                      << "  dz = " << (z_cur(load_node) - h_z_cur(load_node)) << "\n";
         }
     }
 
@@ -191,15 +191,15 @@ int main() {
     element_data.RetrievePositionToCPU(x12_final, y12_final, z12_final);
 
     std::cout << std::fixed << std::setprecision(17);
-    std::cout << "\nFinal x12:\n";
+    std::cout << "\nFinal x_cur:\n";
     for (int i = 0; i < x12_final.size(); i++) {
         std::cout << x12_final(i) << " ";
     }
-    std::cout << "\n\nFinal y12:\n";
+    std::cout << "\n\nFinal y_cur:\n";
     for (int i = 0; i < y12_final.size(); i++) {
         std::cout << y12_final(i) << " ";
     }
-    std::cout << "\n\nFinal z12:\n";
+    std::cout << "\n\nFinal z_cur:\n";
     for (int i = 0; i < z12_final.size(); i++) {
         std::cout << z12_final(i) << " ";
     }

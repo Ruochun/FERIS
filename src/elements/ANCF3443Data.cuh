@@ -142,28 +142,28 @@ struct GPU_ANCF3443_Data : public ElementBase {
         return Map<VectorXR>(d_z12_jac, n_coef);
     }
 
-    __device__ Map<VectorXR> x12() {
-        return Map<VectorXR>(d_x12, n_coef);
+    __device__ Map<VectorXR> x_cur() {
+        return Map<VectorXR>(d_x_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const x12() const {
-        return Map<VectorXR>(d_x12, n_coef);
+    __device__ Map<VectorXR> const x_cur() const {
+        return Map<VectorXR>(d_x_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> y12() {
-        return Map<VectorXR>(d_y12, n_coef);
+    __device__ Map<VectorXR> y_cur() {
+        return Map<VectorXR>(d_y_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const y12() const {
-        return Map<VectorXR>(d_y12, n_coef);
+    __device__ Map<VectorXR> const y_cur() const {
+        return Map<VectorXR>(d_y_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> z12() {
-        return Map<VectorXR>(d_z12, n_coef);
+    __device__ Map<VectorXR> z_cur() {
+        return Map<VectorXR>(d_z_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const z12() const {
-        return Map<VectorXR>(d_z12, n_coef);
+    __device__ Map<VectorXR> const z_cur() const {
+        return Map<VectorXR>(d_z_cur, n_coef);
     }
 
     // Helper: gather 16 DOFs for an element using connectivity
@@ -178,27 +178,27 @@ struct GPU_ANCF3443_Data : public ElementBase {
         }
     }
 
-    // Accessor for x12 for a given element (gathered by connectivity)
+    // Accessor for x_cur for a given element (gathered by connectivity)
     __device__ void x12_elem(int elem, Real* buffer) const {
-        gather_element_dofs(d_x12, this->element_connectivity(), elem, buffer);
+        gather_element_dofs(d_x_cur, this->element_connectivity(), elem, buffer);
     }
 
     __device__ void x12_jac_elem(int elem, Real* buffer) const {
         gather_element_dofs(d_x12_jac, this->element_connectivity(), elem, buffer);
     }
 
-    // Accessor for y12 for a given element
+    // Accessor for y_cur for a given element
     __device__ void y12_elem(int elem, Real* buffer) const {
-        gather_element_dofs(d_y12, this->element_connectivity(), elem, buffer);
+        gather_element_dofs(d_y_cur, this->element_connectivity(), elem, buffer);
     }
 
     __device__ void y12_jac_elem(int elem, Real* buffer) const {
         gather_element_dofs(d_y12_jac, this->element_connectivity(), elem, buffer);
     }
 
-    // Accessor for z12 for a given element
+    // Accessor for z_cur for a given element
     __device__ void z12_elem(int elem, Real* buffer) const {
-        gather_element_dofs(d_z12, this->element_connectivity(), elem, buffer);
+        gather_element_dofs(d_z_cur, this->element_connectivity(), elem, buffer);
     }
 
     __device__ void z12_jac_elem(int elem, Real* buffer) const {
@@ -477,12 +477,12 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_y12_jac.BindDevicePointer(&d_y12_jac);
         da_z12_jac.resize(n_coef);
         da_z12_jac.BindDevicePointer(&d_z12_jac);
-        da_x12.resize(n_coef);
-        da_x12.BindDevicePointer(&d_x12);
-        da_y12.resize(n_coef);
-        da_y12.BindDevicePointer(&d_y12);
-        da_z12.resize(n_coef);
-        da_z12.BindDevicePointer(&d_z12);
+        da_x_cur.resize(n_coef);
+        da_x_cur.BindDevicePointer(&d_x_cur);
+        da_y_cur.resize(n_coef);
+        da_y_cur.BindDevicePointer(&d_y_cur);
+        da_z_cur.resize(n_coef);
+        da_z_cur.BindDevicePointer(&d_z_cur);
 
         da_element_connectivity.resize(n_beam * 4);
         da_element_connectivity.BindDevicePointer(&d_element_connectivity);
@@ -542,9 +542,9 @@ struct GPU_ANCF3443_Data : public ElementBase {
                const VectorXR& weight_xi,
                const VectorXR& weight_eta,
                const VectorXR& weight_zeta,
-               const VectorXR& h_x12,
-               const VectorXR& h_y12,
-               const VectorXR& h_z12,
+               const VectorXR& h_x_cur,
+               const VectorXR& h_y_cur,
+               const VectorXR& h_z_cur,
                const MatrixXi& element_connectivity) {
         if (is_setup) {
             MOPHI_ERROR("GPU_ANCF3443_Data is already set up.");
@@ -595,18 +595,18 @@ struct GPU_ANCF3443_Data : public ElementBase {
         std::copy(weight_zeta.data(), weight_zeta.data() + Quadrature::N_QP_3, da_weight_zeta.host());
         da_weight_zeta.ToDevice();
 
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_x12_jac.host());
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_x12_jac.host());
         da_x12_jac.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_y12_jac.host());
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_y12_jac.host());
         da_y12_jac.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_z12_jac.host());
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_z12_jac.host());
         da_z12_jac.ToDevice();
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_x12.host());
-        da_x12.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_y12.host());
-        da_y12.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_z12.host());
-        da_z12.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_x_cur.host());
+        da_x_cur.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_y_cur.host());
+        da_y_cur.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_z_cur.host());
+        da_z_cur.ToDevice();
 
         std::copy(element_connectivity.data(), element_connectivity.data() + n_beam * 4,
                   da_element_connectivity.host());
@@ -677,15 +677,15 @@ struct GPU_ANCF3443_Data : public ElementBase {
                const VectorXR& weight_xi,
                const VectorXR& weight_eta,
                const VectorXR& weight_zeta,
-               const VectorXR& h_x12,
-               const VectorXR& h_y12,
-               const VectorXR& h_z12,
+               const VectorXR& h_x_cur,
+               const VectorXR& h_y_cur,
+               const VectorXR& h_z_cur,
                const MatrixXi& element_connectivity) {
         VectorXR lengths = VectorXR::Constant(n_beam, length);
         VectorXR widths = VectorXR::Constant(n_beam, width);
         VectorXR heights = VectorXR::Constant(n_beam, height);
         Setup(lengths, widths, heights, gauss_xi_m, gauss_eta_m, gauss_zeta_m, gauss_xi, gauss_eta, gauss_zeta,
-              weight_xi_m, weight_eta_m, weight_zeta_m, weight_xi, weight_eta, weight_zeta, h_x12, h_y12, h_z12,
+              weight_xi_m, weight_eta_m, weight_zeta_m, weight_xi, weight_eta, weight_zeta, h_x_cur, h_y_cur, h_z_cur,
               element_connectivity);
     }
 
@@ -969,9 +969,9 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_x12_jac.free();
         da_y12_jac.free();
         da_z12_jac.free();
-        da_x12.free();
-        da_y12.free();
-        da_z12.free();
+        da_x_cur.free();
+        da_y_cur.free();
+        da_z_cur.free();
 
         da_element_connectivity.free();
 
@@ -1085,7 +1085,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
 
     void RetrieveConstraintJacobianToCPU(MatrixXR& constraint_jac);
 
-    void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12);
+    void RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur);
 
     // ── Legacy accessors (kept for backward compatibility) ───────────────────
     // Prefer the virtual base-class methods IsConstraintSetup() and
@@ -1143,7 +1143,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
     mophi::DualArray<Real> da_weight_xi_m, da_weight_eta_m, da_weight_zeta_m;
     mophi::DualArray<Real> da_weight_xi, da_weight_eta, da_weight_zeta;
     mophi::DualArray<Real> da_x12_jac, da_y12_jac, da_z12_jac;
-    mophi::DualArray<Real> da_x12, da_y12, da_z12;
+    mophi::DualArray<Real> da_x_cur, da_y_cur, da_z_cur;
     mophi::DualArray<int> da_element_connectivity;
     mophi::DualArray<Real> da_F, da_P, da_Fdot, da_P_vis;
     mophi::DualArray<Real> da_H, da_W, da_L;
@@ -1160,7 +1160,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
     Real *d_weight_xi_m, *d_weight_eta_m, *d_weight_zeta_m, *d_weight_xi, *d_weight_eta, *d_weight_zeta;
 
     Real *d_x12_jac, *d_y12_jac, *d_z12_jac;
-    Real *d_x12, *d_y12, *d_z12;
+    Real *d_x_cur, *d_y_cur, *d_z_cur;
 
     int* d_element_connectivity;
     int *d_csr_offsets, *d_csr_columns;

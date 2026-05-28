@@ -70,27 +70,27 @@ struct GPU_FEAT4_Data : public ElementBase {
         return d_tet1pt_weights[qp_idx];
     }
 
-    __device__ Map<VectorXR> x12() {
+    __device__ Map<VectorXR> x_cur() {
         return Map<VectorXR>(d_h_x12, n_coef);
     }
 
-    __device__ Map<VectorXR> const x12() const {
+    __device__ Map<VectorXR> const x_cur() const {
         return Map<VectorXR>(d_h_x12, n_coef);
     }
 
-    __device__ Map<VectorXR> y12() {
+    __device__ Map<VectorXR> y_cur() {
         return Map<VectorXR>(d_h_y12, n_coef);
     }
 
-    __device__ Map<VectorXR> const y12() const {
+    __device__ Map<VectorXR> const y_cur() const {
         return Map<VectorXR>(d_h_y12, n_coef);
     }
 
-    __device__ Map<VectorXR> z12() {
+    __device__ Map<VectorXR> z_cur() {
         return Map<VectorXR>(d_h_z12, n_coef);
     }
 
-    __device__ Map<VectorXR> const z12() const {
+    __device__ Map<VectorXR> const z_cur() const {
         return Map<VectorXR>(d_h_z12, n_coef);
     }
 
@@ -348,7 +348,7 @@ struct GPU_FEAT4_Data : public ElementBase {
 
     void RetrieveConstraintJacobianToCPU(MatrixXR& constraint_jac) override {}
 
-    void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) override;
+    void RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) override;
 
     void RetrieveDeformationGradientToCPU(std::vector<std::vector<MatrixXR>>& deformation_gradient) override {}
 
@@ -424,26 +424,26 @@ struct GPU_FEAT4_Data : public ElementBase {
                const VectorXR& tet1pt_y_host,
                const VectorXR& tet1pt_z_host,
                const VectorXR& tet1pt_weights_host,
-               const VectorXR& h_x12,
-               const VectorXR& h_y12,
-               const VectorXR& h_z12,
+               const VectorXR& h_x_cur,
+               const VectorXR& h_y_cur,
+               const VectorXR& h_z_cur,
                const MatrixXi& element_connectivity) {
         if (is_setup) {
             MOPHI_ERROR(std::string("GPU_FEAT4_Data is already set up."));
             return;
         }
 
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12.host());
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12.host());
         da_h_x12.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12.host());
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12.host());
         da_h_y12.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12.host());
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12.host());
         da_h_z12.ToDevice();
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12_jac.host());
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12_jac.host());
         da_h_x12_jac.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12_jac.host());
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12_jac.host());
         da_h_y12_jac.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12_jac.host());
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12_jac.host());
         da_h_z12_jac.ToDevice();
 
         std::copy(element_connectivity.data(), element_connectivity.data() + n_elem * Quadrature::N_NODE_T4_4,
@@ -606,29 +606,29 @@ struct GPU_FEAT4_Data : public ElementBase {
         return d_f_ext;
     }
 
-    void UpdatePositions(const VectorXR& h_x12, const VectorXR& h_y12, const VectorXR& h_z12) {
-        if (h_x12.size() != n_coef || h_y12.size() != n_coef || h_z12.size() != n_coef) {
+    void UpdatePositions(const VectorXR& h_x_cur, const VectorXR& h_y_cur, const VectorXR& h_z_cur) {
+        if (h_x_cur.size() != n_coef || h_y_cur.size() != n_coef || h_z_cur.size() != n_coef) {
             MOPHI_ERROR("Position vector size mismatch.");
             return;
         }
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12.host());
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12.host());
         da_h_x12.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12.host());
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12.host());
         da_h_y12.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12.host());
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12.host());
         da_h_z12.ToDevice();
     }
 
-    void UpdateConstraintTargets(const VectorXR& h_x12, const VectorXR& h_y12, const VectorXR& h_z12) {
-        if (h_x12.size() != n_coef || h_y12.size() != n_coef || h_z12.size() != n_coef) {
+    void UpdateConstraintTargets(const VectorXR& h_x_cur, const VectorXR& h_y_cur, const VectorXR& h_z_cur) {
+        if (h_x_cur.size() != n_coef || h_y_cur.size() != n_coef || h_z_cur.size() != n_coef) {
             MOPHI_ERROR("Position vector size mismatch.");
             return;
         }
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12_jac.host());
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12_jac.host());
         da_h_x12_jac.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12_jac.host());
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12_jac.host());
         da_h_y12_jac.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12_jac.host());
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12_jac.host());
         da_h_z12_jac.ToDevice();
     }
 

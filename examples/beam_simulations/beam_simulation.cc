@@ -125,11 +125,11 @@ int main() {
     beam->Initialize();
 
     // Extract coordinate vectors from nodes matrix
-    VectorXR h_x12(n_nodes), h_y12(n_nodes), h_z12(n_nodes);
+    VectorXR h_x_cur(n_nodes), h_y_cur(n_nodes), h_z_cur(n_nodes);
     for (int i = 0; i < n_nodes; i++) {
-        h_x12(i) = nodes(i, 0);  // X coordinates
-        h_y12(i) = nodes(i, 1);  // Y coordinates
-        h_z12(i) = nodes(i, 2);  // Z coordinates
+        h_x_cur(i) = nodes(i, 0);  // X coordinates
+        h_y_cur(i) = nodes(i, 1);  // Y coordinates
+        h_z_cur(i) = nodes(i, 2);  // Z coordinates
     }
 
     // ==========================================================================
@@ -137,8 +137,8 @@ int main() {
     // ==========================================================================
 
     // Find the x-coordinate range to determine beam ends
-    Real x_min = h_x12.minCoeff();
-    Real x_max = h_x12.maxCoeff();
+    Real x_min = h_x_cur.minCoeff();
+    Real x_max = h_x_cur.maxCoeff();
     Real x_range = x_max - x_min;
 
     std::cout << "Beam x-coordinate range: [" << x_min << ", " << x_max << "]" << std::endl;
@@ -146,8 +146,8 @@ int main() {
     // Fix nodes at x ≈ 0 (the left end of the beam)
     std::vector<int> fixed_node_indices;
     Real fixed_tolerance = 0.1 * x_range;  // 10% of beam length
-    for (int i = 0; i < h_x12.size(); ++i) {
-        if (std::abs(h_x12(i) - x_min) < fixed_tolerance) {
+    for (int i = 0; i < h_x_cur.size(); ++i) {
+        if (std::abs(h_x_cur(i) - x_min) < fixed_tolerance) {
             fixed_node_indices.push_back(i);
         }
     }
@@ -172,8 +172,8 @@ int main() {
     // This simulates a load applied to the free end of a cantilever beam
     std::vector<int> loaded_node_indices;
     Real load_tolerance = 0.1 * x_range;  // 10% of beam length
-    for (int i = 0; i < h_x12.size(); ++i) {
-        if (std::abs(h_x12(i) - x_max) < load_tolerance) {
+    for (int i = 0; i < h_x_cur.size(); ++i) {
+        if (std::abs(h_x_cur(i) - x_max) < load_tolerance) {
             loaded_node_indices.push_back(i);
         }
     }
@@ -202,7 +202,7 @@ int main() {
     const VectorXR& tet5pt_weights_host = Quadrature::tet5pt_weights;
 
     // Setup element data
-    beam->Setup(tet5pt_x_host, tet5pt_y_host, tet5pt_z_host, tet5pt_weights_host, h_x12, h_y12, h_z12, elements);
+    beam->Setup(tet5pt_x_host, tet5pt_y_host, tet5pt_z_host, tet5pt_weights_host, h_x_cur, h_y_cur, h_z_cur, elements);
 
     beam->SetDensity(rho0);
     beam->SetDamping(0.0, 0.1);  // Add some damping for stability
@@ -260,11 +260,11 @@ int main() {
 
     // Output initial configuration
     {
-        VectorXR x12, y12, z12;
-        beam->RetrievePositionToCPU(x12, y12, z12);
+        VectorXR x_cur, y_cur, z_cur;
+        beam->RetrievePositionToCPU(x_cur, y_cur, z_cur);
         std::stringstream ss;
         ss << output_dir << "/output_beam_" << std::setfill('0') << std::setw(5) << 0 << ".vtk";
-        ANCFCPUUtils::WriteFEAT10ToVTK(ss.str(), nodes, elements, x12, y12, z12);
+        ANCFCPUUtils::WriteFEAT10ToVTK(ss.str(), nodes, elements, x_cur, y_cur, z_cur);
         std::cout << std::setw(10) << std::fixed << std::setprecision(4) << 0.0 << std::setw(18) << std::scientific
                   << std::setprecision(6) << 0.0 << std::setw(18) << 0.0 << std::setw(18) << 0.0 << "  [frame 0 → "
                   << ss.str() << "]\n";
@@ -289,21 +289,21 @@ int main() {
             curr_frame++;
             Real t = step * STEP_SIZE;
 
-            VectorXR x12, y12, z12;
-            beam->RetrievePositionToCPU(x12, y12, z12);
+            VectorXR x_cur, y_cur, z_cur;
+            beam->RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
             // Write VTK
             std::stringstream filename;
             filename << output_dir << "/output_beam_" << std::setfill('0') << std::setw(5) << curr_frame << ".vtk";
-            ANCFCPUUtils::WriteFEAT10ToVTK(filename.str(), nodes, elements, x12, y12, z12);
+            ANCFCPUUtils::WriteFEAT10ToVTK(filename.str(), nodes, elements, x_cur, y_cur, z_cur);
 
             // Estimate velocity: v ≈ (x_{n+1} − x_n) / h
             int n_dof = n_nodes * 3;
             VectorXR v_cpu(n_dof);
             for (int i = 0; i < n_nodes; ++i) {
-                v_cpu(3 * i + 0) = (x12(i) - x_before(i)) / STEP_SIZE;
-                v_cpu(3 * i + 1) = (y12(i) - y_before(i)) / STEP_SIZE;
-                v_cpu(3 * i + 2) = (z12(i) - z_before(i)) / STEP_SIZE;
+                v_cpu(3 * i + 0) = (x_cur(i) - x_before(i)) / STEP_SIZE;
+                v_cpu(3 * i + 1) = (y_cur(i) - y_before(i)) / STEP_SIZE;
+                v_cpu(3 * i + 2) = (z_cur(i) - z_before(i)) / STEP_SIZE;
             }
 
             // KE = (1/2) v^T M v  (exact, using mass CSR)

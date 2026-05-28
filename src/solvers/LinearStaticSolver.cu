@@ -186,13 +186,13 @@ __global__ void apply_bcs_kernel(const int* d_is_fixed,
 // ---------------------------------------------------------------------------
 // Position update: x12_i += u_{3i}, y12_i += u_{3i+1}, z12_i += u_{3i+2}.
 // ---------------------------------------------------------------------------
-__global__ void update_positions_kernel(Real* d_x12, Real* d_y12, Real* d_z12, const Real* d_u, int n_nodes) {
+__global__ void update_positions_kernel(Real* d_x_cur, Real* d_y_cur, Real* d_z_cur, const Real* d_u, int n_nodes) {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_nodes)
         return;
-    d_x12[i] += d_u[3 * i + 0];
-    d_y12[i] += d_u[3 * i + 1];
-    d_z12[i] += d_u[3 * i + 2];
+    d_x_cur[i] += d_u[3 * i + 0];
+    d_y_cur[i] += d_u[3 * i + 1];
+    d_z_cur[i] += d_u[3 * i + 2];
 }
 
 // ===========================================================================

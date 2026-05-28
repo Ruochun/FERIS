@@ -41,9 +41,9 @@ __device__ __forceinline__ void compute_p(int elem_idx,
 #pragma unroll
     for (int node = 0; node < 4; node++) {
         int global_node_idx = d_data->element_connectivity()(elem_idx, node);
-        x_nodes[node][0] = d_data->x12()(global_node_idx);
-        x_nodes[node][1] = d_data->y12()(global_node_idx);
-        x_nodes[node][2] = d_data->z12()(global_node_idx);
+        x_nodes[node][0] = d_data->x_cur()(global_node_idx);
+        x_nodes[node][1] = d_data->y_cur()(global_node_idx);
+        x_nodes[node][2] = d_data->z_cur()(global_node_idx);
     }
 
     // Get precomputed shape function gradients (constant for TET4)
@@ -289,11 +289,11 @@ __device__ __forceinline__ void compute_constraint_data(GPU_FEAT4_Data* d_data) 
 
     if (thread_idx < d_data->gpu_n_constraint() / 3) {
         d_data->constraint()[thread_idx * 3 + 0] =
-            d_data->x12()(d_data->fixed_nodes()[thread_idx]) - d_data->x12_jac()(d_data->fixed_nodes()[thread_idx]);
+            d_data->x_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->x12_jac()(d_data->fixed_nodes()[thread_idx]);
         d_data->constraint()[thread_idx * 3 + 1] =
-            d_data->y12()(d_data->fixed_nodes()[thread_idx]) - d_data->y12_jac()(d_data->fixed_nodes()[thread_idx]);
+            d_data->y_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->y12_jac()(d_data->fixed_nodes()[thread_idx]);
         d_data->constraint()[thread_idx * 3 + 2] =
-            d_data->z12()(d_data->fixed_nodes()[thread_idx]) - d_data->z12_jac()(d_data->fixed_nodes()[thread_idx]);
+            d_data->z_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->z12_jac()(d_data->fixed_nodes()[thread_idx]);
     }
 }
 
@@ -348,9 +348,9 @@ __device__ __forceinline__ void compute_hessian_assemble_csr<GPU_FEAT4_Data>(GPU
 #pragma unroll
     for (int node = 0; node < 4; node++) {
         int gn = global_node_indices[node];
-        x_nodes[node][0] = d_data->x12()(gn);
-        x_nodes[node][1] = d_data->y12()(gn);
-        x_nodes[node][2] = d_data->z12()(gn);
+        x_nodes[node][0] = d_data->x_cur()(gn);
+        x_nodes[node][1] = d_data->y_cur()(gn);
+        x_nodes[node][2] = d_data->z_cur()(gn);
     }
 
     // grad_N (4 nodes × 3 spatial dims)

@@ -93,9 +93,9 @@ __device__ __forceinline__ void compute_p(int edge_idx,
 
     // Current edge vector (x_j - x_i)
     Real r[3];
-    r[0] = d_data->x12()(nj) - d_data->x12()(ni);
-    r[1] = d_data->y12()(nj) - d_data->y12()(ni);
-    r[2] = d_data->z12()(nj) - d_data->z12()(ni);
+    r[0] = d_data->x_cur()(nj) - d_data->x_cur()(ni);
+    r[1] = d_data->y_cur()(nj) - d_data->y_cur()(ni);
+    r[2] = d_data->z_cur()(nj) - d_data->z_cur()(ni);
 
     // Relative displacement: delta_u = r - l0 * n_ref
     const Real du0 = r[0] - l0 * n0;
@@ -109,9 +109,9 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     // ── Rotational strains (linearised) ────────────────────────────────────
 
     // Rotation difference: delta_theta = theta_j - theta_i
-    const Real dt0 = d_data->rx12()(nj) - d_data->rx12()(ni);
-    const Real dt1 = d_data->ry12()(nj) - d_data->ry12()(ni);
-    const Real dt2 = d_data->rz12()(nj) - d_data->rz12()(ni);
+    const Real dt0 = d_data->rot_x_cur()(nj) - d_data->rot_x_cur()(ni);
+    const Real dt1 = d_data->rot_y_cur()(nj) - d_data->rot_y_cur()(ni);
+    const Real dt2 = d_data->rot_z_cur()(nj) - d_data->rot_z_cur()(ni);
 
     const Real kappa_T = (dt0 * n0 + dt1 * n1 + dt2 * n2) * inv_l0;
     const Real kappa_M = (dt0 * m0 + dt1 * m1 + dt2 * m2) * inv_l0;

@@ -150,9 +150,9 @@ __global__ void dn_du_pre_kernel(GPU_FEAT10_Data* d_data) {
     Real X_elem[10][3];  // 10 nodes × 3 coordinates
     for (int node = 0; node < 10; node++) {
         int global_node_idx = d_data->element_connectivity()(elem_idx, node);
-        X_elem[node][0] = d_data->x12()(global_node_idx);  // x coordinate
-        X_elem[node][1] = d_data->y12()(global_node_idx);  // y coordinate
-        X_elem[node][2] = d_data->z12()(global_node_idx);  // z coordinate
+        X_elem[node][0] = d_data->x_cur()(global_node_idx);  // x coordinate
+        X_elem[node][1] = d_data->y_cur()(global_node_idx);  // y coordinate
+        X_elem[node][2] = d_data->z_cur()(global_node_idx);  // z coordinate
     }
 
     // Compute Jacobian matrix J = Σ(X_node ⊗ dN_dxi)
@@ -637,14 +637,14 @@ void GPU_FEAT10_Data::RetrieveExternalForceToCPU(VectorXR& external_force) {
     external_force = Map<VectorXR>(da_f_ext.host(), total_dofs).eval();
 }
 
-void GPU_FEAT10_Data::RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) {
+void GPU_FEAT10_Data::RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) {
     int total_nodes = n_coef;
     da_h_x12.ToHost();
     da_h_y12.ToHost();
     da_h_z12.ToHost();
-    x12 = Map<VectorXR>(da_h_x12.host(), total_nodes).eval();
-    y12 = Map<VectorXR>(da_h_y12.host(), total_nodes).eval();
-    z12 = Map<VectorXR>(da_h_z12.host(), total_nodes).eval();
+    x_cur = Map<VectorXR>(da_h_x12.host(), total_nodes).eval();
+    y_cur = Map<VectorXR>(da_h_y12.host(), total_nodes).eval();
+    z_cur = Map<VectorXR>(da_h_z12.host(), total_nodes).eval();
 }
 
 void GPU_FEAT10_Data::SetNodalFixed(const VectorXi& fixed_nodes) {
@@ -757,8 +757,8 @@ void GPU_FEAT10_Data::RetrieveConnectivityToCPU(MatrixXi& connectivity) {
 }
 
 void GPU_FEAT10_Data::WriteOutputVTK(const std::string& filename) {
-    VectorXR x12, y12, z12;
-    this->RetrievePositionToCPU(x12, y12, z12);
+    VectorXR x_cur, y_cur, z_cur;
+    this->RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
     // Retrieve connectivity
     MatrixXi connectivity;
@@ -771,9 +771,9 @@ void GPU_FEAT10_Data::WriteOutputVTK(const std::string& filename) {
     out << "DATASET UNSTRUCTURED_GRID\n";
 
     // Write points
-    out << "POINTS " << x12.size() << " float\n";
-    for (int i = 0; i < x12.size(); ++i) {
-        out << x12(i) << " " << y12(i) << " " << z12(i) << "\n";
+    out << "POINTS " << x_cur.size() << " float\n";
+    for (int i = 0; i < x_cur.size(); ++i) {
+        out << x_cur(i) << " " << y_cur(i) << " " << z_cur(i) << "\n";
     }
 
     // Write cells (elements)

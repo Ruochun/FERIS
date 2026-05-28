@@ -187,3 +187,12 @@ The current branch already has the **right mesh/solver skeleton** for LDPM. The 
 - target: full LDPM tension/compression/friction/compaction behavior.
 
 That is the roadmap from the present implementation to the intended modern LDPM model.
+
+---
+
+## Literature basis
+
+This gap definition is based on comparing the current FERIS implementation to the canonical LDPM formulation and its calibration framework in:
+
+1. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. I: Theory*. Cement and Concrete Composites, 33(9), 881-890. https://doi.org/10.1016/j.cemconcomp.2011.02.011  
+2. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. II: Calibration and validation*. Cement and Concrete Composites, 33(9), 891-905. https://doi.org/10.1016/j.cemconcomp.2011.02.010

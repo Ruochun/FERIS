@@ -82,8 +82,8 @@ Each particle has 6 DOFs:
 
 | Array | Size | Meaning |
 |-------|------|---------|
-| `d_x12, d_y12, d_z12` | `n_nodes` each | Translational positions |
-| `d_rx12, d_ry12, d_rz12` | `n_nodes` each | Rotational angles (θ_x, θ_y, θ_z) |
+| `d_x_cur, d_y_cur, d_z_cur` | `n_nodes` each | Translational positions |
+| `d_rot_x_cur, d_rot_y_cur, d_rot_z_cur` | `n_nodes` each | Rotational angles (θ_x, θ_y, θ_z) |
 | `d_f_int_t, d_f_ext_t` | `n_nodes * 3` each | Translational force vectors |
 | `d_f_int_r, d_f_ext_r` | `n_nodes * 3` each | Rotational moment vectors |
 

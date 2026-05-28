@@ -120,9 +120,9 @@ __global__ void dn_du_pre_feat4_kernel(GPU_FEAT4_Data* d_data) {
     Real X_elem[4][3];
     for (int node = 0; node < 4; node++) {
         int global_node_idx = d_data->element_connectivity()(elem_idx, node);
-        X_elem[node][0] = d_data->x12()(global_node_idx);
-        X_elem[node][1] = d_data->y12()(global_node_idx);
-        X_elem[node][2] = d_data->z12()(global_node_idx);
+        X_elem[node][0] = d_data->x_cur()(global_node_idx);
+        X_elem[node][1] = d_data->y_cur()(global_node_idx);
+        X_elem[node][2] = d_data->z_cur()(global_node_idx);
     }
 
     // Jacobian J = Σ(X_node ⊗ dN_dxi) for 4-node tet

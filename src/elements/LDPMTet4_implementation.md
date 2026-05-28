@@ -258,3 +258,14 @@ Compared with the canonical modern LDPM facet law, the current branch does **not
 7. **a parameterization centered on the full LDPM calibration set**.
 
 In short, the current branch captures the LDPM mesh layout and a useful tensile/shear-damage subset, but **not yet the full modern LDPM constitutive model**.
+
+---
+
+## 10. Literature grounding
+
+The currently implemented constitutive law is a reduced subset of the LDPM framework introduced by Cusatis et al. It is consistent with a tension/shear-damage-only branch, but it does **not** include the full compression-compaction-friction inelastic branches used in canonical calibrated LDPM workflows.
+
+### References
+
+1. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. I: Theory*. Cement and Concrete Composites, 33(9), 881-890. https://doi.org/10.1016/j.cemconcomp.2011.02.011  
+2. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. II: Calibration and validation*. Cement and Concrete Composites, 33(9), 891-905. https://doi.org/10.1016/j.cemconcomp.2011.02.010
