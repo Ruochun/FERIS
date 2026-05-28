@@ -1,5 +1,5 @@
 /**
- * ldpm_singletet_case1_velbc.cc
+ * ldpm_singletet.cc
  *
  * LDPM single regular tetrahedron benchmark (Cases 1–7 from the uploaded
  * document) using LeapfrogSolver with prescribed translational/rotational
@@ -208,7 +208,7 @@ int main(int argc, char* argv[]) {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
     int case_id = 1;
     if (argc > 2) {
-        std::cerr << "Usage: ldpm_singletet_case1_velbc [case_id]\n";
+        std::cerr << "Usage: ldpm_singletet [case_id]\n";
         std::cerr << "  case_id must be in [1, 7]. Default is 1.\n";
         return 1;
     }
@@ -230,7 +230,7 @@ int main(int argc, char* argv[]) {
 
     const CaseDefinition case_def = BuildCaseDefinition(case_id);
     const std::string case_tag = "case" + std::to_string(case_id);
-    const std::string output_dir = "ldpm_singletet_case1_velbc_" + case_tag;
+    const std::string output_dir = "ldpm_singletet_" + case_tag;
     std::filesystem::remove_all(output_dir);
     if (!std::filesystem::create_directories(output_dir)) {
         std::cerr << "Failed to create output directory: " << output_dir << "\n";
@@ -438,9 +438,12 @@ int main(int argc, char* argv[]) {
     subfacet_csv << "# time_s";
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
         const int sf_label = sf + 1;
-        subfacet_csv << ",facet_" << sf_label << "_stress_n" << ",facet_" << sf_label << "_stress_m" << ",facet_"
-                     << sf_label << "_stress_l" << ",facet_" << sf_label << "_strain_n" << ",facet_" << sf_label
-                     << "_strain_m" << ",facet_" << sf_label << "_strain_l";
+        subfacet_csv << ",facet_" << sf_label << "_stress_n"
+                     << ",facet_" << sf_label << "_stress_m"
+                     << ",facet_" << sf_label << "_stress_l"
+                     << ",facet_" << sf_label << "_strain_n"
+                     << ",facet_" << sf_label << "_strain_m"
+                     << ",facet_" << sf_label << "_strain_l";
     }
     subfacet_csv << "\n";
 
