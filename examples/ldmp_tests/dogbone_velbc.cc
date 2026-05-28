@@ -148,8 +148,7 @@ int main() {
         z_max = std::max(z_max, mesh.particle_z(i));
     }
 
-    std::cout << "  Bounding box  x=[" << x_min << ", " << x_max << "]"
-              << "  y=[" << y_min << ", " << y_max << "]"
+    std::cout << "  Bounding box  x=[" << x_min << ", " << x_max << "]" << "  y=[" << y_min << ", " << y_max << "]"
               << "  z=[" << z_min << ", " << z_max << "]\n";
 
     // Approximate cross-sectional area (bounding-box XY face).
@@ -352,8 +351,7 @@ int main() {
     const int n_edge = element_data.n_edge;
     std::cout << "\n"
               << std::setw(8) << "Step" << std::setw(20) << "prescribed dz [mm]" << std::setw(20)
-              << "mean dz (driven) [mm]" << std::setw(18) << "stress [MPa]"
-              << "\n";
+              << "mean dz (driven) [mm]" << std::setw(18) << "stress [MPa]" << "\n";
     std::cout << std::string(68, '-') << "\n";
 
     Real prescribed_z_total = Real(0);  // cumulative prescribed displacement

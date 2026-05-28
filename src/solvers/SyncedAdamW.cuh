@@ -103,12 +103,12 @@ class SyncedAdamWSolver : public SolverBase {
         da_lambda_guess_.BindDevicePointer(&d_lambda_guess_);
         da_g_.resize(static_cast<size_t>(n_coef_) * 3);
         da_g_.BindDevicePointer(&d_g_);
-        da_x_cur_prev_.resize(static_cast<size_t>(n_coef_));
-        da_x_cur_prev_.BindDevicePointer(&d_x_cur_prev);
-        da_y_cur_prev_.resize(static_cast<size_t>(n_coef_));
-        da_y_cur_prev_.BindDevicePointer(&d_y_cur_prev);
-        da_z_cur_prev_.resize(static_cast<size_t>(n_coef_));
-        da_z_cur_prev_.BindDevicePointer(&d_z_cur_prev);
+        da_x_prev_.resize(static_cast<size_t>(n_coef_));
+        da_x_prev_.BindDevicePointer(&d_x_prev);
+        da_y_prev_.resize(static_cast<size_t>(n_coef_));
+        da_y_prev_.BindDevicePointer(&d_y_prev);
+        da_z_prev_.resize(static_cast<size_t>(n_coef_));
+        da_z_prev_.BindDevicePointer(&d_z_prev);
     }
 
     ~SyncedAdamWSolver() {
@@ -119,9 +119,9 @@ class SyncedAdamWSolver : public SolverBase {
         da_v_next_.free();
         da_lambda_guess_.free();
         da_g_.free();
-        da_x_cur_prev_.free();
-        da_y_cur_prev_.free();
-        da_z_cur_prev_.free();
+        da_x_prev_.free();
+        da_y_prev_.free();
+        da_z_prev_.free();
 
         cudaFree(d_norm_g_);
         cudaFree(d_inner_flag_);
@@ -174,12 +174,12 @@ class SyncedAdamWSolver : public SolverBase {
     }
 
     void Setup() {
-        da_x_cur_prev_.SetVal(Real(0));
-        da_x_cur_prev_.ToDevice();
-        da_y_cur_prev_.SetVal(Real(0));
-        da_y_cur_prev_.ToDevice();
-        da_z_cur_prev_.SetVal(Real(0));
-        da_z_cur_prev_.ToDevice();
+        da_x_prev_.SetVal(Real(0));
+        da_x_prev_.ToDevice();
+        da_y_prev_.SetVal(Real(0));
+        da_y_prev_.ToDevice();
+        da_z_prev_.SetVal(Real(0));
+        da_z_prev_.ToDevice();
 
         da_v_guess_.SetVal(Real(0));
         da_v_guess_.ToDevice();
@@ -199,114 +199,48 @@ class SyncedAdamWSolver : public SolverBase {
 
 #if defined(__CUDACC__)
     // Device accessors (define as __device__ in .cuh or .cu as needed)
-    __device__ Map<VectorXR> v_guess() {
-        return Map<VectorXR>(d_v_guess_, n_coef_ * 3);
-    }
-    __device__ Map<VectorXR> v_prev() {
-        return Map<VectorXR>(d_v_prev_, n_coef_ * 3);
-    }
-    __device__ Map<VectorXR> v_k() {
-        return Map<VectorXR>(d_v_k_, n_coef_ * 3);
-    }
-    __device__ Map<VectorXR> v_next() {
-        return Map<VectorXR>(d_v_next_, n_coef_ * 3);
-    }
-    __device__ Map<VectorXR> lambda_guess() {
-        return Map<VectorXR>(d_lambda_guess_, n_constraints_);
-    }
-    __device__ Map<VectorXR> g() {
-        return Map<VectorXR>(d_g_, 3 * n_coef_);
-    }
+    __device__ Map<VectorXR> v_guess() { return Map<VectorXR>(d_v_guess_, n_coef_ * 3); }
+    __device__ Map<VectorXR> v_prev() { return Map<VectorXR>(d_v_prev_, n_coef_ * 3); }
+    __device__ Map<VectorXR> v_k() { return Map<VectorXR>(d_v_k_, n_coef_ * 3); }
+    __device__ Map<VectorXR> v_next() { return Map<VectorXR>(d_v_next_, n_coef_ * 3); }
+    __device__ Map<VectorXR> lambda_guess() { return Map<VectorXR>(d_lambda_guess_, n_constraints_); }
+    __device__ Map<VectorXR> g() { return Map<VectorXR>(d_g_, 3 * n_coef_); }
 
-    __device__ int gpu_n_constraints() {
-        return n_constraints_;
-    }
-    __device__ int gpu_n_total_qp() {
-        return n_total_qp_;
-    }
-    __device__ int gpu_n_shape() {
-        return n_shape_;
-    }
+    __device__ int gpu_n_constraints() { return n_constraints_; }
+    __device__ int gpu_n_total_qp() { return n_total_qp_; }
+    __device__ int gpu_n_shape() { return n_shape_; }
 
-    __device__ Real* norm_g() {
-        return d_norm_g_;
-    }
-    __device__ int* inner_flag() {
-        return d_inner_flag_;
-    }
-    __device__ int* outer_flag() {
-        return d_outer_flag_;
-    }
-    __device__ Real* solver_rho() {
-        return d_solver_rho_;
-    }
-    __device__ Real solver_alpha() const {
-        return *d_alpha_;
-    }
-    __device__ Real solver_inner_tol() const {
-        return *d_inner_tol_;
-    }
-    __device__ Real solver_inner_rtol() const {
-        return *d_inner_rtol_;
-    }
-    __device__ Real solver_outer_tol() const {
-        return *d_outer_tol_;
-    }
-    __device__ int solver_max_outer() const {
-        return *d_max_outer_;
-    }
-    __device__ int solver_max_inner() const {
-        return *d_max_inner_;
-    }
-    __device__ Real solver_time_step() const {
-        return *d_time_step_;
-    }
-    __device__ Real solver_lr() const {
-        return *d_lr_;
-    }
-    __device__ Real solver_beta1() const {
-        return *d_beta1_;
-    }
-    __device__ Real solver_beta2() const {
-        return *d_beta2_;
-    }
-    __device__ Real solver_eps() const {
-        return *d_eps_;
-    }
-    __device__ Real solver_weight_decay() const {
-        return *d_weight_decay_;
-    }
-    __device__ Real solver_lr_decay() const {
-        return *d_lr_decay_;
-    }
+    __device__ Real* norm_g() { return d_norm_g_; }
+    __device__ int* inner_flag() { return d_inner_flag_; }
+    __device__ int* outer_flag() { return d_outer_flag_; }
+    __device__ Real* solver_rho() { return d_solver_rho_; }
+    __device__ Real solver_alpha() const { return *d_alpha_; }
+    __device__ Real solver_inner_tol() const { return *d_inner_tol_; }
+    __device__ Real solver_inner_rtol() const { return *d_inner_rtol_; }
+    __device__ Real solver_outer_tol() const { return *d_outer_tol_; }
+    __device__ int solver_max_outer() const { return *d_max_outer_; }
+    __device__ int solver_max_inner() const { return *d_max_inner_; }
+    __device__ Real solver_time_step() const { return *d_time_step_; }
+    __device__ Real solver_lr() const { return *d_lr_; }
+    __device__ Real solver_beta1() const { return *d_beta1_; }
+    __device__ Real solver_beta2() const { return *d_beta2_; }
+    __device__ Real solver_eps() const { return *d_eps_; }
+    __device__ Real solver_weight_decay() const { return *d_weight_decay_; }
+    __device__ Real solver_lr_decay() const { return *d_lr_decay_; }
 
-    __device__ int solver_convergence_check_interval() const {
-        return *d_convergence_check_interval_;
-    }
+    __device__ int solver_convergence_check_interval() const { return *d_convergence_check_interval_; }
 
-    __device__ Map<VectorXR> x_cur_prev() {
-        return Map<VectorXR>(d_x_cur_prev, n_coef_);
-    }
-    __device__ Map<VectorXR> y_cur_prev() {
-        return Map<VectorXR>(d_y_cur_prev, n_coef_);
-    }
-    __device__ Map<VectorXR> z_cur_prev() {
-        return Map<VectorXR>(d_z_cur_prev, n_coef_);
-    }
+    __device__ Map<VectorXR> x_prev() { return Map<VectorXR>(d_x_prev, n_coef_); }
+    __device__ Map<VectorXR> y_prev() { return Map<VectorXR>(d_y_prev, n_coef_); }
+    __device__ Map<VectorXR> z_prev() { return Map<VectorXR>(d_z_prev, n_coef_); }
 #endif
 
-    __host__ __device__ int get_n_coef() const {
-        return n_coef_;
-    }
-    __host__ __device__ int get_n_beam() const {
-        return n_beam_;
-    }
+    __host__ __device__ int get_n_coef() const { return n_coef_; }
+    __host__ __device__ int get_n_beam() const { return n_beam_; }
 
     void OneStepAdamW();
 
-    void Solve() override {
-        OneStepAdamW();
-    }
+    void Solve() override { OneStepAdamW(); }
 
   private:
     ElementType type_;
@@ -323,11 +257,11 @@ class SyncedAdamWSolver : public SolverBase {
     // DualArrays for long arrays (manage both pinned host and device memory).
     mophi::DualArray<Real> da_v_guess_, da_v_prev_, da_v_k_, da_v_next_;
     mophi::DualArray<Real> da_lambda_guess_, da_g_;
-    mophi::DualArray<Real> da_x_cur_prev_, da_y_cur_prev_, da_z_cur_prev_;
+    mophi::DualArray<Real> da_x_prev_, da_y_prev_, da_z_prev_;
 
     // Raw device pointers for GPU kernel access (bound to DualArrays above).
     // Nodal x/y/z positions from the previous half-step (used in the momentum update).
-    Real *d_x_cur_prev, *d_y_cur_prev, *d_z_cur_prev;
+    Real *d_x_prev, *d_y_prev, *d_z_prev;
     // Generalized coordinate (velocity/position DOF) vectors at successive AdamW stages:
     //   d_v_guess_  – initial guess for the current outer iteration
     //   d_v_prev_   – accepted solution from the previous outer iteration

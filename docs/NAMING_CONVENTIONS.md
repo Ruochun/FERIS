@@ -1,6 +1,6 @@
 # Naming Conventions
 
-This document defines recommended naming conventions for FERIS. The goal is to improve readability across the repository's mixed physics domains (continuum FEA, ANCF, and LDPM) and reduce ambiguity from legacy names such as `x12`, `y12`, and `z12`.
+This document defines recommended naming conventions for FERIS. The goal is to improve readability across the repository's mixed physics domains (continuum FEA, ANCF, and LDPM).
 
 These conventions are intended to guide **new code** and **incremental refactors**. They are not a mandate to perform broad mechanical renames in unrelated files.
 
@@ -26,6 +26,11 @@ When both reference and current configurations are needed:
 Grouped alternatives when appropriate:
 - `pos_ref`
 - `pos_cur`
+
+When a previous-step value is needed, use:
+- `x_prev`, `y_prev`, `z_prev`
+
+Do not compose suffixes like `x_cur_prev` or `x_cur_ref`; use a single state suffix (`_cur`, `_prev`, or `_ref`) that directly matches the represented state.
 
 ### Displacements
 
@@ -151,31 +156,6 @@ Examples:
 
 Avoid pairing memory prefixes with opaque suffixes where possible.
 
-## Legacy Name Guidance
-
-Names such as the following are considered ambiguous and should generally be avoided in new code:
-- `x12`
-- `y12`
-- `z12`
-- `rx12`
-- `ry12`
-- `rz12`
-
-These names may remain in existing interfaces until a local refactor is warranted, but new code should prefer explicit alternatives.
-
-Recommended replacements:
-- `x12` → `x_cur`
-- `y12` → `y_cur`
-- `z12` → `z_cur`
-- `rx12` → `rot_x_cur` or `rot_x`
-- `ry12` → `rot_y_cur` or `rot_y`
-- `rz12` → `rot_z_cur` or `rot_z`
-
-For host/device forms:
-- `h_x12` → `h_x_cur`
-- `d_x12` → `d_x_cur`
-- `da_x12` → `da_x_cur`
-
 ## Recommended Repository-wide Standard
 
 Across FEAT, ANCF, and LDPM code, the preferred standard is:
@@ -204,13 +184,6 @@ To minimize churn:
 ```cpp
 VectorXR x_cur, y_cur, z_cur;
 element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
-```
-
-Instead of:
-
-```cpp
-VectorXR x12, y12, z12;
-element_data.RetrievePositionToCPU(x12, y12, z12);
 ```
 
 ### Reference/current distinction

@@ -254,8 +254,7 @@ int main() {
     // Print energy table header
     std::cout << "\n"
               << std::setw(10) << "Time [s]" << std::setw(18) << "KE [J]" << std::setw(18) << "SE [J]" << std::setw(18)
-              << "Total E [J]"
-              << "\n"
+              << "Total E [J]" << "\n"
               << std::string(64, '-') << "\n";
 
     // Output initial configuration

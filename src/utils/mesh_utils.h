@@ -225,9 +225,9 @@ void AppendANCF3243VectorWeldedConstraint(LinearConstraintBuilder& builder,
 // index): component-wise equality to the provided reference (x_cur/y_cur/z_cur).
 void AppendANCF3243FixedCoefficient(LinearConstraintBuilder& builder,
                                     int coef_index,
-                                    const VectorXR& x_cur_ref,
-                                    const VectorXR& y_cur_ref,
-                                    const VectorXR& z_cur_ref);
+                                    const VectorXR& x_ref,
+                                    const VectorXR& y_ref,
+                                    const VectorXR& z_ref);
 
 /**
  * Write FEAT10 tetrahedral mesh to VTK format for visualization

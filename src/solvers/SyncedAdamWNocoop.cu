@@ -98,9 +98,9 @@ template <typename ElementType>
 __global__ void adamw_save_prev_pos_kernel(ElementType* d_data, SyncedAdamWNocoopSolver* d_solver) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < d_solver->get_n_coef()) {
-        d_solver->x_cur_prev()(tid) = d_data->x_cur()(tid);
-        d_solver->y_cur_prev()(tid) = d_data->y_cur()(tid);
-        d_solver->z_cur_prev()(tid) = d_data->z_cur()(tid);
+        d_solver->x_prev()(tid) = d_data->x_cur()(tid);
+        d_solver->y_prev()(tid) = d_data->y_cur()(tid);
+        d_solver->z_prev()(tid) = d_data->z_cur()(tid);
     }
 }
 
@@ -175,9 +175,9 @@ __global__ void adamw_update_positions_from_prev_kernel(ElementType* d_data, Syn
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < d_solver->get_n_coef()) {
         Real dt = d_solver->solver_time_step();
-        d_data->x_cur()(tid) = d_solver->x_cur_prev()(tid) + dt * d_solver->v_guess()(tid * 3 + 0);
-        d_data->y_cur()(tid) = d_solver->y_cur_prev()(tid) + dt * d_solver->v_guess()(tid * 3 + 1);
-        d_data->z_cur()(tid) = d_solver->z_cur_prev()(tid) + dt * d_solver->v_guess()(tid * 3 + 2);
+        d_data->x_cur()(tid) = d_solver->x_prev()(tid) + dt * d_solver->v_guess()(tid * 3 + 0);
+        d_data->y_cur()(tid) = d_solver->y_prev()(tid) + dt * d_solver->v_guess()(tid * 3 + 1);
+        d_data->z_cur()(tid) = d_solver->z_prev()(tid) + dt * d_solver->v_guess()(tid * 3 + 2);
     }
 }
 

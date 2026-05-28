@@ -100,11 +100,11 @@ __global__ void one_step_nesterov_kernel(ElementType* data, SyncedNesterovSolver
 
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Assign x_cur_prev, y_cur_prev, z_cur_prev
+    // Assign x_prev, y_prev, z_prev
     if (tid < d_nesterov_solver->get_n_coef()) {
-        d_nesterov_solver->x_cur_prev()(tid) = data->x_cur()(tid);
-        d_nesterov_solver->y_cur_prev()(tid) = data->y_cur()(tid);
-        d_nesterov_solver->z_cur_prev()(tid) = data->z_cur()(tid);
+        d_nesterov_solver->x_prev()(tid) = data->x_cur()(tid);
+        d_nesterov_solver->y_prev()(tid) = data->y_cur()(tid);
+        d_nesterov_solver->z_prev()(tid) = data->z_cur()(tid);
     }
 
     grid.sync();
@@ -164,13 +164,13 @@ __global__ void one_step_nesterov_kernel(ElementType* data, SyncedNesterovSolver
                     // Step 2: Update scratch positions
                     if (tid < d_nesterov_solver->get_n_coef()) {
                         data->x_cur()(tid) =
-                            d_nesterov_solver->x_cur_prev()(tid) +
+                            d_nesterov_solver->x_prev()(tid) +
                             d_nesterov_solver->solver_time_step() * d_nesterov_solver->v_guess()(tid * 3 + 0);
                         data->y_cur()(tid) =
-                            d_nesterov_solver->y_cur_prev()(tid) +
+                            d_nesterov_solver->y_prev()(tid) +
                             d_nesterov_solver->solver_time_step() * d_nesterov_solver->v_guess()(tid * 3 + 1);
                         data->z_cur()(tid) =
-                            d_nesterov_solver->z_cur_prev()(tid) +
+                            d_nesterov_solver->z_prev()(tid) +
                             d_nesterov_solver->solver_time_step() * d_nesterov_solver->v_guess()(tid * 3 + 2);
                     }
 
@@ -299,11 +299,11 @@ __global__ void one_step_nesterov_kernel(ElementType* data, SyncedNesterovSolver
 
             // Update positions
             if (tid < d_nesterov_solver->get_n_coef()) {
-                data->x_cur()(tid) = d_nesterov_solver->x_cur_prev()(tid) +
+                data->x_cur()(tid) = d_nesterov_solver->x_prev()(tid) +
                                      d_nesterov_solver->v_guess()(tid * 3 + 0) * d_nesterov_solver->solver_time_step();
-                data->y_cur()(tid) = d_nesterov_solver->y_cur_prev()(tid) +
+                data->y_cur()(tid) = d_nesterov_solver->y_prev()(tid) +
                                      d_nesterov_solver->v_guess()(tid * 3 + 1) * d_nesterov_solver->solver_time_step();
-                data->z_cur()(tid) = d_nesterov_solver->z_cur_prev()(tid) +
+                data->z_cur()(tid) = d_nesterov_solver->z_prev()(tid) +
                                      d_nesterov_solver->v_guess()(tid * 3 + 2) * d_nesterov_solver->solver_time_step();
             }
 
@@ -348,11 +348,11 @@ __global__ void one_step_nesterov_kernel(ElementType* data, SyncedNesterovSolver
 
     // Final position update
     if (tid < d_nesterov_solver->get_n_coef()) {
-        data->x_cur()(tid) = d_nesterov_solver->x_cur_prev()(tid) +
+        data->x_cur()(tid) = d_nesterov_solver->x_prev()(tid) +
                              d_nesterov_solver->v_guess()(tid * 3 + 0) * d_nesterov_solver->solver_time_step();
-        data->y_cur()(tid) = d_nesterov_solver->y_cur_prev()(tid) +
+        data->y_cur()(tid) = d_nesterov_solver->y_prev()(tid) +
                              d_nesterov_solver->v_guess()(tid * 3 + 1) * d_nesterov_solver->solver_time_step();
-        data->z_cur()(tid) = d_nesterov_solver->z_cur_prev()(tid) +
+        data->z_cur()(tid) = d_nesterov_solver->z_prev()(tid) +
                              d_nesterov_solver->v_guess()(tid * 3 + 2) * d_nesterov_solver->solver_time_step();
     }
 

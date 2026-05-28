@@ -277,17 +277,16 @@ void AppendANCF3243VectorWeldedConstraint(LinearConstraintBuilder& builder,
 
 void AppendANCF3243FixedCoefficient(LinearConstraintBuilder& builder,
                                     int coef_index,
-                                    const VectorXR& x_cur_ref,
-                                    const VectorXR& y_cur_ref,
-                                    const VectorXR& z_cur_ref) {
-    if (coef_index < 0 || coef_index >= x_cur_ref.size() || coef_index >= y_cur_ref.size() ||
-        coef_index >= z_cur_ref.size()) {
+                                    const VectorXR& x_ref,
+                                    const VectorXR& y_ref,
+                                    const VectorXR& z_ref) {
+    if (coef_index < 0 || coef_index >= x_ref.size() || coef_index >= y_ref.size() || coef_index >= z_ref.size()) {
         throw std::out_of_range("AppendANCF3243FixedCoefficient: coef_index out of range");
     }
 
-    builder.AddFixedDof(coef_index * 3 + 0, x_cur_ref(coef_index));
-    builder.AddFixedDof(coef_index * 3 + 1, y_cur_ref(coef_index));
-    builder.AddFixedDof(coef_index * 3 + 2, z_cur_ref(coef_index));
+    builder.AddFixedDof(coef_index * 3 + 0, x_ref(coef_index));
+    builder.AddFixedDof(coef_index * 3 + 1, y_ref(coef_index));
+    builder.AddFixedDof(coef_index * 3 + 2, z_ref(coef_index));
 }
 
 // ============================================================
