@@ -54,57 +54,31 @@ struct GPU_FEAT4_Data : public ElementBase {
         return d_detJ_ref[elem_idx * Quadrature::N_QP_T4_1 + qp_idx];
     }
 
-    __device__ Real tet1pt_x(int qp_idx) {
-        return d_tet1pt_x[qp_idx];
-    }
+    __device__ Real tet1pt_x(int qp_idx) { return d_tet1pt_x[qp_idx]; }
 
-    __device__ Real tet1pt_y(int qp_idx) {
-        return d_tet1pt_y[qp_idx];
-    }
+    __device__ Real tet1pt_y(int qp_idx) { return d_tet1pt_y[qp_idx]; }
 
-    __device__ Real tet1pt_z(int qp_idx) {
-        return d_tet1pt_z[qp_idx];
-    }
+    __device__ Real tet1pt_z(int qp_idx) { return d_tet1pt_z[qp_idx]; }
 
-    __device__ Real tet1pt_weights(int qp_idx) {
-        return d_tet1pt_weights[qp_idx];
-    }
+    __device__ Real tet1pt_weights(int qp_idx) { return d_tet1pt_weights[qp_idx]; }
 
-    __device__ Map<VectorXR> x_cur() {
-        return Map<VectorXR>(d_h_x12, n_coef);
-    }
+    __device__ Map<VectorXR> x_cur() { return Map<VectorXR>(d_h_x_cur, n_coef); }
 
-    __device__ Map<VectorXR> const x_cur() const {
-        return Map<VectorXR>(d_h_x12, n_coef);
-    }
+    __device__ Map<VectorXR> const x_cur() const { return Map<VectorXR>(d_h_x_cur, n_coef); }
 
-    __device__ Map<VectorXR> y_cur() {
-        return Map<VectorXR>(d_h_y12, n_coef);
-    }
+    __device__ Map<VectorXR> y_cur() { return Map<VectorXR>(d_h_y_cur, n_coef); }
 
-    __device__ Map<VectorXR> const y_cur() const {
-        return Map<VectorXR>(d_h_y12, n_coef);
-    }
+    __device__ Map<VectorXR> const y_cur() const { return Map<VectorXR>(d_h_y_cur, n_coef); }
 
-    __device__ Map<VectorXR> z_cur() {
-        return Map<VectorXR>(d_h_z12, n_coef);
-    }
+    __device__ Map<VectorXR> z_cur() { return Map<VectorXR>(d_h_z_cur, n_coef); }
 
-    __device__ Map<VectorXR> const z_cur() const {
-        return Map<VectorXR>(d_h_z12, n_coef);
-    }
+    __device__ Map<VectorXR> const z_cur() const { return Map<VectorXR>(d_h_z_cur, n_coef); }
 
-    __device__ Map<VectorXR> const x12_jac() const {
-        return Map<VectorXR>(d_h_x12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const x_cur_jac() const { return Map<VectorXR>(d_h_x_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> const y12_jac() const {
-        return Map<VectorXR>(d_h_y12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const y_cur_jac() const { return Map<VectorXR>(d_h_y_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> const z12_jac() const {
-        return Map<VectorXR>(d_h_z12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const z_cur_jac() const { return Map<VectorXR>(d_h_z_cur_jac, n_coef); }
 
     __device__ Map<MatrixXR> F(int elem_idx, int qp_idx) {
         return Map<MatrixXR>(d_F + (elem_idx * Quadrature::N_QP_T4_1 + qp_idx) * 9, 3, 3);
@@ -138,163 +112,89 @@ struct GPU_FEAT4_Data : public ElementBase {
         return Map<MatrixXR>(d_P_vis + (elem_idx * Quadrature::N_QP_T4_1 + qp_idx) * 9, 3, 3);
     }
 
-    __device__ Map<VectorXR> f_int(int global_node_idx) {
-        return Map<VectorXR>(d_f_int + global_node_idx * 3, 3);
-    }
+    __device__ Map<VectorXR> f_int(int global_node_idx) { return Map<VectorXR>(d_f_int + global_node_idx * 3, 3); }
 
     __device__ const Map<VectorXR> f_int(int global_node_idx) const {
         return Map<VectorXR>(d_f_int + global_node_idx * 3, 3);
     }
 
-    __device__ Map<VectorXR> f_int() {
-        return Map<VectorXR>(d_f_int, n_coef * 3);
-    }
+    __device__ Map<VectorXR> f_int() { return Map<VectorXR>(d_f_int, n_coef * 3); }
 
-    __device__ const Map<VectorXR> f_int() const {
-        return Map<VectorXR>(d_f_int, n_coef * 3);
-    }
+    __device__ const Map<VectorXR> f_int() const { return Map<VectorXR>(d_f_int, n_coef * 3); }
 
-    __device__ Map<VectorXR> f_ext(int global_node_idx) {
-        return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3);
-    }
+    __device__ Map<VectorXR> f_ext(int global_node_idx) { return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3); }
 
     __device__ const Map<VectorXR> f_ext(int global_node_idx) const {
         return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3);
     }
 
-    __device__ Map<VectorXR> f_ext() {
-        return Map<VectorXR>(d_f_ext, n_coef * 3);
-    }
+    __device__ Map<VectorXR> f_ext() { return Map<VectorXR>(d_f_ext, n_coef * 3); }
 
-    __device__ const Map<VectorXR> f_ext() const {
-        return Map<VectorXR>(d_f_ext, n_coef * 3);
-    }
+    __device__ const Map<VectorXR> f_ext() const { return Map<VectorXR>(d_f_ext, n_coef * 3); }
 
-    __device__ Map<VectorXR> constraint() {
-        return Map<VectorXR>(d_constraint, n_constraint);
-    }
+    __device__ Map<VectorXR> constraint() { return Map<VectorXR>(d_constraint, n_constraint); }
 
-    __device__ const Map<VectorXR> constraint() const {
-        return Map<VectorXR>(d_constraint, n_constraint);
-    }
+    __device__ const Map<VectorXR> constraint() const { return Map<VectorXR>(d_constraint, n_constraint); }
 
-    __device__ Map<VectorXi> fixed_nodes() {
-        return Map<VectorXi>(d_fixed_nodes, n_constraint / 3);
-    }
+    __device__ Map<VectorXi> fixed_nodes() { return Map<VectorXi>(d_fixed_nodes, n_constraint / 3); }
 
     // ================================
-    __device__ Real rho0() const {
-        return *d_rho0;
-    }
+    __device__ Real rho0() const { return *d_rho0; }
 
-    __device__ Real nu() const {
-        return *d_nu;
-    }
+    __device__ Real nu() const { return *d_nu; }
 
-    __device__ Real E() const {
-        return *d_E;
-    }
+    __device__ Real E() const { return *d_E; }
 
-    __device__ Real lambda() const {
-        return *d_lambda;
-    }
+    __device__ Real lambda() const { return *d_lambda; }
 
-    __device__ Real eta_damp() const {
-        return *d_eta_damp;
-    }
+    __device__ Real eta_damp() const { return *d_eta_damp; }
 
-    __device__ Real lambda_damp() const {
-        return *d_lambda_damp;
-    }
+    __device__ Real lambda_damp() const { return *d_lambda_damp; }
 
-    __device__ Real mu() const {
-        return *d_mu;
-    }
+    __device__ Real mu() const { return *d_mu; }
 
-    __device__ int material_model() const {
-        return *d_material_model;
-    }
+    __device__ int material_model() const { return *d_material_model; }
 
-    __device__ Real mu10() const {
-        return *d_mu10;
-    }
+    __device__ Real mu10() const { return *d_mu10; }
 
-    __device__ Real mu01() const {
-        return *d_mu01;
-    }
+    __device__ Real mu01() const { return *d_mu01; }
 
-    __device__ Real kappa() const {
-        return *d_kappa;
-    }
+    __device__ Real kappa() const { return *d_kappa; }
 
-    __device__ int gpu_n_elem() const {
-        return n_elem;
-    }
+    __device__ int gpu_n_elem() const { return n_elem; }
 
-    __device__ int gpu_n_coef() const {
-        return n_coef;
-    }
+    __device__ int gpu_n_coef() const { return n_coef; }
 
-    __device__ int gpu_n_constraint() const {
-        return n_constraint;
-    }
+    __device__ int gpu_n_constraint() const { return n_constraint; }
 
     // ======================================================
 
-    __device__ int* csr_offsets() {
-        return d_csr_offsets;
-    }
+    __device__ int* csr_offsets() { return d_csr_offsets; }
 
-    __device__ int* csr_columns() {
-        return d_csr_columns;
-    }
+    __device__ int* csr_columns() { return d_csr_columns; }
 
-    __device__ Real* csr_values() {
-        return d_csr_values;
-    }
+    __device__ Real* csr_values() { return d_csr_values; }
 
-    __device__ int* cj_csr_offsets() {
-        return d_cj_csr_offsets;
-    }
+    __device__ int* cj_csr_offsets() { return d_cj_csr_offsets; }
 
-    __device__ int* cj_csr_columns() {
-        return d_cj_csr_columns;
-    }
+    __device__ int* cj_csr_columns() { return d_cj_csr_columns; }
 
-    __device__ Real* cj_csr_values() {
-        return d_cj_csr_values;
-    }
+    __device__ Real* cj_csr_values() { return d_cj_csr_values; }
 
-    __device__ int* j_csr_offsets() {
-        return d_j_csr_offsets;
-    }
+    __device__ int* j_csr_offsets() { return d_j_csr_offsets; }
 
-    __device__ int* j_csr_columns() {
-        return d_j_csr_columns;
-    }
+    __device__ int* j_csr_columns() { return d_j_csr_columns; }
 
-    __device__ Real* j_csr_values() {
-        return d_j_csr_values;
-    }
+    __device__ Real* j_csr_values() { return d_j_csr_values; }
 
-    __device__ int nnz() {
-        return *d_nnz;
-    }
+    __device__ int nnz() { return *d_nnz; }
 #endif
 
-    __host__ __device__ int get_n_elem() const {
-        return n_elem;
-    }
-    __host__ __device__ int get_n_coef() const {
-        return n_coef;
-    }
-    __host__ __device__ int get_n_constraint() const {
-        return n_constraint;
-    }
+    __host__ __device__ int get_n_elem() const { return n_elem; }
+    __host__ __device__ int get_n_coef() const { return n_coef; }
+    __host__ __device__ int get_n_constraint() const { return n_constraint; }
 
-    __host__ __device__ int get_n_beam() const override {
-        return n_elem;
-    }
+    __host__ __device__ int get_n_beam() const override { return n_elem; }
 
     void CalcDnDuPre();
 
@@ -304,15 +204,11 @@ struct GPU_FEAT4_Data : public ElementBase {
 
     void ConvertToCSR_ConstraintJacT();
 
-    void BuildConstraintJacobianTransposeCSR() {
-        ConvertToCSR_ConstraintJacT();
-    }
+    void BuildConstraintJacobianTransposeCSR() { ConvertToCSR_ConstraintJacT(); }
 
     void ConvertToCSR_ConstraintJac();
 
-    void BuildConstraintJacobianCSR() {
-        ConvertToCSR_ConstraintJac();
-    }
+    void BuildConstraintJacobianCSR() { ConvertToCSR_ConstraintJac(); }
 
     void CalcInternalForce() override;
 
@@ -366,18 +262,18 @@ struct GPU_FEAT4_Data : public ElementBase {
     }
 
     void Initialize() {
-        da_h_x12.resize(n_coef);
-        da_h_x12.BindDevicePointer(&d_h_x12);
-        da_h_y12.resize(n_coef);
-        da_h_y12.BindDevicePointer(&d_h_y12);
-        da_h_z12.resize(n_coef);
-        da_h_z12.BindDevicePointer(&d_h_z12);
-        da_h_x12_jac.resize(n_coef);
-        da_h_x12_jac.BindDevicePointer(&d_h_x12_jac);
-        da_h_y12_jac.resize(n_coef);
-        da_h_y12_jac.BindDevicePointer(&d_h_y12_jac);
-        da_h_z12_jac.resize(n_coef);
-        da_h_z12_jac.BindDevicePointer(&d_h_z12_jac);
+        da_h_x_cur.resize(n_coef);
+        da_h_x_cur.BindDevicePointer(&d_h_x_cur);
+        da_h_y_cur.resize(n_coef);
+        da_h_y_cur.BindDevicePointer(&d_h_y_cur);
+        da_h_z_cur.resize(n_coef);
+        da_h_z_cur.BindDevicePointer(&d_h_z_cur);
+        da_h_x_cur_jac.resize(n_coef);
+        da_h_x_cur_jac.BindDevicePointer(&d_h_x_cur_jac);
+        da_h_y_cur_jac.resize(n_coef);
+        da_h_y_cur_jac.BindDevicePointer(&d_h_y_cur_jac);
+        da_h_z_cur_jac.resize(n_coef);
+        da_h_z_cur_jac.BindDevicePointer(&d_h_z_cur_jac);
         da_element_connectivity.resize(n_elem * Quadrature::N_NODE_T4_4);
         da_element_connectivity.BindDevicePointer(&d_element_connectivity);
         da_tet1pt_x.resize(Quadrature::N_QP_T4_1);
@@ -433,18 +329,18 @@ struct GPU_FEAT4_Data : public ElementBase {
             return;
         }
 
-        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12.host());
-        da_h_x12.ToDevice();
-        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12.host());
-        da_h_y12.ToDevice();
-        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12.host());
-        da_h_z12.ToDevice();
-        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12_jac.host());
-        da_h_x12_jac.ToDevice();
-        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12_jac.host());
-        da_h_y12_jac.ToDevice();
-        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12_jac.host());
-        da_h_z12_jac.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur.host());
+        da_h_x_cur.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur.host());
+        da_h_y_cur.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur.host());
+        da_h_z_cur.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur_jac.host());
+        da_h_x_cur_jac.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur_jac.host());
+        da_h_y_cur_jac.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur_jac.host());
+        da_h_z_cur_jac.ToDevice();
 
         std::copy(element_connectivity.data(), element_connectivity.data() + n_elem * Quadrature::N_NODE_T4_4,
                   da_element_connectivity.host());
@@ -586,37 +482,27 @@ struct GPU_FEAT4_Data : public ElementBase {
         SetExternalForce(flat);
     }
 
-    const Real* GetX12DevicePtr() const {
-        return d_h_x12;
-    }
+    const Real* GetXCurDevicePtr() const { return d_h_x_cur; }
 
-    const Real* GetY12DevicePtr() const {
-        return d_h_y12;
-    }
+    const Real* GetYCurDevicePtr() const { return d_h_y_cur; }
 
-    const Real* GetZ12DevicePtr() const {
-        return d_h_z12;
-    }
+    const Real* GetZCurDevicePtr() const { return d_h_z_cur; }
 
-    Real* GetExternalForceDevicePtr() {
-        return d_f_ext;
-    }
+    Real* GetExternalForceDevicePtr() { return d_f_ext; }
 
-    const Real* GetExternalForceDevicePtr() const {
-        return d_f_ext;
-    }
+    const Real* GetExternalForceDevicePtr() const { return d_f_ext; }
 
     void UpdatePositions(const VectorXR& h_x_cur, const VectorXR& h_y_cur, const VectorXR& h_z_cur) {
         if (h_x_cur.size() != n_coef || h_y_cur.size() != n_coef || h_z_cur.size() != n_coef) {
             MOPHI_ERROR("Position vector size mismatch.");
             return;
         }
-        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12.host());
-        da_h_x12.ToDevice();
-        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12.host());
-        da_h_y12.ToDevice();
-        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12.host());
-        da_h_z12.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur.host());
+        da_h_x_cur.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur.host());
+        da_h_y_cur.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur.host());
+        da_h_z_cur.ToDevice();
     }
 
     void UpdateConstraintTargets(const VectorXR& h_x_cur, const VectorXR& h_y_cur, const VectorXR& h_z_cur) {
@@ -624,12 +510,12 @@ struct GPU_FEAT4_Data : public ElementBase {
             MOPHI_ERROR("Position vector size mismatch.");
             return;
         }
-        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x12_jac.host());
-        da_h_x12_jac.ToDevice();
-        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y12_jac.host());
-        da_h_y12_jac.ToDevice();
-        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z12_jac.host());
-        da_h_z12_jac.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur_jac.host());
+        da_h_x_cur_jac.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur_jac.host());
+        da_h_y_cur_jac.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur_jac.host());
+        da_h_z_cur_jac.ToDevice();
     }
 
     void SetNodalFixed(const VectorXi& fixed_nodes);
@@ -637,12 +523,12 @@ struct GPU_FEAT4_Data : public ElementBase {
     void UpdateNodalFixed(const VectorXi& fixed_nodes);
 
     void Destroy() {
-        da_h_x12.free();
-        da_h_y12.free();
-        da_h_z12.free();
-        da_h_x12_jac.free();
-        da_h_y12_jac.free();
-        da_h_z12_jac.free();
+        da_h_x_cur.free();
+        da_h_y_cur.free();
+        da_h_z_cur.free();
+        da_h_x_cur_jac.free();
+        da_h_y_cur_jac.free();
+        da_h_z_cur_jac.free();
         da_element_connectivity.free();
 
         if (is_csr_setup) {
@@ -704,27 +590,17 @@ struct GPU_FEAT4_Data : public ElementBase {
     // ── Legacy accessors (kept for backward compatibility) ───────────────────
     // Prefer the virtual base-class methods IsConstraintSetup() and
     // GetConstraintDevicePtr() when working through an ElementBase pointer.
-    Real* Get_Constraint_Ptr() {
-        return d_constraint;
-    }
+    Real* Get_Constraint_Ptr() { return d_constraint; }
 
-    bool Get_Is_Constraint_Setup() {
-        return is_constraints_setup;
-    }
+    bool Get_Is_Constraint_Setup() { return is_constraints_setup; }
 
     // ── ElementBase dispatch helpers ─────────────────────────────────────────
 
-    ElementBase* GetDevicePtr() override {
-        return d_data;
-    }
+    ElementBase* GetDevicePtr() override { return d_data; }
 
-    bool IsConstraintSetup() override {
-        return is_constraints_setup;
-    }
+    bool IsConstraintSetup() override { return is_constraints_setup; }
 
-    Real* GetConstraintDevicePtr() override {
-        return d_constraint;
-    }
+    Real* GetConstraintDevicePtr() override { return d_constraint; }
 
     GPU_FEAT4_Data* d_data;  // GPU copy of this struct
 
@@ -733,8 +609,8 @@ struct GPU_FEAT4_Data : public ElementBase {
     int n_constraint;
 
   private:
-    mophi::DualArray<Real> da_h_x12, da_h_y12, da_h_z12;
-    mophi::DualArray<Real> da_h_x12_jac, da_h_y12_jac, da_h_z12_jac;
+    mophi::DualArray<Real> da_h_x_cur, da_h_y_cur, da_h_z_cur;
+    mophi::DualArray<Real> da_h_x_cur_jac, da_h_y_cur_jac, da_h_z_cur_jac;
     mophi::DualArray<int> da_element_connectivity;
     mophi::DualArray<Real> da_tet1pt_x, da_tet1pt_y, da_tet1pt_z, da_tet1pt_weights;
     mophi::DualArray<Real> da_grad_N_ref;
@@ -744,8 +620,8 @@ struct GPU_FEAT4_Data : public ElementBase {
     mophi::DualArray<Real> da_constraint;
     mophi::DualArray<int> da_fixed_nodes;
 
-    Real *d_h_x12, *d_h_y12, *d_h_z12;
-    Real *d_h_x12_jac, *d_h_y12_jac, *d_h_z12_jac;
+    Real *d_h_x_cur, *d_h_y_cur, *d_h_z_cur;
+    Real *d_h_x_cur_jac, *d_h_y_cur_jac, *d_h_z_cur_jac;
 
     int* d_element_connectivity;  // (n_elem, 4)
 

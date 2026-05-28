@@ -35,7 +35,7 @@ namespace feris {
 struct GPU_ANCF3443_Data : public ElementBase {
     // Constraint modes:
     // - kConstraintFixedCoefficients: legacy fixed coefficient constraints via
-    //   d_fixed_nodes[] and x12_jac/y12_jac/z12_jac targets.
+    //   d_fixed_nodes[] and x_cur_jac/y_cur_jac/z_cur_jac targets.
     // - kConstraintLinearCSR: general linear constraints with explicit J in CSR
     //   and per-row rhs targets.
     static constexpr int kConstraintNone = 0;
@@ -68,103 +68,55 @@ struct GPU_ANCF3443_Data : public ElementBase {
 
     // ==============================================================
 
-    __device__ const Map<VectorXR> gauss_xi_m() const {
-        return Map<VectorXR>(d_gauss_xi_m, Quadrature::N_QP_7);
-    }
+    __device__ const Map<VectorXR> gauss_xi_m() const { return Map<VectorXR>(d_gauss_xi_m, Quadrature::N_QP_7); }
 
-    __device__ const Map<VectorXR> gauss_eta_m() const {
-        return Map<VectorXR>(d_gauss_eta_m, Quadrature::N_QP_7);
-    }
+    __device__ const Map<VectorXR> gauss_eta_m() const { return Map<VectorXR>(d_gauss_eta_m, Quadrature::N_QP_7); }
 
-    __device__ const Map<VectorXR> gauss_zeta_m() const {
-        return Map<VectorXR>(d_gauss_zeta_m, Quadrature::N_QP_3);
-    }
+    __device__ const Map<VectorXR> gauss_zeta_m() const { return Map<VectorXR>(d_gauss_zeta_m, Quadrature::N_QP_3); }
 
-    __device__ const Map<VectorXR> gauss_xi() const {
-        return Map<VectorXR>(d_gauss_xi, Quadrature::N_QP_4);
-    }
+    __device__ const Map<VectorXR> gauss_xi() const { return Map<VectorXR>(d_gauss_xi, Quadrature::N_QP_4); }
 
-    __device__ const Map<VectorXR> gauss_eta() const {
-        return Map<VectorXR>(d_gauss_eta, Quadrature::N_QP_4);
-    }
+    __device__ const Map<VectorXR> gauss_eta() const { return Map<VectorXR>(d_gauss_eta, Quadrature::N_QP_4); }
 
-    __device__ const Map<VectorXR> gauss_zeta() const {
-        return Map<VectorXR>(d_gauss_zeta, Quadrature::N_QP_3);
-    }
+    __device__ const Map<VectorXR> gauss_zeta() const { return Map<VectorXR>(d_gauss_zeta, Quadrature::N_QP_3); }
 
-    __device__ const Map<VectorXR> weight_xi_m() const {
-        return Map<VectorXR>(d_weight_xi_m, Quadrature::N_QP_7);
-    }
+    __device__ const Map<VectorXR> weight_xi_m() const { return Map<VectorXR>(d_weight_xi_m, Quadrature::N_QP_7); }
 
-    __device__ const Map<VectorXR> weight_eta_m() const {
-        return Map<VectorXR>(d_weight_eta_m, Quadrature::N_QP_7);
-    }
+    __device__ const Map<VectorXR> weight_eta_m() const { return Map<VectorXR>(d_weight_eta_m, Quadrature::N_QP_7); }
 
-    __device__ const Map<VectorXR> weight_zeta_m() const {
-        return Map<VectorXR>(d_weight_zeta_m, Quadrature::N_QP_3);
-    }
+    __device__ const Map<VectorXR> weight_zeta_m() const { return Map<VectorXR>(d_weight_zeta_m, Quadrature::N_QP_3); }
 
-    __device__ const Map<VectorXR> weight_xi() const {
-        return Map<VectorXR>(d_weight_xi, Quadrature::N_QP_4);
-    }
+    __device__ const Map<VectorXR> weight_xi() const { return Map<VectorXR>(d_weight_xi, Quadrature::N_QP_4); }
 
-    __device__ const Map<VectorXR> weight_eta() const {
-        return Map<VectorXR>(d_weight_eta, Quadrature::N_QP_4);
-    }
+    __device__ const Map<VectorXR> weight_eta() const { return Map<VectorXR>(d_weight_eta, Quadrature::N_QP_4); }
 
-    __device__ const Map<VectorXR> weight_zeta() const {
-        return Map<VectorXR>(d_weight_zeta, Quadrature::N_QP_3);
-    }
+    __device__ const Map<VectorXR> weight_zeta() const { return Map<VectorXR>(d_weight_zeta, Quadrature::N_QP_3); }
 
     // ==============================================================
 
-    __device__ Map<VectorXR> x12_jac() {
-        return Map<VectorXR>(d_x12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> x_cur_jac() { return Map<VectorXR>(d_x_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> const x12_jac() const {
-        return Map<VectorXR>(d_x12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const x_cur_jac() const { return Map<VectorXR>(d_x_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> y12_jac() {
-        return Map<VectorXR>(d_y12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> y_cur_jac() { return Map<VectorXR>(d_y_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> const y12_jac() const {
-        return Map<VectorXR>(d_y12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const y_cur_jac() const { return Map<VectorXR>(d_y_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> z12_jac() {
-        return Map<VectorXR>(d_z12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> z_cur_jac() { return Map<VectorXR>(d_z_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> const z12_jac() const {
-        return Map<VectorXR>(d_z12_jac, n_coef);
-    }
+    __device__ Map<VectorXR> const z_cur_jac() const { return Map<VectorXR>(d_z_cur_jac, n_coef); }
 
-    __device__ Map<VectorXR> x_cur() {
-        return Map<VectorXR>(d_x_cur, n_coef);
-    }
+    __device__ Map<VectorXR> x_cur() { return Map<VectorXR>(d_x_cur, n_coef); }
 
-    __device__ Map<VectorXR> const x_cur() const {
-        return Map<VectorXR>(d_x_cur, n_coef);
-    }
+    __device__ Map<VectorXR> const x_cur() const { return Map<VectorXR>(d_x_cur, n_coef); }
 
-    __device__ Map<VectorXR> y_cur() {
-        return Map<VectorXR>(d_y_cur, n_coef);
-    }
+    __device__ Map<VectorXR> y_cur() { return Map<VectorXR>(d_y_cur, n_coef); }
 
-    __device__ Map<VectorXR> const y_cur() const {
-        return Map<VectorXR>(d_y_cur, n_coef);
-    }
+    __device__ Map<VectorXR> const y_cur() const { return Map<VectorXR>(d_y_cur, n_coef); }
 
-    __device__ Map<VectorXR> z_cur() {
-        return Map<VectorXR>(d_z_cur, n_coef);
-    }
+    __device__ Map<VectorXR> z_cur() { return Map<VectorXR>(d_z_cur, n_coef); }
 
-    __device__ Map<VectorXR> const z_cur() const {
-        return Map<VectorXR>(d_z_cur, n_coef);
-    }
+    __device__ Map<VectorXR> const z_cur() const { return Map<VectorXR>(d_z_cur, n_coef); }
 
     // Helper: gather 16 DOFs for an element using connectivity
     __device__ void gather_element_dofs(const Real* global, Map<MatrixXi> connectivity, int elem, Real* local) const {
@@ -179,35 +131,33 @@ struct GPU_ANCF3443_Data : public ElementBase {
     }
 
     // Accessor for x_cur for a given element (gathered by connectivity)
-    __device__ void x12_elem(int elem, Real* buffer) const {
+    __device__ void x_cur_elem(int elem, Real* buffer) const {
         gather_element_dofs(d_x_cur, this->element_connectivity(), elem, buffer);
     }
 
-    __device__ void x12_jac_elem(int elem, Real* buffer) const {
-        gather_element_dofs(d_x12_jac, this->element_connectivity(), elem, buffer);
+    __device__ void x_cur_jac_elem(int elem, Real* buffer) const {
+        gather_element_dofs(d_x_cur_jac, this->element_connectivity(), elem, buffer);
     }
 
     // Accessor for y_cur for a given element
-    __device__ void y12_elem(int elem, Real* buffer) const {
+    __device__ void y_cur_elem(int elem, Real* buffer) const {
         gather_element_dofs(d_y_cur, this->element_connectivity(), elem, buffer);
     }
 
-    __device__ void y12_jac_elem(int elem, Real* buffer) const {
-        gather_element_dofs(d_y12_jac, this->element_connectivity(), elem, buffer);
+    __device__ void y_cur_jac_elem(int elem, Real* buffer) const {
+        gather_element_dofs(d_y_cur_jac, this->element_connectivity(), elem, buffer);
     }
 
     // Accessor for z_cur for a given element
-    __device__ void z12_elem(int elem, Real* buffer) const {
+    __device__ void z_cur_elem(int elem, Real* buffer) const {
         gather_element_dofs(d_z_cur, this->element_connectivity(), elem, buffer);
     }
 
-    __device__ void z12_jac_elem(int elem, Real* buffer) const {
-        gather_element_dofs(d_z12_jac, this->element_connectivity(), elem, buffer);
+    __device__ void z_cur_jac_elem(int elem, Real* buffer) const {
+        gather_element_dofs(d_z_cur_jac, this->element_connectivity(), elem, buffer);
     }
 
-    __device__ Map<MatrixXi> element_connectivity() const {
-        return Map<MatrixXi>(d_element_connectivity, n_beam, 4);
-    }
+    __device__ Map<MatrixXi> element_connectivity() const { return Map<MatrixXi>(d_element_connectivity, n_beam, 4); }
 
     __device__ Map<MatrixXR> F(int elem_idx, int qp_idx) {
         return Map<MatrixXR>(d_F + (elem_idx * Quadrature::N_TOTAL_QP_4_4_3 + qp_idx) * 9, 3, 3);
@@ -243,181 +193,99 @@ struct GPU_ANCF3443_Data : public ElementBase {
         return Map<MatrixXR>(d_P_vis + (elem_idx * Quadrature::N_TOTAL_QP_4_4_3 + qp_idx) * 9, 3, 3);
     }
 
-    __device__ Map<VectorXR> f_int(int global_node_idx) {
-        return Map<VectorXR>(d_f_int + global_node_idx * 3, 3);
-    }
+    __device__ Map<VectorXR> f_int(int global_node_idx) { return Map<VectorXR>(d_f_int + global_node_idx * 3, 3); }
 
     __device__ const Map<VectorXR> f_int(int global_node_idx) const {
         return Map<VectorXR>(d_f_int + global_node_idx * 3, 3);
     }
 
-    __device__ Map<VectorXR> f_int() {
-        return Map<VectorXR>(d_f_int, n_coef * 3);
-    }
+    __device__ Map<VectorXR> f_int() { return Map<VectorXR>(d_f_int, n_coef * 3); }
 
-    __device__ const Map<VectorXR> f_int() const {
-        return Map<VectorXR>(d_f_int, n_coef * 3);
-    }
+    __device__ const Map<VectorXR> f_int() const { return Map<VectorXR>(d_f_int, n_coef * 3); }
 
-    __device__ Map<VectorXR> f_ext(int global_node_idx) {
-        return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3);
-    }
+    __device__ Map<VectorXR> f_ext(int global_node_idx) { return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3); }
 
     __device__ const Map<VectorXR> f_ext(int global_node_idx) const {
         return Map<VectorXR>(d_f_ext + global_node_idx * 3, 3);
     }
 
-    __device__ Map<VectorXR> f_ext() {
-        return Map<VectorXR>(d_f_ext, n_coef * 3);
-    }
+    __device__ Map<VectorXR> f_ext() { return Map<VectorXR>(d_f_ext, n_coef * 3); }
 
-    __device__ const Map<VectorXR> f_ext() const {
-        return Map<VectorXR>(d_f_ext, n_coef * 3);
-    }
+    __device__ const Map<VectorXR> f_ext() const { return Map<VectorXR>(d_f_ext, n_coef * 3); }
 
-    __device__ Map<VectorXR> constraint() {
-        return Map<VectorXR>(d_constraint, n_constraint);
-    }
+    __device__ Map<VectorXR> constraint() { return Map<VectorXR>(d_constraint, n_constraint); }
 
-    __device__ const Map<VectorXR> constraint() const {
-        return Map<VectorXR>(d_constraint, n_constraint);
-    }
+    __device__ const Map<VectorXR> constraint() const { return Map<VectorXR>(d_constraint, n_constraint); }
 
-    __device__ const Real* constraint_rhs() const {
-        return d_constraint_rhs;
-    }
+    __device__ const Real* constraint_rhs() const { return d_constraint_rhs; }
 
-    __device__ int constraint_mode_device() const {
-        return constraint_mode;
-    }
+    __device__ int constraint_mode_device() const { return constraint_mode; }
 
-    __device__ Map<VectorXi> fixed_nodes() {
-        return Map<VectorXi>(d_fixed_nodes, n_constraint / 3);
-    }
+    __device__ Map<VectorXi> fixed_nodes() { return Map<VectorXi>(d_fixed_nodes, n_constraint / 3); }
 
     // ================================
 
-    __device__ Real L(int elem_idx) const {
-        return d_L[elem_idx];
-    }
+    __device__ Real L(int elem_idx) const { return d_L[elem_idx]; }
 
-    __device__ Real W(int elem_idx) const {
-        return d_W[elem_idx];
-    }
+    __device__ Real W(int elem_idx) const { return d_W[elem_idx]; }
 
-    __device__ Real H(int elem_idx) const {
-        return d_H[elem_idx];
-    }
+    __device__ Real H(int elem_idx) const { return d_H[elem_idx]; }
 
-    __device__ Real rho0() const {
-        return *d_rho0;
-    }
+    __device__ Real rho0() const { return *d_rho0; }
 
-    __device__ Real nu() const {
-        return *d_nu;
-    }
+    __device__ Real nu() const { return *d_nu; }
 
-    __device__ Real E() const {
-        return *d_E;
-    }
+    __device__ Real E() const { return *d_E; }
 
-    __device__ Real lambda() const {
-        return *d_lambda;
-    }
+    __device__ Real lambda() const { return *d_lambda; }
 
-    __device__ Real mu() const {
-        return *d_mu;
-    }
+    __device__ Real mu() const { return *d_mu; }
 
-    __device__ int material_model() const {
-        return *d_material_model;
-    }
+    __device__ int material_model() const { return *d_material_model; }
 
-    __device__ Real mu10() const {
-        return *d_mu10;
-    }
+    __device__ Real mu10() const { return *d_mu10; }
 
-    __device__ Real mu01() const {
-        return *d_mu01;
-    }
+    __device__ Real mu01() const { return *d_mu01; }
 
-    __device__ Real kappa() const {
-        return *d_kappa;
-    }
+    __device__ Real kappa() const { return *d_kappa; }
 
-    __device__ Real eta_damp() const {
-        return *d_eta_damp;
-    }
+    __device__ Real eta_damp() const { return *d_eta_damp; }
 
-    __device__ Real lambda_damp() const {
-        return *d_lambda_damp;
-    }
+    __device__ Real lambda_damp() const { return *d_lambda_damp; }
 
     //===========================================
 
-    __device__ int* csr_offsets() {
-        return d_csr_offsets;
-    }
+    __device__ int* csr_offsets() { return d_csr_offsets; }
 
-    __device__ int* csr_columns() {
-        return d_csr_columns;
-    }
+    __device__ int* csr_columns() { return d_csr_columns; }
 
-    __device__ Real* csr_values() {
-        return d_csr_values;
-    }
+    __device__ Real* csr_values() { return d_csr_values; }
 
-    __device__ int* cj_csr_offsets() {
-        return d_cj_csr_offsets;
-    }
+    __device__ int* cj_csr_offsets() { return d_cj_csr_offsets; }
 
-    __device__ int* cj_csr_columns() {
-        return d_cj_csr_columns;
-    }
+    __device__ int* cj_csr_columns() { return d_cj_csr_columns; }
 
-    __device__ Real* cj_csr_values() {
-        return d_cj_csr_values;
-    }
+    __device__ Real* cj_csr_values() { return d_cj_csr_values; }
 
-    __device__ int* j_csr_offsets() {
-        return d_j_csr_offsets;
-    }
+    __device__ int* j_csr_offsets() { return d_j_csr_offsets; }
 
-    __device__ int* j_csr_columns() {
-        return d_j_csr_columns;
-    }
+    __device__ int* j_csr_columns() { return d_j_csr_columns; }
 
-    __device__ Real* j_csr_values() {
-        return d_j_csr_values;
-    }
+    __device__ Real* j_csr_values() { return d_j_csr_values; }
 
-    __device__ int nnz() {
-        return *d_nnz;
-    }
+    __device__ int nnz() { return *d_nnz; }
 
-    __device__ int gpu_n_beam() const {
-        return n_beam;
-    }
+    __device__ int gpu_n_beam() const { return n_beam; }
 
-    __device__ int gpu_n_coef() const {
-        return n_coef;
-    }
+    __device__ int gpu_n_coef() const { return n_coef; }
 
-    __device__ int gpu_n_constraint() const {
-        return n_constraint;
-    }
+    __device__ int gpu_n_constraint() const { return n_constraint; }
 
 #endif
 
-    __host__ __device__ int get_n_beam() const {
-        return n_beam;
-    }
-    __host__ __device__ int get_n_coef() const {
-        return n_coef;
-    }
-    __host__ __device__ int get_n_constraint() const {
-        return n_constraint;
-    }
+    __host__ __device__ int get_n_beam() const { return n_beam; }
+    __host__ __device__ int get_n_coef() const { return n_coef; }
+    __host__ __device__ int get_n_constraint() const { return n_constraint; }
 
     // Constructors
     //
@@ -471,12 +339,12 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_weight_zeta.resize(Quadrature::N_QP_3);
         da_weight_zeta.BindDevicePointer(&d_weight_zeta);
 
-        da_x12_jac.resize(n_coef);
-        da_x12_jac.BindDevicePointer(&d_x12_jac);
-        da_y12_jac.resize(n_coef);
-        da_y12_jac.BindDevicePointer(&d_y12_jac);
-        da_z12_jac.resize(n_coef);
-        da_z12_jac.BindDevicePointer(&d_z12_jac);
+        da_x_cur_jac.resize(n_coef);
+        da_x_cur_jac.BindDevicePointer(&d_x_cur_jac);
+        da_y_cur_jac.resize(n_coef);
+        da_y_cur_jac.BindDevicePointer(&d_y_cur_jac);
+        da_z_cur_jac.resize(n_coef);
+        da_z_cur_jac.BindDevicePointer(&d_z_cur_jac);
         da_x_cur.resize(n_coef);
         da_x_cur.BindDevicePointer(&d_x_cur);
         da_y_cur.resize(n_coef);
@@ -595,12 +463,12 @@ struct GPU_ANCF3443_Data : public ElementBase {
         std::copy(weight_zeta.data(), weight_zeta.data() + Quadrature::N_QP_3, da_weight_zeta.host());
         da_weight_zeta.ToDevice();
 
-        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_x12_jac.host());
-        da_x12_jac.ToDevice();
-        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_y12_jac.host());
-        da_y12_jac.ToDevice();
-        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_z12_jac.host());
-        da_z12_jac.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_x_cur_jac.host());
+        da_x_cur_jac.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_y_cur_jac.host());
+        da_y_cur_jac.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_z_cur_jac.host());
+        da_z_cur_jac.ToDevice();
         std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_x_cur.host());
         da_x_cur.ToDevice();
         std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_y_cur.host());
@@ -966,9 +834,9 @@ struct GPU_ANCF3443_Data : public ElementBase {
         da_weight_eta.free();
         da_weight_zeta.free();
 
-        da_x12_jac.free();
-        da_y12_jac.free();
-        da_z12_jac.free();
+        da_x_cur_jac.free();
+        da_y_cur_jac.free();
+        da_z_cur_jac.free();
         da_x_cur.free();
         da_y_cur.free();
         da_z_cur.free();
@@ -1041,15 +909,11 @@ struct GPU_ANCF3443_Data : public ElementBase {
 
     void ConvertToCSR_ConstraintJacT();
 
-    void BuildConstraintJacobianTransposeCSR() {
-        ConvertToCSR_ConstraintJacT();
-    }
+    void BuildConstraintJacobianTransposeCSR() { ConvertToCSR_ConstraintJacT(); }
 
     void ConvertToCSR_ConstraintJac();
 
-    void BuildConstraintJacobianCSR() {
-        ConvertToCSR_ConstraintJac();
-    }
+    void BuildConstraintJacobianCSR() { ConvertToCSR_ConstraintJac(); }
 
     void CalcP();
 
@@ -1090,35 +954,21 @@ struct GPU_ANCF3443_Data : public ElementBase {
     // ── Legacy accessors (kept for backward compatibility) ───────────────────
     // Prefer the virtual base-class methods IsConstraintSetup() and
     // GetConstraintDevicePtr() when working through an ElementBase pointer.
-    Real* Get_Constraint_Ptr() {
-        return d_constraint;
-    }
+    Real* Get_Constraint_Ptr() { return d_constraint; }
 
-    bool Get_Is_Constraint_Setup() {
-        return is_constraints_setup;
-    }
+    bool Get_Is_Constraint_Setup() { return is_constraints_setup; }
 
-    int GetConstraintMode() const {
-        return constraint_mode;
-    }
+    int GetConstraintMode() const { return constraint_mode; }
 
     // ── ElementBase dispatch helpers ─────────────────────────────────────────
 
-    ElementBase* GetDevicePtr() override {
-        return d_data;
-    }
+    ElementBase* GetDevicePtr() override { return d_data; }
 
-    void PrepareSolverData() override {
-        CalcDsDuPre();
-    }
+    void PrepareSolverData() override { CalcDsDuPre(); }
 
-    bool IsConstraintSetup() override {
-        return is_constraints_setup;
-    }
+    bool IsConstraintSetup() override { return is_constraints_setup; }
 
-    Real* GetConstraintDevicePtr() override {
-        return d_constraint;
-    }
+    Real* GetConstraintDevicePtr() override { return d_constraint; }
 
     void RetrieveConstraintJacobianCSRToCPU(std::vector<int>& offsets,
                                             std::vector<int>& columns,
@@ -1142,7 +992,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
     mophi::DualArray<Real> da_gauss_xi, da_gauss_eta, da_gauss_zeta;
     mophi::DualArray<Real> da_weight_xi_m, da_weight_eta_m, da_weight_zeta_m;
     mophi::DualArray<Real> da_weight_xi, da_weight_eta, da_weight_zeta;
-    mophi::DualArray<Real> da_x12_jac, da_y12_jac, da_z12_jac;
+    mophi::DualArray<Real> da_x_cur_jac, da_y_cur_jac, da_z_cur_jac;
     mophi::DualArray<Real> da_x_cur, da_y_cur, da_z_cur;
     mophi::DualArray<int> da_element_connectivity;
     mophi::DualArray<Real> da_F, da_P, da_Fdot, da_P_vis;
@@ -1159,7 +1009,7 @@ struct GPU_ANCF3443_Data : public ElementBase {
     Real *d_gauss_xi_m, *d_gauss_eta_m, *d_gauss_zeta_m, *d_gauss_xi, *d_gauss_eta, *d_gauss_zeta;
     Real *d_weight_xi_m, *d_weight_eta_m, *d_weight_zeta_m, *d_weight_xi, *d_weight_eta, *d_weight_zeta;
 
-    Real *d_x12_jac, *d_y12_jac, *d_z12_jac;
+    Real *d_x_cur_jac, *d_y_cur_jac, *d_z_cur_jac;
     Real *d_x_cur, *d_y_cur, *d_z_cur;
 
     int* d_element_connectivity;

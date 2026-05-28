@@ -177,8 +177,8 @@ int main() {
         if ((step + 1) % print_interval == 0) {
             VectorXR x_cur, y_cur, z_cur;
             element_data.RetrievePositionToCPU(x_cur, y_cur, z_cur);
-            std::cout << "Step " << step + 1 << " | load node displacement:"
-                      << "  dx = " << (x_cur(load_node) - h_x_cur(load_node))
+            std::cout << "Step " << step + 1
+                      << " | load node displacement:" << "  dx = " << (x_cur(load_node) - h_x_cur(load_node))
                       << "  dy = " << (y_cur(load_node) - h_y_cur(load_node))
                       << "  dz = " << (z_cur(load_node) - h_z_cur(load_node)) << "\n";
         }
@@ -187,21 +187,21 @@ int main() {
     // -------------------------------------------------------------------------
     // 8. Print final nodal positions
     // -------------------------------------------------------------------------
-    VectorXR x12_final, y12_final, z12_final;
-    element_data.RetrievePositionToCPU(x12_final, y12_final, z12_final);
+    VectorXR x_cur_final, y_cur_final, z_cur_final;
+    element_data.RetrievePositionToCPU(x_cur_final, y_cur_final, z_cur_final);
 
     std::cout << std::fixed << std::setprecision(17);
     std::cout << "\nFinal x_cur:\n";
-    for (int i = 0; i < x12_final.size(); i++) {
-        std::cout << x12_final(i) << " ";
+    for (int i = 0; i < x_cur_final.size(); i++) {
+        std::cout << x_cur_final(i) << " ";
     }
     std::cout << "\n\nFinal y_cur:\n";
-    for (int i = 0; i < y12_final.size(); i++) {
-        std::cout << y12_final(i) << " ";
+    for (int i = 0; i < y_cur_final.size(); i++) {
+        std::cout << y_cur_final(i) << " ";
     }
     std::cout << "\n\nFinal z_cur:\n";
-    for (int i = 0; i < z12_final.size(); i++) {
-        std::cout << z12_final(i) << " ";
+    for (int i = 0; i < z_cur_final.size(); i++) {
+        std::cout << z_cur_final(i) << " ";
     }
     std::cout << "\n";
 

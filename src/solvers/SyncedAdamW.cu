@@ -103,9 +103,9 @@ __global__ void one_step_adamw_kernel_impl(ElementType* d_data, SyncedAdamWSolve
 
     // Save previous positions
     if (tid < d_adamw_solver->get_n_coef()) {
-        d_adamw_solver->x12_prev()(tid) = d_data->x_cur()(tid);
-        d_adamw_solver->y12_prev()(tid) = d_data->y_cur()(tid);
-        d_adamw_solver->z12_prev()(tid) = d_data->z_cur()(tid);
+        d_adamw_solver->x_cur_prev()(tid) = d_data->x_cur()(tid);
+        d_adamw_solver->y_cur_prev()(tid) = d_data->y_cur()(tid);
+        d_adamw_solver->z_cur_prev()(tid) = d_data->z_cur()(tid);
     }
 
     grid.sync();
@@ -175,13 +175,13 @@ __global__ void one_step_adamw_kernel_impl(ElementType* d_data, SyncedAdamWSolve
                     // Step 2: Update scratch positions
                     if (tid < d_adamw_solver->get_n_coef()) {
                         d_data->x_cur()(tid) =
-                            d_adamw_solver->x12_prev()(tid) +
+                            d_adamw_solver->x_cur_prev()(tid) +
                             d_adamw_solver->solver_time_step() * d_adamw_solver->v_guess()(tid * 3 + 0);
                         d_data->y_cur()(tid) =
-                            d_adamw_solver->y12_prev()(tid) +
+                            d_adamw_solver->y_cur_prev()(tid) +
                             d_adamw_solver->solver_time_step() * d_adamw_solver->v_guess()(tid * 3 + 1);
                         d_data->z_cur()(tid) =
-                            d_adamw_solver->z12_prev()(tid) +
+                            d_adamw_solver->z_cur_prev()(tid) +
                             d_adamw_solver->solver_time_step() * d_adamw_solver->v_guess()(tid * 3 + 2);
                     }
 
@@ -284,12 +284,12 @@ __global__ void one_step_adamw_kernel_impl(ElementType* d_data, SyncedAdamWSolve
 
             // Update positions
             if (tid < d_adamw_solver->get_n_coef()) {
-                d_data->x_cur()(tid) = d_adamw_solver->x12_prev()(tid) +
-                                     d_adamw_solver->v_guess()(tid * 3 + 0) * d_adamw_solver->solver_time_step();
-                d_data->y_cur()(tid) = d_adamw_solver->y12_prev()(tid) +
-                                     d_adamw_solver->v_guess()(tid * 3 + 1) * d_adamw_solver->solver_time_step();
-                d_data->z_cur()(tid) = d_adamw_solver->z12_prev()(tid) +
-                                     d_adamw_solver->v_guess()(tid * 3 + 2) * d_adamw_solver->solver_time_step();
+                d_data->x_cur()(tid) = d_adamw_solver->x_cur_prev()(tid) +
+                                       d_adamw_solver->v_guess()(tid * 3 + 0) * d_adamw_solver->solver_time_step();
+                d_data->y_cur()(tid) = d_adamw_solver->y_cur_prev()(tid) +
+                                       d_adamw_solver->v_guess()(tid * 3 + 1) * d_adamw_solver->solver_time_step();
+                d_data->z_cur()(tid) = d_adamw_solver->z_cur_prev()(tid) +
+                                       d_adamw_solver->v_guess()(tid * 3 + 2) * d_adamw_solver->solver_time_step();
             }
 
             grid.sync();
@@ -332,12 +332,12 @@ __global__ void one_step_adamw_kernel_impl(ElementType* d_data, SyncedAdamWSolve
 
     // Final position update
     if (tid < d_adamw_solver->get_n_coef()) {
-        d_data->x_cur()(tid) = d_adamw_solver->x12_prev()(tid) +
-                             d_adamw_solver->v_guess()(tid * 3 + 0) * d_adamw_solver->solver_time_step();
-        d_data->y_cur()(tid) = d_adamw_solver->y12_prev()(tid) +
-                             d_adamw_solver->v_guess()(tid * 3 + 1) * d_adamw_solver->solver_time_step();
-        d_data->z_cur()(tid) = d_adamw_solver->z12_prev()(tid) +
-                             d_adamw_solver->v_guess()(tid * 3 + 2) * d_adamw_solver->solver_time_step();
+        d_data->x_cur()(tid) = d_adamw_solver->x_cur_prev()(tid) +
+                               d_adamw_solver->v_guess()(tid * 3 + 0) * d_adamw_solver->solver_time_step();
+        d_data->y_cur()(tid) = d_adamw_solver->y_cur_prev()(tid) +
+                               d_adamw_solver->v_guess()(tid * 3 + 1) * d_adamw_solver->solver_time_step();
+        d_data->z_cur()(tid) = d_adamw_solver->z_cur_prev()(tid) +
+                               d_adamw_solver->v_guess()(tid * 3 + 2) * d_adamw_solver->solver_time_step();
     }
 
     grid.sync();

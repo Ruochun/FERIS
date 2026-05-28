@@ -639,12 +639,12 @@ void GPU_FEAT10_Data::RetrieveExternalForceToCPU(VectorXR& external_force) {
 
 void GPU_FEAT10_Data::RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) {
     int total_nodes = n_coef;
-    da_h_x12.ToHost();
-    da_h_y12.ToHost();
-    da_h_z12.ToHost();
-    x_cur = Map<VectorXR>(da_h_x12.host(), total_nodes).eval();
-    y_cur = Map<VectorXR>(da_h_y12.host(), total_nodes).eval();
-    z_cur = Map<VectorXR>(da_h_z12.host(), total_nodes).eval();
+    da_h_x_cur.ToHost();
+    da_h_y_cur.ToHost();
+    da_h_z_cur.ToHost();
+    x_cur = Map<VectorXR>(da_h_x_cur.host(), total_nodes).eval();
+    y_cur = Map<VectorXR>(da_h_y_cur.host(), total_nodes).eval();
+    z_cur = Map<VectorXR>(da_h_z_cur.host(), total_nodes).eval();
 }
 
 void GPU_FEAT10_Data::SetNodalFixed(const VectorXi& fixed_nodes) {

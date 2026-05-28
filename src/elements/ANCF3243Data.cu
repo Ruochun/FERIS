@@ -134,9 +134,9 @@ __global__ void precompute_reference_kernel(GPU_ANCF3243_Data* d_data) {
     Real x_local_arr[Quadrature::N_SHAPE_3243];
     Real y_local_arr[Quadrature::N_SHAPE_3243];
     Real z_local_arr[Quadrature::N_SHAPE_3243];
-    d_data->x12_jac_elem(elem_idx, x_local_arr);
-    d_data->y12_jac_elem(elem_idx, y_local_arr);
-    d_data->z12_jac_elem(elem_idx, z_local_arr);
+    d_data->x_cur_jac_elem(elem_idx, x_local_arr);
+    d_data->y_cur_jac_elem(elem_idx, y_local_arr);
+    d_data->z_cur_jac_elem(elem_idx, z_local_arr);
     Map<VectorXR> x_loc(x_local_arr, Quadrature::N_SHAPE_3243);
     Map<VectorXR> y_loc(y_local_arr, Quadrature::N_SHAPE_3243);
     Map<VectorXR> z_loc(z_local_arr, Quadrature::N_SHAPE_3243);
@@ -225,9 +225,9 @@ __global__ void mass_matrix_qp_kernel(GPU_ANCF3243_Data* d_data) {
     Real x_local_arr[Quadrature::N_SHAPE_3243];
     Real y_local_arr[Quadrature::N_SHAPE_3243];
     Real z_local_arr[Quadrature::N_SHAPE_3243];
-    d_data->x12_jac_elem(elem, x_local_arr);
-    d_data->y12_jac_elem(elem, y_local_arr);
-    d_data->z12_jac_elem(elem, z_local_arr);
+    d_data->x_cur_jac_elem(elem, x_local_arr);
+    d_data->y_cur_jac_elem(elem, y_local_arr);
+    d_data->z_cur_jac_elem(elem, z_local_arr);
     Map<VectorXR> x_loc(x_local_arr, Quadrature::N_SHAPE_3243);
     Map<VectorXR> y_loc(y_local_arr, Quadrature::N_SHAPE_3243);
     Map<VectorXR> z_loc(z_local_arr, Quadrature::N_SHAPE_3243);

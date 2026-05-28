@@ -14,7 +14,7 @@
  *            - get_n_elem(), get_n_coef(), get_n_constraint()
  *            - static constexpr N_NODES_PER_ELEM, N_QP_PER_ELEM
  *            - GetDevicePtr() (GPU copy of the struct)
- *            - GetX12DevicePtr(), GetY12DevicePtr(), GetZ12DevicePtr()
+ *            - GetXCurDevicePtr(), GetYCurDevicePtr(), GetZCurDevicePtr()
  *            - GetExternalForceDevicePtr()
  *            - SetNodalFixed()
  *

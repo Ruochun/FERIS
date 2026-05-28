@@ -289,11 +289,11 @@ __device__ __forceinline__ void compute_constraint_data(GPU_FEAT4_Data* d_data) 
 
     if (thread_idx < d_data->gpu_n_constraint() / 3) {
         d_data->constraint()[thread_idx * 3 + 0] =
-            d_data->x_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->x12_jac()(d_data->fixed_nodes()[thread_idx]);
+            d_data->x_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->x_cur_jac()(d_data->fixed_nodes()[thread_idx]);
         d_data->constraint()[thread_idx * 3 + 1] =
-            d_data->y_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->y12_jac()(d_data->fixed_nodes()[thread_idx]);
+            d_data->y_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->y_cur_jac()(d_data->fixed_nodes()[thread_idx]);
         d_data->constraint()[thread_idx * 3 + 2] =
-            d_data->z_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->z12_jac()(d_data->fixed_nodes()[thread_idx]);
+            d_data->z_cur()(d_data->fixed_nodes()[thread_idx]) - d_data->z_cur_jac()(d_data->fixed_nodes()[thread_idx]);
     }
 }
 
