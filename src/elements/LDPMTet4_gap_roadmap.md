@@ -157,36 +157,43 @@ The model becomes much easier to validate against the intended modern LDPM behav
 
 ## 7. Suggested Implementation Order
 
-### Phase 1 — Expand the parameter API
+### Phase 1 — Expand the parameter API ✅ DONE
 
-Add the missing compression, friction, and mixed-mode tension parameters while preserving the current elastic/tensile inputs.
+Added `SetLDPMParams()` with full compression, friction, and mixed-mode tension parameters. Legacy `SetDamageParams()` preserved for backward compatibility.
 
-### Phase 2 — Expand per-facet state storage
+### Phase 2 — Expand per-facet state storage ✅ DONE
 
-Introduce the extra history arrays needed by compression and friction.
+Added per-edge `e_N_comp` (compressive strain history) alongside existing `kappa` and `omega`.
 
-### Phase 3 — Replace the simplified constitutive kernel
+### Phase 3 — Replace the simplified constitutive kernel ✅ DONE
 
-Turn `ldpm_tet4_cusatis_traction(...)` into a fuller LDPM constitutive update with separate mechanism branches.
+New `ldpm_tet4_constitutive_update()` in `LDPM.cuh` implements:
+- Tensile fracturing with mode-mixity dependent boundary strength (r_st, n_t)
+- Compressive yielding, hardening, and densification (sigma_c0, Hc0_ratio, kappa_c0, Ed_ratio)
+- Pressure-dependent friction under compression (mu_0, mu_inf, sigma_N0)
+
+Legacy `ldpm_tet4_cusatis_traction()` wrapper preserved for backward compatibility.
 
 ### Phase 4 — Upgrade post-processing and tests
 
 Expose the richer state in outputs and add focused single-facet / single-tet verification cases.
 
-### Phase 5 — Align demos with the target model
+### Phase 5 — Align demos with the target model ✅ DONE (single-tet)
 
-Update dogbone and other LDPM examples so their input parameter sets and expected outputs reflect the full model rather than the simplified current branch.
+`ldpm_singletet.cc` updated to use `SetLDPMParams()` with full Table-4 parameter set. Dogbone demos continue to use `SetDamageParams()` (legacy behavior preserved via defaults).
 
 ---
 
 ## Bottom line
 
-The current branch already has the **right mesh/solver skeleton** for LDPM. The main gap is the **facet constitutive model**:
+The main gaps (Phases 1–3, 5) have been closed:
 
-- today: elastic + tensile/shear damage subset,
-- target: full LDPM tension/compression/friction/compaction behavior.
+- The **facet constitutive model** now implements full LDPM tension/compression/friction/compaction.
+- The **parameter API** supports the full modern LDPM parameter set.
+- The **single-tet demo** uses the complete parameter set from the reference document.
+- **Backward compatibility** is maintained for legacy demos via `SetDamageParams()`.
 
-That is the roadmap from the present implementation to the intended modern LDPM model.
+Remaining work: Phase 4 (richer post-processing outputs for compressive/friction state).
 
 ---
 
