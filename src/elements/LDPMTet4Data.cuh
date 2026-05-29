@@ -6,6 +6,7 @@
 #include <iostream>
 #include <vector>
 
+#include "../materials/LDPM.cuh"
 #include "../types.h"
 #include "../utils/cuda_utils.h"
 #include "../utils/ldpm_mesh_utils.h"
@@ -54,194 +55,104 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── Translational nodal positions ────────────────────────────────────────
 
-    __device__ Map<VectorXR> x_cur() {
-        return Map<VectorXR>(d_x_cur, n_nodes);
-    }
-    __device__ const Map<VectorXR> x_cur() const {
-        return Map<VectorXR>(d_x_cur, n_nodes);
-    }
-    __device__ Map<VectorXR> y_cur() {
-        return Map<VectorXR>(d_y_cur, n_nodes);
-    }
-    __device__ const Map<VectorXR> y_cur() const {
-        return Map<VectorXR>(d_y_cur, n_nodes);
-    }
-    __device__ Map<VectorXR> z_cur() {
-        return Map<VectorXR>(d_z_cur, n_nodes);
-    }
-    __device__ const Map<VectorXR> z_cur() const {
-        return Map<VectorXR>(d_z_cur, n_nodes);
-    }
+    __device__ Map<VectorXR> x_cur() { return Map<VectorXR>(d_x_cur, n_nodes); }
+    __device__ const Map<VectorXR> x_cur() const { return Map<VectorXR>(d_x_cur, n_nodes); }
+    __device__ Map<VectorXR> y_cur() { return Map<VectorXR>(d_y_cur, n_nodes); }
+    __device__ const Map<VectorXR> y_cur() const { return Map<VectorXR>(d_y_cur, n_nodes); }
+    __device__ Map<VectorXR> z_cur() { return Map<VectorXR>(d_z_cur, n_nodes); }
+    __device__ const Map<VectorXR> z_cur() const { return Map<VectorXR>(d_z_cur, n_nodes); }
 
     // ── Rotational nodal positions (θ_x, θ_y, θ_z per node) ─────────────────
 
-    __device__ Map<VectorXR> rot_x_cur() {
-        return Map<VectorXR>(d_rot_x_cur, n_nodes);
-    }
-    __device__ const Map<VectorXR> rot_x_cur() const {
-        return Map<VectorXR>(d_rot_x_cur, n_nodes);
-    }
-    __device__ Map<VectorXR> rot_y_cur() {
-        return Map<VectorXR>(d_rot_y_cur, n_nodes);
-    }
-    __device__ const Map<VectorXR> rot_y_cur() const {
-        return Map<VectorXR>(d_rot_y_cur, n_nodes);
-    }
-    __device__ Map<VectorXR> rot_z_cur() {
-        return Map<VectorXR>(d_rot_z_cur, n_nodes);
-    }
-    __device__ const Map<VectorXR> rot_z_cur() const {
-        return Map<VectorXR>(d_rot_z_cur, n_nodes);
-    }
+    __device__ Map<VectorXR> rot_x_cur() { return Map<VectorXR>(d_rot_x_cur, n_nodes); }
+    __device__ const Map<VectorXR> rot_x_cur() const { return Map<VectorXR>(d_rot_x_cur, n_nodes); }
+    __device__ Map<VectorXR> rot_y_cur() { return Map<VectorXR>(d_rot_y_cur, n_nodes); }
+    __device__ const Map<VectorXR> rot_y_cur() const { return Map<VectorXR>(d_rot_y_cur, n_nodes); }
+    __device__ Map<VectorXR> rot_z_cur() { return Map<VectorXR>(d_rot_z_cur, n_nodes); }
+    __device__ const Map<VectorXR> rot_z_cur() const { return Map<VectorXR>(d_rot_z_cur, n_nodes); }
 
     // ── Translational nodal forces ───────────────────────────────────────────
 
-    __device__ Map<VectorXR> f_int() {
-        return Map<VectorXR>(d_f_int_t, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_int() const {
-        return Map<VectorXR>(d_f_int_t, n_nodes * 3);
-    }
-    __device__ Map<VectorXR> f_ext() {
-        return Map<VectorXR>(d_f_ext_t, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_ext() const {
-        return Map<VectorXR>(d_f_ext_t, n_nodes * 3);
-    }
+    __device__ Map<VectorXR> f_int() { return Map<VectorXR>(d_f_int_t, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_int() const { return Map<VectorXR>(d_f_int_t, n_nodes * 3); }
+    __device__ Map<VectorXR> f_ext() { return Map<VectorXR>(d_f_ext_t, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_ext() const { return Map<VectorXR>(d_f_ext_t, n_nodes * 3); }
 
     // ── Rotational nodal moments ─────────────────────────────────────────────
 
-    __device__ Map<VectorXR> f_int_r() {
-        return Map<VectorXR>(d_f_int_r, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_int_r() const {
-        return Map<VectorXR>(d_f_int_r, n_nodes * 3);
-    }
-    __device__ Map<VectorXR> f_ext_r() {
-        return Map<VectorXR>(d_f_ext_r, n_nodes * 3);
-    }
-    __device__ const Map<VectorXR> f_ext_r() const {
-        return Map<VectorXR>(d_f_ext_r, n_nodes * 3);
-    }
+    __device__ Map<VectorXR> f_int_r() { return Map<VectorXR>(d_f_int_r, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_int_r() const { return Map<VectorXR>(d_f_int_r, n_nodes * 3); }
+    __device__ Map<VectorXR> f_ext_r() { return Map<VectorXR>(d_f_ext_r, n_nodes * 3); }
+    __device__ const Map<VectorXR> f_ext_r() const { return Map<VectorXR>(d_f_ext_r, n_nodes * 3); }
 
     // ── Boundary conditions ──────────────────────────────────────────────────
 
-    __device__ Map<VectorXi> fixed_nodes() {
-        return Map<VectorXi>(d_fixed_nodes, n_constraint / 6);
-    }
-    __device__ int gpu_n_constraint() const {
-        return n_constraint;
-    }
-    __device__ int gpu_n_coef() const {
-        return n_nodes;
-    }
-    __device__ int gpu_n_edge() const {
-        return n_edge;
-    }
+    __device__ Map<VectorXi> fixed_nodes() { return Map<VectorXi>(d_fixed_nodes, n_constraint / 6); }
+    __device__ int gpu_n_constraint() const { return n_constraint; }
+    __device__ int gpu_n_coef() const { return n_nodes; }
+    __device__ int gpu_n_edge() const { return n_edge; }
 
     // ── Edge geometry ────────────────────────────────────────────────────────
 
-    __device__ int edge_node(int edge_idx, int local_node) const {
-        return d_edge_nodes[edge_idx * 2 + local_node];
-    }
-    __device__ Real edge_l0(int edge_idx) const {
-        return d_l0[edge_idx];
-    }
-    __device__ Real facet_area(int edge_idx) const {
-        return d_facet_area[edge_idx];
-    }
-    __device__ Real edge_n_comp(int edge_idx, int k) const {
-        return d_edge_n[edge_idx * 3 + k];
-    }
-    __device__ Real edge_m_comp(int edge_idx, int k) const {
-        return d_edge_m[edge_idx * 3 + k];
-    }
-    __device__ Real edge_lv_comp(int edge_idx, int k) const {
-        return d_edge_lv[edge_idx * 3 + k];
-    }
+    __device__ int edge_node(int edge_idx, int local_node) const { return d_edge_nodes[edge_idx * 2 + local_node]; }
+    __device__ Real edge_l0(int edge_idx) const { return d_l0[edge_idx]; }
+    __device__ Real facet_area(int edge_idx) const { return d_facet_area[edge_idx]; }
+    __device__ Real edge_n_comp(int edge_idx, int k) const { return d_edge_n[edge_idx * 3 + k]; }
+    __device__ Real edge_m_comp(int edge_idx, int k) const { return d_edge_m[edge_idx * 3 + k]; }
+    __device__ Real edge_lv_comp(int edge_idx, int k) const { return d_edge_lv[edge_idx * 3 + k]; }
 
     // ── Per-step facet tractions and moments ─────────────────────────────────
     // Layout per edge: [t_N, t_M, t_L, m_T, m_M, m_L]  (6 components)
 
-    __device__ Real& facet_t(int edge_idx, int comp) {
-        return d_facet_t[edge_idx * 6 + comp];
-    }
-    __device__ Real facet_t(int edge_idx, int comp) const {
-        return d_facet_t[edge_idx * 6 + comp];
-    }
+    __device__ Real& facet_t(int edge_idx, int comp) { return d_facet_t[edge_idx * 6 + comp]; }
+    __device__ Real facet_t(int edge_idx, int comp) const { return d_facet_t[edge_idx * 6 + comp]; }
 
-    // ── Per-edge damage state ─────────────────────────────────────────────────
+    // ── Per-edge damage state (legacy) ──────────────────────────────────────────
     // kappa : max effective damage-driving strain (history variable, grows only)
     // omega : current damage variable ∈ [0, 1]
 
-    __device__ Real& edge_kappa(int edge_idx) {
-        return d_kappa[edge_idx];
-    }
-    __device__ Real edge_kappa(int edge_idx) const {
-        return d_kappa[edge_idx];
-    }
-    __device__ Real& edge_omega(int edge_idx) {
-        return d_omega[edge_idx];
-    }
-    __device__ Real edge_omega(int edge_idx) const {
-        return d_omega[edge_idx];
-    }
+    __device__ Real& edge_kappa(int edge_idx) { return d_kappa[edge_idx]; }
+    __device__ Real edge_kappa(int edge_idx) const { return d_kappa[edge_idx]; }
+    __device__ Real& edge_omega(int edge_idx) { return d_omega[edge_idx]; }
+    __device__ Real edge_omega(int edge_idx) const { return d_omega[edge_idx]; }
 
-    // ── Material parameters ──────────────────────────────────────────────────
+    // ── Per-edge full LDPM state vector (LDPM_N_STATEV per edge) ─────────────
 
-    __device__ Real E_N() const {
-        return *d_E_N;
-    }
-    __device__ Real E_T() const {
-        return *d_E_T;
-    }
-    __device__ Real E_kT() const {
-        return *d_E_kT;
-    }
-    __device__ Real E_kM() const {
-        return *d_E_kM;
-    }
-    __device__ Real E_kL() const {
-        return *d_E_kL;
-    }
-    __device__ Real sigma_t() const {
-        return *d_sigma_t;
-    }
-    __device__ Real H_t() const {
-        return *d_H_t;
-    }
+    __device__ Real& edge_statev(int edge_idx, int comp) { return d_statev[edge_idx * LDPM_N_STATEV + comp]; }
+    __device__ Real edge_statev(int edge_idx, int comp) const { return d_statev[edge_idx * LDPM_N_STATEV + comp]; }
+
+    // ── Full LDPM parameters (device struct) ─────────────────────────────────
+
+    __device__ const LDPMParams& ldpm_params() const { return *d_ldpm_params; }
+    __device__ bool use_full_ldpm() const { return d_use_full_ldpm; }
+
+    // ── Material parameters (legacy) ─────────────────────────────────────────
+
+    __device__ Real E_N() const { return *d_E_N; }
+    __device__ Real E_T() const { return *d_E_T; }
+    __device__ Real E_kT() const { return *d_E_kT; }
+    __device__ Real E_kM() const { return *d_E_kM; }
+    __device__ Real E_kL() const { return *d_E_kL; }
+    __device__ Real sigma_t() const { return *d_sigma_t; }
+    __device__ Real H_t() const { return *d_H_t; }
 
     // ── Per-node rotational inertia ──────────────────────────────────────────
 
-    __device__ Real I_lump(int node_i) const {
-        return d_I_lump[node_i];
-    }
+    __device__ Real I_lump(int node_i) const { return d_I_lump[node_i]; }
 
     // ── Diagonal CSR mass matrix ─────────────────────────────────────────────
 
-    __device__ int* csr_offsets() {
-        return d_csr_offsets;
-    }
-    __device__ int* csr_columns() {
-        return d_csr_columns;
-    }
-    __device__ Real* csr_values() {
-        return d_csr_values;
-    }
-    __device__ int nnz() {
-        return *d_nnz;
-    }
+    __device__ int* csr_offsets() { return d_csr_offsets; }
+    __device__ int* csr_columns() { return d_csr_columns; }
+    __device__ Real* csr_values() { return d_csr_values; }
+    __device__ int nnz() { return *d_nnz; }
 
 #endif  // __CUDACC__
 
     // ── Host/device scalar accessors ─────────────────────────────────────────
 
-    __host__ __device__ int get_n_coef() const override {
-        return n_nodes;
-    }
-    __host__ __device__ int get_n_beam() const override {
-        return n_edge;
-    }
+    __host__ __device__ int get_n_coef() const override { return n_nodes; }
+    __host__ __device__ int get_n_beam() const override { return n_edge; }
 
     // ── Virtual method implementations ───────────────────────────────────────
 
@@ -281,16 +192,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── ElementBase dispatch helpers ─────────────────────────────────────────
 
-    ElementBase* GetDevicePtr() override {
-        return d_data;
-    }
+    ElementBase* GetDevicePtr() override { return d_data; }
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
     // Default constructor: mesh counts are set later by SetupFromMesh() or Setup().
-    GPU_LDPMTet4_Data() : n_nodes(0), n_elem(0), n_edge(0), n_constraint(0), h_rho(0) {
-        type = TYPE_LDPM_TET4;
-    }
+    GPU_LDPMTet4_Data() : n_nodes(0), n_elem(0), n_edge(0), n_constraint(0), h_rho(0) { type = TYPE_LDPM_TET4; }
 
     // Parameterized constructor: use when calling Setup() directly.
     GPU_LDPMTet4_Data(int num_nodes, int num_elems)
@@ -327,6 +234,11 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     //           If SetDamageParams is not called, sigma_t defaults to 0
     //           and no damage is applied (falls back to linear elastic).
     void SetDamageParams(Real sigma_t_val, Real H_t_val);
+
+    // Set the full LDPM parameter set.  Must be called after Setup().
+    // Switches the constitutive law from the legacy simplified model to
+    // the full LDPM model with tensile fracture, compression, and friction.
+    void SetLDPMParams(const LDPMParams& params);
 
     void SetDensity(Real rho_val);
     void SetExternalForce(const VectorXR& h_f_ext);
@@ -368,9 +280,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Expose edge connectivity for visualization (e.g. VTK line-segment mesh).
     // Returns a reference to the host-side edge node array (size 2 * n_edge):
     //   h_edge_nodes_vec[2*e+0] = node i,  h_edge_nodes_vec[2*e+1] = node j.
-    const std::vector<int>& GetEdgeNodes() const {
-        return h_edge_nodes_vec;
-    }
+    const std::vector<int>& GetEdgeNodes() const { return h_edge_nodes_vec; }
 
     // Project per-edge damage ω onto the sub-facet mesh.
     //
@@ -422,28 +332,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Must be called after SetupFromMesh().
     void AdvanceDrivenNodesZ(const int* d_driven_idx, int n_driven, Real dz);
 
-    const Real* GetXCurDevicePtr() const {
-        return d_x_cur;
-    }
-    const Real* GetYCurDevicePtr() const {
-        return d_y_cur;
-    }
-    const Real* GetZCurDevicePtr() const {
-        return d_z_cur;
-    }
+    const Real* GetXCurDevicePtr() const { return d_x_cur; }
+    const Real* GetYCurDevicePtr() const { return d_y_cur; }
+    const Real* GetZCurDevicePtr() const { return d_z_cur; }
     // Non-const accessors for externally driven (kinematic BC) position updates.
-    Real* GetXCurWritableDevicePtr() {
-        return d_x_cur;
-    }
-    Real* GetYCurWritableDevicePtr() {
-        return d_y_cur;
-    }
-    Real* GetZCurWritableDevicePtr() {
-        return d_z_cur;
-    }
-    Real* GetExternalForceDevicePtr() {
-        return d_f_ext_t;
-    }
+    Real* GetXCurWritableDevicePtr() { return d_x_cur; }
+    Real* GetYCurWritableDevicePtr() { return d_y_cur; }
+    Real* GetZCurWritableDevicePtr() { return d_z_cur; }
+    Real* GetExternalForceDevicePtr() { return d_f_ext_t; }
 
     void Destroy();
 
@@ -530,11 +426,19 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_facet_t;  // [n_edge * 6]
     Real* d_facet_t;
 
-    // ── Per-edge damage state ─────────────────────────────────────────────────
+    // ── Per-edge damage state (legacy) ───────────────────────────────────────────
     mophi::DualArray<Real> da_kappa;  // history max effective strain [n_edge]
     mophi::DualArray<Real> da_omega;  // damage variable              [n_edge]
     Real* d_kappa;
     Real* d_omega;
+
+    // ── Per-edge full LDPM state vector [n_edge * LDPM_N_STATEV] ─────────────
+    mophi::DualArray<Real> da_statev;
+    Real* d_statev = nullptr;
+
+    // ── Full LDPM material parameters (device) ───────────────────────────────
+    LDPMParams* d_ldpm_params = nullptr;
+    bool d_use_full_ldpm = false;
 
     // ── Subfacet → global edge index (built by SetupFromMesh) ─────────────────
     // da_subfacet_edge_idx[sf] = global edge index for sub-facet sf.

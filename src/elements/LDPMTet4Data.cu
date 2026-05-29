@@ -674,6 +674,43 @@ void GPU_LDPMTet4_Data::SetDamageParams(Real sigma_t_val, Real H_t_val) {
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 }
 
+void GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params) {
+    if (!is_setup) {
+        MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting LDPM parameters.");
+        return;
+    }
+
+    // Allocate per-edge state vector if not already done
+    if (d_statev == nullptr) {
+        da_statev.resize(static_cast<size_t>(n_edge) * LDPM_N_STATEV);
+        da_statev.BindDevicePointer(&d_statev);
+        da_statev.SetVal(Real(0));
+        da_statev.ToDevice();
+    }
+
+    // Allocate and copy params struct to device
+    if (d_ldpm_params == nullptr) {
+        MOPHI_GPU_CALL(cudaMalloc(&d_ldpm_params, sizeof(LDPMParams)));
+    }
+    MOPHI_GPU_CALL(cudaMemcpy(d_ldpm_params, &params, sizeof(LDPMParams), cudaMemcpyHostToDevice));
+
+    // Also set the legacy material parameters for backward-compatible output
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_N, &params.E0, sizeof(Real), cudaMemcpyHostToDevice));
+    Real E_T_val = params.alpha * params.E0;
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_T, &E_T_val, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kT, &params.E_kT, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kM, &params.E_kM, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_E_kL, &params.E_kL, sizeof(Real), cudaMemcpyHostToDevice));
+    MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &params.sigma_t, sizeof(Real), cudaMemcpyHostToDevice));
+
+    d_use_full_ldpm = true;
+    h_rho = params.rho;
+    MOPHI_GPU_CALL(cudaMemcpy(d_rho, &params.rho, sizeof(Real), cudaMemcpyHostToDevice));
+
+    // Update device mirror
+    MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
+}
+
 void GPU_LDPMTet4_Data::SetExternalForce(const VectorXR& h_f_ext) {
     if (!is_setup) {
         MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting external force.");
@@ -984,6 +1021,7 @@ void GPU_LDPMTet4_Data::Destroy() {
     da_facet_t.free();
     da_kappa.free();
     da_omega.free();
+    da_statev.free();
     da_subfacet_edge_idx.free();
     da_fixed_nodes.free();
     da_I_lump.free();
@@ -1002,6 +1040,9 @@ void GPU_LDPMTet4_Data::Destroy() {
     MOPHI_GPU_CALL(cudaFree(d_rho));
     MOPHI_GPU_CALL(cudaFree(d_sigma_t));
     MOPHI_GPU_CALL(cudaFree(d_H_t));
+    if (d_ldpm_params != nullptr) {
+        MOPHI_GPU_CALL(cudaFree(d_ldpm_params));
+    }
     MOPHI_GPU_CALL(cudaFree(d_data));
 }
 

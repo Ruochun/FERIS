@@ -40,13 +40,31 @@ using namespace feris;
 
 namespace {
 
-// Table-4 parameters used by current LDPMTet4 implementation (mm-tonne-s).
-static constexpr Real RHO_VAL = Real(2.40e-9);  // tonne/mm^3
-static constexpr Real E_N_VAL = Real(30000.0);  // MPa = N/mm^2
-static constexpr Real ALPHA_T = Real(0.2);      // E_T / E_N
-static constexpr Real BETA_K = Real(0.25);      // rotational coupling
-static constexpr Real SIGMA_T_VAL = Real(3.0);  // MPa
-static constexpr Real G_T_VAL = Real(0.0375);   // N/mm
+// Table-4 parameters for full LDPM model (mm-tonne-s unit system).
+static constexpr Real RHO_VAL = Real(2.40e-9);     // tonne/mm^3
+static constexpr Real E0_VAL = Real(30000.0);      // MPa (normal modulus)
+static constexpr Real ALPHA_VAL = Real(0.2);       // E_T / E_N
+static constexpr Real SIGMA_T_VAL = Real(3.0);     // MPa (tensile strength)
+static constexpr Real LT_VAL = Real(250.0);        // mm (tensile characteristic length)
+static constexpr Real GT_VAL = Real(0.0375);       // N/mm (fracture energy = lt*sigma_t^2/(2*E0))
+static constexpr Real NT_VAL = Real(0.2);          // softening exponent
+static constexpr Real SIGMA_C0_VAL = Real(120.0);  // MPa (compressive yielding strength)
+static constexpr Real HC0_OVER_E0 = Real(0.33);    // H_c0/E_0 = initial hardening modulus ratio
+static constexpr Real KC0_VAL = Real(3.0);         // transitional strain ratio
+static constexpr Real KC1_VAL = Real(0.5);         // deviatoric strain threshold ratio
+static constexpr Real KC2_VAL = Real(5.0);         // deviatoric damage parameter
+static constexpr Real MU0_VAL = Real(0.4);         // initial friction
+static constexpr Real MU_INF_VAL = Real(0.0);      // asymptotic friction
+static constexpr Real SIGMA_N0_VAL = Real(600.0);  // MPa (transitional stress)
+static constexpr Real ED_OVER_E0 = Real(1.0);      // densification modulus ratio (E_d/E_0)
+static constexpr Real BETA_VAL = Real(0.0);        // volumetric deviatoric coupling
+static constexpr Real KT_VAL = Real(0.0);          // tensile unloading parameter
+static constexpr Real KS_VAL = Real(0.0);          // shear unloading
+static constexpr Real KC_VAL = Real(0.0);          // compressive unloading
+static constexpr Real RS_VAL = Real(0.0);          // shear softening modulus ratio
+static constexpr Real HC1_OVER_E0 = Real(0.1);     // H_c1/E_0 = final hardening modulus ratio
+static constexpr Real KC3_VAL = Real(0.1);         // volumetric strain parameter (from Table)
+static constexpr Real BETA_K = Real(0.25);         // rotational coupling
 
 static constexpr std::array<Real, 5> kDispTimePts = {Real(0.0), Real(0.2), Real(2.4), Real(4.6), Real(4.8)};
 static constexpr std::array<Real, 5> kRotTimePts = {Real(0.0), Real(0.5), Real(1.5), Real(2.5), Real(3.0)};
@@ -268,17 +286,45 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    const Real E_T_VAL = ALPHA_T * E_N_VAL;
-    const Real E_kT_VAL = BETA_K * E_N_VAL * l_min * l_min;
+    const Real E_kT_VAL = BETA_K * E0_VAL * l_min * l_min;
     const Real E_kM_VAL = E_kT_VAL;
     const Real E_kL_VAL = E_kT_VAL;
-    const Real H_T_VAL = l_min * SIGMA_T_VAL / G_T_VAL;
+
+    // Compute derived parameters for the full LDPM model
+    const Real sigma_s_val = Real(2.5) * SIGMA_T_VAL;  // r_st = sigma_s / sigma_t (shear strength ratio)
 
     GPU_LDPMTet4_Data element_data;
     element_data.SetupFromMesh(mesh);
-    element_data.SetMaterial(E_N_VAL, E_T_VAL, E_kT_VAL, E_kM_VAL, E_kL_VAL);
-    element_data.SetDamageParams(SIGMA_T_VAL, H_T_VAL);
-    element_data.SetDensity(RHO_VAL);
+
+    // Set up full LDPM parameters
+    LDPMParams ldpm_params{};
+    ldpm_params.E0 = E0_VAL;
+    ldpm_params.alpha = ALPHA_VAL;
+    ldpm_params.sigma_t = SIGMA_T_VAL;
+    ldpm_params.sigma_s = sigma_s_val;
+    ldpm_params.n_t = NT_VAL;
+    ldpm_params.l_t = LT_VAL;
+    ldpm_params.r_s = RS_VAL;
+    ldpm_params.k_t = KT_VAL;
+    ldpm_params.E_d = ED_OVER_E0 * E0_VAL;
+    ldpm_params.sigma_c0 = SIGMA_C0_VAL;
+    ldpm_params.H_c0 = HC0_OVER_E0 * E0_VAL;
+    ldpm_params.H_c1 = HC1_OVER_E0 * E0_VAL;
+    ldpm_params.kc0 = KC0_VAL;
+    ldpm_params.kc1 = KC1_VAL;
+    ldpm_params.kc2 = KC2_VAL;
+    ldpm_params.kc3 = KC3_VAL;
+    ldpm_params.beta = BETA_VAL;
+    ldpm_params.mu_0 = MU0_VAL;
+    ldpm_params.mu_inf = MU_INF_VAL;
+    ldpm_params.sigma_N0 = SIGMA_N0_VAL;
+    ldpm_params.E_kT = E_kT_VAL;
+    ldpm_params.E_kM = E_kM_VAL;
+    ldpm_params.E_kL = E_kL_VAL;
+    ldpm_params.rho = RHO_VAL;
+    ldpm_params.elastic_flag = false;
+
+    element_data.SetLDPMParams(ldpm_params);
 
     VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles), Real3::Zero());
     element_data.SetExternalForce(h_f_ext);
@@ -291,7 +337,7 @@ int main(int argc, char* argv[]) {
 
     element_data.CalcMassMatrix();
 
-    const Real c_N = std::sqrt(E_N_VAL / RHO_VAL);
+    const Real c_N = std::sqrt(E0_VAL / RHO_VAL);
     const Real dt = Real(0.5) * (l_min / c_N);
     const Real T_SIM = case_def.key_times->back();
     const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
@@ -383,7 +429,8 @@ int main(int argc, char* argv[]) {
     std::cout << std::fixed << std::setprecision(9);
     std::cout << "Single-tet Case " << case_id << ": " << case_def.description << "\n";
     std::cout << "  dt=" << dt << " s, steps=" << n_steps << "\n";
-    std::cout << "  E_N=" << E_N_VAL << ", E_T=" << E_T_VAL << ", H_t=" << H_T_VAL << ", l_min=" << l_min << "\n";
+    std::cout << "  E0=" << E0_VAL << ", alpha=" << ALPHA_VAL << ", sigma_t=" << SIGMA_T_VAL
+              << ", sigma_c0=" << SIGMA_C0_VAL << ", l_min=" << l_min << "\n";
     std::cout << "  Output directory: " << output_dir << "\n";
 
     const std::string node_force_csv_name =
@@ -438,12 +485,9 @@ int main(int argc, char* argv[]) {
     subfacet_csv << "# time_s";
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
         const int sf_label = sf + 1;
-        subfacet_csv << ",facet_" << sf_label << "_stress_n"
-                     << ",facet_" << sf_label << "_stress_m"
-                     << ",facet_" << sf_label << "_stress_l"
-                     << ",facet_" << sf_label << "_strain_n"
-                     << ",facet_" << sf_label << "_strain_m"
-                     << ",facet_" << sf_label << "_strain_l";
+        subfacet_csv << ",facet_" << sf_label << "_stress_n" << ",facet_" << sf_label << "_stress_m" << ",facet_"
+                     << sf_label << "_stress_l" << ",facet_" << sf_label << "_strain_n" << ",facet_" << sf_label
+                     << "_strain_m" << ",facet_" << sf_label << "_strain_l";
     }
     subfacet_csv << "\n";
 
