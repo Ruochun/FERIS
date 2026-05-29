@@ -58,9 +58,10 @@ namespace feris {
 //   kappa_M = (delta_theta · m) / l0
 //   kappa_L = (delta_theta · l) / l0
 //
-// Constitutive law: Cusatis LDPM tensile-shear damage (LDPM.cuh).
-//   History variable kappa and damage omega are read from and written
-//   to the per-edge arrays d_kappa / d_omega.
+// Constitutive law:
+//   If use_full_ldpm() is true, uses the full LDPM model with tensile
+//   fracture, compression, and friction from ldpm_tet4_full_constitutive().
+//   Otherwise, uses the legacy Cusatis tensile-shear damage from LDPM.cuh.
 //
 // Stores results in d_data->facet_t(edge_idx, {0..5}):
 //   comp 0 = t_N, 1 = t_M, 2 = t_L  (tractions)
@@ -117,18 +118,56 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     const Real kappa_M = (dt0 * m0 + dt1 * m1 + dt2 * m2) * inv_l0;
     const Real kappa_L = (dt0 * l_0 + dt1 * l_1 + dt2 * l_2) * inv_l0;
 
-    // ── Cusatis damage constitutive law ────────────────────────────────────
+    // ── Constitutive law ───────────────────────────────────────────────────
 
     Real t_N, t_M, t_L, m_T, m_M, m_L;
-    Real kappa_new, omega_new;
 
-    ldpm_tet4_cusatis_traction(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, d_data->E_N(), d_data->E_T(), d_data->E_kT(),
-                               d_data->E_kM(), d_data->E_kL(), d_data->sigma_t(), d_data->H_t(),
-                               d_data->edge_kappa(edge_idx), kappa_new, omega_new, t_N, t_M, t_L, m_T, m_M, m_L);
+    if (d_data->use_full_ldpm()) {
+        // Full LDPM model: incremental update with per-edge state vector.
+        // Compute strain increments relative to stored accumulated strain.
+        const Real prev_eps_N = d_data->edge_statev(edge_idx, 0);
+        const Real prev_eps_M = d_data->edge_statev(edge_idx, 1);
+        const Real prev_eps_L = d_data->edge_statev(edge_idx, 2);
+        const Real d_eps_N = e_N - prev_eps_N;
+        const Real d_eps_M = e_M - prev_eps_M;
+        const Real d_eps_L = e_L - prev_eps_L;
 
-    // Write back updated damage state
-    d_data->edge_kappa(edge_idx) = kappa_new;
-    d_data->edge_omega(edge_idx) = omega_new;
+        // Volumetric strain approximation: use normal strain component
+        // (for a single tet this is adequate; for multi-tet meshes a
+        // proper volumetric average could be computed externally).
+        const Real eps_V = e_N;
+
+        // Local copy of state vector for the constitutive update
+        Real statev[LDPM_N_STATEV];
+        for (int k = 0; k < LDPM_N_STATEV; ++k) {
+            statev[k] = d_data->edge_statev(edge_idx, k);
+        }
+
+        ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L, kappa_T, kappa_M, kappa_L, eps_V, l0,
+                                    d_data->ldpm_params(), statev, t_N, t_M, t_L, m_T, m_M, m_L);
+
+        // Write back updated state
+        for (int k = 0; k < LDPM_N_STATEV; ++k) {
+            d_data->edge_statev(edge_idx, k) = statev[k];
+        }
+
+        // Also maintain legacy kappa/omega for backward-compatible output.
+        // Use effective strain as kappa proxy and crack-opening-based damage.
+        d_data->edge_kappa(edge_idx) = statev[8];
+        const Real crack_w = statev[11];
+        const Real eff_crack = (l0 > Real(0)) ? crack_w / l0 : Real(0);
+        d_data->edge_omega(edge_idx) = std::min(eff_crack / std::max(statev[8], Real(1e-30)), Real(1));
+    } else {
+        // Legacy Cusatis tensile-shear damage model
+        Real kappa_new, omega_new;
+        ldpm_tet4_cusatis_traction(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, d_data->E_N(), d_data->E_T(),
+                                   d_data->E_kT(), d_data->E_kM(), d_data->E_kL(), d_data->sigma_t(), d_data->H_t(),
+                                   d_data->edge_kappa(edge_idx), kappa_new, omega_new, t_N, t_M, t_L, m_T, m_M, m_L);
+
+        // Write back updated damage state
+        d_data->edge_kappa(edge_idx) = kappa_new;
+        d_data->edge_omega(edge_idx) = omega_new;
+    }
 
     // Store facet tractions [0..2] and moments [3..5]
     d_data->facet_t(edge_idx, 0) = t_N;

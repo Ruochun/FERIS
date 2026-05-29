@@ -1,6 +1,6 @@
 # LDPM-TET4 Target Implementation Summary
 
-> **Goal:** Document the target modern LDPM facet model that FERIS should implement next.
+> **Goal:** Document the target modern LDPM facet model that FERIS implements.
 
 ---
 
@@ -19,16 +19,14 @@
 
 ## 1. Target Scope
 
-The target FERIS LDPM implementation should match the **canonical modern LDPM facet formulation** used in the Cusatis LDPM family and later practical implementations:
+The FERIS LDPM implementation matches the **canonical modern LDPM facet formulation** as implemented in the chrono-mechanics CPU code (`ChMaterialVECT.cpp`):
 
 - elastic facet response in normal and shear directions,
 - tensile fracturing / softening with mode-mixity dependence,
 - compressive pore collapse, hardening, and rehardening / densification,
 - pressure-dependent frictional sliding in shear,
 - distinct history variables for tensile damage, compressive compaction, and sliding,
-- continued support for the current GPU edge-based geometry and leapfrog infrastructure.
-
-The target is therefore **not** just a stronger tensile damage law. It is a **multi-mechanism facet constitutive model**.
+- continued support for the GPU edge-based geometry and leapfrog infrastructure.
 
 ---
 
@@ -36,171 +34,166 @@ The target is therefore **not** just a stronger tensile damage law. It is a **mu
 
 ### 2.1 Elastic regime
 
-Use the existing facet kinematics, with normal modulus `E_0` and shear modulus derived from the standard LDPM shear-normal ratio `alpha`, i.e. `E_T = alpha * E_0`.
+Normal modulus `E_0` and shear modulus `E_T = alpha * E_0`.
 
-### 2.2 Tensile fracturing
+### 2.2 Tensile fracturing (FractureBC)
 
-Under opening-dominated loading, the target model should use the canonical LDPM tensile boundary with:
+When `eps_N > 0`, the model computes:
 
-- tensile strength `sigma_t`,
-- tensile characteristic length `l_t` (or an equivalent `G_t` form),
-- mode-mixity dependence through parameters such as `r_st`, `n_t`, and `r_s`.
+- Mode-mixity angle: `omega = atan(eps_N / (sqrt(alpha) * eps_T))`
+- Effective strength with mixed-mode dependence on the ratio `r_st = sigma_s / sigma_t`
+- Softening modulus: `H0 = Hs/alpha + (Ht - Hs/alpha) * (2*omega/pi)^n_t`
+  where `Ht = 2*E0 / (l_t/l0 - 1)` and `Hs = r_s * E0`
+- Exponential softening: `sigma_bt = sigma0 * exp(-H0 * max(eps_max - eps0, 0) / sigma0)`
+- Unloading via `k_t` parameter
+- Stress projection: `sigma_N = sigma_fr * eps_N / eps_Q`, `sigma_M = alpha * sigma_fr * eps_M / eps_Q`
 
-### 2.3 Compression / pore collapse / compaction
+### 2.3 Compression / pore collapse / compaction (CompressBC)
 
-Under compressive loading, the target model should replace the current elastic compression branch with the standard LDPM compressive boundary, including:
+When `eps_N <= 0`:
 
-- onset of compressive yielding,
-- compressive hardening,
-- pore collapse / compaction,
-- confinement-sensitive rehardening / densification.
+- Deviatoric strain: `eps_D = eps_N - eps_V`
+- Modified volumetric strain: `eps_DV = eps_V + beta * eps_D`
+- Confinement ratio: `r_DV = |eps_D| / (eps_V - eps_v0)` (or `/eps_v0` when `eps_V > 0`)
+- Confinement-sensitive hardening: `Hc = (H_c0 - H_c1) / (1 + kc2 * max(r_DV - kc1, 0)) + H_c1`
+- Three-phase boundary: elastic → linear hardening → exponential compaction
+- Densification modulus `E_d` replaces `E_0` after yielding
 
-### 2.4 Frictional shear under compression
+### 2.4 Frictional shear under compression (ShearBC)
 
-When the facet is compressed, the target model should use a **pressure-dependent shear limit / friction law**, rather than reducing shear only through the tensile damage variable.
+When the facet is compressed:
 
-### 2.5 Mixed-mode coupling
+- Shear boundary: `sigma_bs = sigma_s + (mu0 - mu_inf) * sigma_N0 - mu_inf * sigma_N - (mu0 - mu_inf) * sigma_N0 * exp(sigma_N / sigma_N0)`
+- Elastic trial clamped to boundary with return mapping to maintain direction
 
-The target response should handle tension-shear and compression-shear coupling through the proper LDPM constitutive boundaries instead of a single scalar tensile/shear damage rule.
+### 2.5 Constitutive branching
+
+The model branches on `eps_N`:
+- `eps_N > 0` → tensile/fracture path (coupled tension-shear via effective strain)
+- `eps_N <= 0` → independent compression (CompressBC) + friction (ShearBC)
 
 ---
 
 ## 3. Target Parameter Set
 
-A practical target parameterization should include the standard LDPM groups below.
-
 ### 3.1 Elastic parameters
 
 - `E_0`: facet normal modulus
-- `alpha`: shear-to-normal modulus ratio (`E_T = alpha * E_0`)
-- rotational stiffness parameters (`beta`-style derived parameters, or explicit `E_kT`, `E_kM`, `E_kL` if FERIS keeps its current API)
+- `alpha`: shear-to-normal modulus ratio
+- `E_kT`, `E_kM`, `E_kL`: rotational stiffness
 - `rho`: density
 
 ### 3.2 Tensile-fracture parameters
 
 - `sigma_t`: mesoscale tensile strength
+- `sigma_s`: mesoscale shear strength (defines `r_st = sigma_s / sigma_t`)
 - `l_t`: tensile characteristic length
-- `r_st`: shear-to-tensile strength ratio
-- `n_t`: softening exponent / mode-mixity softening-shape parameter
-- `r_s`: shear softening ratio
+- `n_t`: softening exponent (mode-mixity shape)
+- `r_s`: shear softening modulus ratio
+- `k_t`: tensile unloading parameter
 
 ### 3.3 Compression / compaction parameters
 
 - `sigma_c0`: initial compressive yielding threshold
-- `H_c0`: initial compressive hardening parameter
-- `H_c1`: final compressive hardening / rehardening parameter
-- `kappa_c0`: strain ratio at the rehardening transition
-- `kappa_c1`: deviatoric strain threshold ratio
-- `kappa_c2`: deviatoric damage parameter
-- `kappa_c3`: volumetric strain parameter
-- `beta`: volumetric-deviatoric coupling parameter
-- `E_d` or `E_d/E_0`: densification stiffness parameter
+- `H_c0`: initial hardening modulus
+- `H_c1`: final hardening modulus
+- `kc0`: transitional strain ratio (defines `eps_c1 = eps_c0 * kc0`)
+- `kc1`: deviatoric strain threshold ratio
+- `kc2`: deviatoric damage parameter
+- `kc3`: volumetric strain parameter (defines `eps_v0 = eps_c0 * kc3`)
+- `beta`: volumetric-deviatoric coupling
+- `E_d`: densification stiffness
 
 ### 3.4 Friction parameters
 
-- `mu_0`: low-pressure friction coefficient
-- `mu_inf`: high-pressure / asymptotic friction coefficient
-- `sigma_N0`: transition stress for the friction law
+- `mu_0`: initial friction coefficient
+- `mu_inf`: asymptotic friction coefficient
+- `sigma_N0`: transitional stress for the friction law
 
-### 3.5 Optional unloading / hysteresis parameters
+### 3.5 Elastic analysis flag
 
-If FERIS adopts the full cyclic-capable formulation rather than a monotonic subset, also store:
-
-- `k_t`: tensile unloading parameter
-- `k_s`: shear unloading parameter
-- `k_c`: compressive unloading parameter
+- `elastic_flag`: if true, bypasses all inelastic updates (useful for debugging)
 
 ---
 
 ## 4. Target Facet State Variables
 
-The target implementation should go beyond the current `(kappa, omega)` pair.
+Each edge stores 16 state variables (LDPM_N_STATEV = 16):
 
-At minimum, each facet should be able to track:
-
-- current normal and shear strain components,
-- tensile history / damage variable(s),
-- compressive boundary / compaction history,
-- shear-slip or frictional plastic history,
-- branch-selection or yield-state information,
-- derived crack opening / sliding quantities for output.
-
-In practice, this means FERIS should support **different irreversible histories for tensile fracture, compressive compaction, and frictional sliding**, rather than forcing all inelasticity into one scalar damage variable.
+| Index | Variable | Description |
+|-------|----------|-------------|
+| 0 | eps_N | accumulated normal strain |
+| 1 | eps_M | accumulated shear M strain |
+| 2 | eps_L | accumulated shear L strain |
+| 3 | sigma_N | current normal stress |
+| 4 | sigma_M | current shear M stress |
+| 5 | sigma_L | current shear L stress |
+| 6 | max_eps_N | maximum normal strain history |
+| 7 | max_eps_T | maximum shear magnitude history |
+| 8 | eff_strain | effective strain |
+| 9 | eff_stress | effective stress |
+| 10 | W_int | internal work |
+| 11 | crack_w | crack opening displacement |
+| 12-14 | reserved | for eigenstrain support |
+| 15 | W_diss | dissipated energy |
 
 ---
 
 ## 5. Target Constitutive Update Structure
 
-A target facet update should follow this structure:
-
-1. compute facet strains from the current `(n, m, l)` frame,
-2. compute the mode indicators needed by LDPM,
-3. determine whether the facet is in opening, compression, or mixed mode,
-4. evaluate the corresponding LDPM constitutive boundary,
-5. update the relevant tensile, compressive, and sliding history variables,
-6. return normal traction, two shear tractions, and rotational moments,
-7. preserve explicit GPU-friendly storage for post-processing.
-
-The key design change is that **compression and friction cannot remain elastic side branches**. They need their own constitutive update logic and state evolution.
+1. Compute strain increments from current total strains minus stored accumulated strains
+2. Branch on sign of normal strain:
+   - Positive → tensile/fracture regime (coupled via effective strain)
+   - Non-positive → compression boundary + friction boundary (independent)
+3. Update energy quantities (internal work, dissipated energy, crack opening)
+4. Store updated state vector
+5. Return tractions and elastic rotational moments
 
 ---
 
 ## 6. Rotational Moments in the Target Model
 
-The target implementation should keep the current first-order LDPM treatment of rotational moments as **elastic-only** unless FERIS explicitly chooses a different higher-order extension.
+Rotational moments remain **elastic-only** (first-order LDPM):
 
-That means the target full LDPM upgrade should primarily change:
-
-- the translational facet constitutive response,
-- the facet history variables,
-- the constitutive branching,
-
-while keeping rotational moments in the same general form:
-
-- twist from `kappa_T`,
-- bending from `kappa_M` and `kappa_L`,
-- no direct damage coupling in the standard first-order formulation.
+- `m_T = E_kT * kappa_T`
+- `m_M = E_kM * kappa_M`
+- `m_L = E_kL * kappa_L`
 
 ---
 
 ## 7. Target Use of Existing Mesh Data
 
-The current branch already stores several inputs that a fuller LDPM can exploit better:
-
-- sub-facet projected area,
-- sub-facet volumes,
-- material flags (`mF`),
-- face-facet surface triangles,
-- exact sub-facet geometry.
-
-The target implementation should use these data not just for visualization, but also where appropriate for:
-
-- richer material-zone assignment,
-- boundary traction handling,
-- more faithful sub-facet post-processing,
-- constitutive branching that depends on facet metadata.
+The implementation uses:
+- particle positions and TET connectivity
+- sub-facet projected areas and tangent frames
+- reference edge length `l0` (used in softening modulus calculation)
 
 ---
 
-## 8. Expected Outputs
+## 8. Volumetric Strain
 
-Once the target model is implemented, FERIS should be able to report not only the current edge tractions and scalar damage proxy, but also:
+The target model uses a volumetric strain `eps_V` in the compressive boundary
+computation. The current implementation uses a **per-facet approximation**
+(`eps_V = eps_N`) which is adequate for single-tet and simple multi-tet meshes.
 
-- tensile damage state,
-- compressive compaction / crushing state,
-- frictional / sliding state,
-- more physically meaningful crack opening and sliding measures,
-- branch-aware facet diagnostics for verification.
-
-That is the level of functionality expected from a **modern, correct LDPM implementation**, as opposed to the current tensile/shear-only simplification.
+A future refinement could compute `eps_V` as the average normal strain across
+all facets surrounding a node, providing better accuracy for complex multi-tet
+geometries under highly non-uniform compressive loading.
 
 ---
 
-## 9. Physical soundness and references
+## 9. Expected Outputs
 
-The target model described above is physically sound with respect to canonical LDPM literature: it combines tensile fracturing, compression-compaction response, and pressure-dependent shear/friction branches within one facet constitutive update, while keeping first-order rotational moments elastic unless a higher-order extension is intentionally introduced.
+The model reports:
+- facet tractions (t_N, t_M, t_L) and moments (m_T, m_M, m_L)
+- per-edge effective strain and stress history
+- crack opening displacement
+- internal work and dissipated energy
+- legacy kappa/omega for backward-compatible visualization
 
-### References
+---
 
-1. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. I: Theory*. Cement and Concrete Composites, 33(9), 881-890. https://doi.org/10.1016/j.cemconcomp.2011.02.011  
-2. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. II: Calibration and validation*. Cement and Concrete Composites, 33(9), 891-905. https://doi.org/10.1016/j.cemconcomp.2011.02.010
+## 10. References
+
+1. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. I: Theory*. Cement and Concrete Composites, 33(9), 881-890.
+2. chrono-mechanics (base_dev): `src/chrono_ldpm/ChMaterialVECT.cpp` — CPU reference implementation.

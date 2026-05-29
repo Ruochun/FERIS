@@ -6,6 +6,7 @@
 #include <iostream>
 #include <vector>
 
+#include "../materials/LDPM.cuh"
 #include "../types.h"
 #include "../utils/cuda_utils.h"
 #include "../utils/ldpm_mesh_utils.h"
@@ -170,7 +171,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         return d_facet_t[edge_idx * 6 + comp];
     }
 
-    // ── Per-edge damage state ─────────────────────────────────────────────────
+    // ── Per-edge damage state (legacy) ──────────────────────────────────────────
     // kappa : max effective damage-driving strain (history variable, grows only)
     // omega : current damage variable ∈ [0, 1]
 
@@ -187,7 +188,25 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         return d_omega[edge_idx];
     }
 
-    // ── Material parameters ──────────────────────────────────────────────────
+    // ── Per-edge full LDPM state vector (LDPM_N_STATEV per edge) ─────────────
+
+    __device__ Real& edge_statev(int edge_idx, int comp) {
+        return d_statev[edge_idx * LDPM_N_STATEV + comp];
+    }
+    __device__ Real edge_statev(int edge_idx, int comp) const {
+        return d_statev[edge_idx * LDPM_N_STATEV + comp];
+    }
+
+    // ── Full LDPM parameters (device struct) ─────────────────────────────────
+
+    __device__ const LDPMParams& ldpm_params() const {
+        return *d_ldpm_params;
+    }
+    __device__ bool use_full_ldpm() const {
+        return d_use_full_ldpm;
+    }
+
+    // ── Material parameters (legacy) ─────────────────────────────────────────
 
     __device__ Real E_N() const {
         return *d_E_N;
@@ -327,6 +346,11 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     //           If SetDamageParams is not called, sigma_t defaults to 0
     //           and no damage is applied (falls back to linear elastic).
     void SetDamageParams(Real sigma_t_val, Real H_t_val);
+
+    // Set the full LDPM parameter set.  Must be called after Setup().
+    // Switches the constitutive law from the legacy simplified model to
+    // the full LDPM model with tensile fracture, compression, and friction.
+    void SetLDPMParams(const LDPMParams& params);
 
     void SetDensity(Real rho_val);
     void SetExternalForce(const VectorXR& h_f_ext);
@@ -530,11 +554,19 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_facet_t;  // [n_edge * 6]
     Real* d_facet_t;
 
-    // ── Per-edge damage state ─────────────────────────────────────────────────
+    // ── Per-edge damage state (legacy) ───────────────────────────────────────────
     mophi::DualArray<Real> da_kappa;  // history max effective strain [n_edge]
     mophi::DualArray<Real> da_omega;  // damage variable              [n_edge]
     Real* d_kappa;
     Real* d_omega;
+
+    // ── Per-edge full LDPM state vector [n_edge * LDPM_N_STATEV] ─────────────
+    mophi::DualArray<Real> da_statev;
+    Real* d_statev = nullptr;
+
+    // ── Full LDPM material parameters (device) ───────────────────────────────
+    LDPMParams* d_ldpm_params = nullptr;
+    bool d_use_full_ldpm = false;
 
     // ── Subfacet → global edge index (built by SetupFromMesh) ─────────────────
     // da_subfacet_edge_idx[sf] = global edge index for sub-facet sf.
