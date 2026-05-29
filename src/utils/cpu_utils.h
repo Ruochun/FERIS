@@ -79,11 +79,11 @@ void ANCF3243_B12_matrix_flat_per_element(const VectorXR& L,
 /**
  * Generate 3D beam element coordinates for multiple ANCF3243 elements
  * @param n_beam Number of 3D elements
- * @param x12 Output x coordinates for all nodes
- * @param y12 Output y coordinates for all nodes
- * @param z12 Output z coordinates for all nodes
+ * @param x_cur Output x coordinates for all nodes
+ * @param y_cur Output y coordinates for all nodes
+ * @param z_cur Output z coordinates for all nodes
  */
-void ANCF3243_generate_beam_coordinates(int n_beam, VectorXR& x12, VectorXR& y12, VectorXR& z12);
+void ANCF3243_generate_beam_coordinates(int n_beam, VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur);
 
 /**
  * Calculate offset indices for ANCF3243 elements
@@ -117,14 +117,14 @@ void ANCF3443_B12_matrix_flat_per_element(const VectorXR& L,
 /**
  * Generate 3D element coordinates for multiple ANCF3443 elements
  * @param n_beam Number of 3D elements
- * @param x12 Output x coordinates for all nodes
- * @param y12 Output y coordinates for all nodes
- * @param z12 Output z coordinates for all nodes
+ * @param x_cur Output x coordinates for all nodes
+ * @param y_cur Output y coordinates for all nodes
+ * @param z_cur Output z coordinates for all nodes
  */
 void ANCF3443_generate_beam_coordinates(int n_beam,
-                                        VectorXR& x12,
-                                        VectorXR& y12,
-                                        VectorXR& z12,
+                                        VectorXR& x_cur,
+                                        VectorXR& y_cur,
+                                        VectorXR& z_cur,
                                         MatrixXi& element_connectivity);
 
 /**

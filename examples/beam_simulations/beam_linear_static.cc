@@ -198,13 +198,13 @@ int main() {
     // -----------------------------------------------------------------------
     // Retrieve displaced positions and compute nodal displacements
     // -----------------------------------------------------------------------
-    VectorXR x12, y12, z12;
-    beam->RetrievePositionToCPU(x12, y12, z12);
+    VectorXR x_cur, y_cur, z_cur;
+    beam->RetrievePositionToCPU(x_cur, y_cur, z_cur);
 
     // Displacement = deformed − reference positions.
-    VectorXR ux = x12 - h_x;
-    VectorXR uy = y12 - h_y;
-    VectorXR uz = z12 - h_z;
+    VectorXR ux = x_cur - h_x;
+    VectorXR uy = y_cur - h_y;
+    VectorXR uz = z_cur - h_z;
 
     // Maximum displacement magnitude.
     Real max_disp = 0.0;
@@ -242,7 +242,7 @@ int main() {
     // Write output VTK
     // -----------------------------------------------------------------------
     const std::string output_vtk = output_dir + "/output_beam_linear_static.vtk";
-    ANCFCPUUtils::WriteFEAT10ToVTK(output_vtk, nodes, elements, x12, y12, z12);
+    ANCFCPUUtils::WriteFEAT10ToVTK(output_vtk, nodes, elements, x_cur, y_cur, z_cur);
     std::cout << "\n  Deformed mesh written to: " << output_vtk << "\n";
 
     // -----------------------------------------------------------------------

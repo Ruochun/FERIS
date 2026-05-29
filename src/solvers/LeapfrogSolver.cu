@@ -166,9 +166,9 @@ __global__ void leapfrog_update_position_kernel(ElemType* d_data, LeapfrogSolver
         return;
 
     Real dt = d_solver->solver_time_step();
-    d_data->x12()(tid) += dt * d_solver->v()(tid * 3 + 0);
-    d_data->y12()(tid) += dt * d_solver->v()(tid * 3 + 1);
-    d_data->z12()(tid) += dt * d_solver->v()(tid * 3 + 2);
+    d_data->x_cur()(tid) += dt * d_solver->v()(tid * 3 + 0);
+    d_data->y_cur()(tid) += dt * d_solver->v()(tid * 3 + 1);
+    d_data->z_cur()(tid) += dt * d_solver->v()(tid * 3 + 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,9 +340,9 @@ __global__ void leapfrog_update_rotation_kernel(ElemType* d_data, LeapfrogSolver
         return;
 
     Real dt = d_solver->solver_time_step();
-    d_data->rx12()(tid) += dt * d_solver->v_rot()(tid * 3 + 0);
-    d_data->ry12()(tid) += dt * d_solver->v_rot()(tid * 3 + 1);
-    d_data->rz12()(tid) += dt * d_solver->v_rot()(tid * 3 + 2);
+    d_data->rot_x_cur()(tid) += dt * d_solver->v_rot()(tid * 3 + 0);
+    d_data->rot_y_cur()(tid) += dt * d_solver->v_rot()(tid * 3 + 1);
+    d_data->rot_z_cur()(tid) += dt * d_solver->v_rot()(tid * 3 + 2);
 }
 
 // ---------------------------------------------------------------------------

@@ -193,3 +193,14 @@ Once the target model is implemented, FERIS should be able to report not only th
 - branch-aware facet diagnostics for verification.
 
 That is the level of functionality expected from a **modern, correct LDPM implementation**, as opposed to the current tensile/shear-only simplification.
+
+---
+
+## 9. Physical soundness and references
+
+The target model described above is physically sound with respect to canonical LDPM literature: it combines tensile fracturing, compression-compaction response, and pressure-dependent shear/friction branches within one facet constitutive update, while keeping first-order rotational moments elastic unless a higher-order extension is intentionally introduced.
+
+### References
+
+1. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. I: Theory*. Cement and Concrete Composites, 33(9), 881-890. https://doi.org/10.1016/j.cemconcomp.2011.02.011  
+2. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. II: Calibration and validation*. Cement and Concrete Composites, 33(9), 891-905. https://doi.org/10.1016/j.cemconcomp.2011.02.010
