@@ -122,8 +122,7 @@ int main() {
     const Real h = z_max - z_min;  // cross-section height
 
     std::cout << std::fixed << std::setprecision(4) << "  Bounding box:  x∈[" << x_min << ", " << x_max << "]  "
-              << "y∈[" << y_min << ", " << y_max << "]  "
-              << "z∈[" << z_min << ", " << z_max << "]\n"
+              << "y∈[" << y_min << ", " << y_max << "]  " << "z∈[" << z_min << ", " << z_max << "]\n"
               << "  L = " << L << "  b = " << b << "  h = " << h << "\n";
 
     // -----------------------------------------------------------------------

@@ -117,18 +117,42 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     const Real kappa_M = (dt0 * m0 + dt1 * m1 + dt2 * m2) * inv_l0;
     const Real kappa_L = (dt0 * l_0 + dt1 * l_1 + dt2 * l_2) * inv_l0;
 
-    // ── Cusatis damage constitutive law ────────────────────────────────────
+    // ── Cusatis LDPM full constitutive update ─────────────────────────────────
+
+    // Build params struct from device scalars
+    LDPMParams params;
+    params.E_N = d_data->E_N();
+    params.E_T = d_data->E_T();
+    params.E_kT = d_data->E_kT();
+    params.E_kM = d_data->E_kM();
+    params.E_kL = d_data->E_kL();
+    params.sigma_t = d_data->sigma_t();
+    params.l_t = d_data->l_t();
+    params.r_st = d_data->r_st();
+    params.n_t = d_data->n_t();
+    params.sigma_c0 = d_data->sigma_c0();
+    params.Hc0_ratio = d_data->Hc0_ratio();
+    params.kappa_c0 = d_data->kappa_c0();
+    params.Ed_ratio = d_data->Ed_ratio();
+    params.mu_0 = d_data->mu_0();
+    params.mu_inf = d_data->mu_inf();
+    params.sigma_N0 = d_data->sigma_N0();
+
+    // Build state from per-edge arrays
+    LDPMState state;
+    state.kappa = d_data->edge_kappa(edge_idx);
+    state.omega = Real(0);
+    state.e_N_comp = d_data->edge_e_N_comp(edge_idx);
 
     Real t_N, t_M, t_L, m_T, m_M, m_L;
-    Real kappa_new, omega_new;
 
-    ldpm_tet4_cusatis_traction(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, d_data->E_N(), d_data->E_T(), d_data->E_kT(),
-                               d_data->E_kM(), d_data->E_kL(), d_data->sigma_t(), d_data->H_t(),
-                               d_data->edge_kappa(edge_idx), kappa_new, omega_new, t_N, t_M, t_L, m_T, m_M, m_L);
+    ldpm_tet4_constitutive_update(e_N, e_M, e_L, kappa_T, kappa_M, kappa_L, params, state, t_N, t_M, t_L, m_T, m_M,
+                                  m_L);
 
-    // Write back updated damage state
-    d_data->edge_kappa(edge_idx) = kappa_new;
-    d_data->edge_omega(edge_idx) = omega_new;
+    // Write back updated state
+    d_data->edge_kappa(edge_idx) = state.kappa;
+    d_data->edge_omega(edge_idx) = state.omega;
+    d_data->edge_e_N_comp(edge_idx) = state.e_N_comp;
 
     // Store facet tractions [0..2] and moments [3..5]
     d_data->facet_t(edge_idx, 0) = t_N;
