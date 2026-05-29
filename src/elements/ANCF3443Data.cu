@@ -127,9 +127,9 @@ __global__ void precompute_reference_kernel(GPU_ANCF3443_Data* d_data) {
     Real x_local_arr[Quadrature::N_SHAPE_3443];
     Real y_local_arr[Quadrature::N_SHAPE_3443];
     Real z_local_arr[Quadrature::N_SHAPE_3443];
-    d_data->x12_jac_elem(elem_idx, x_local_arr);
-    d_data->y12_jac_elem(elem_idx, y_local_arr);
-    d_data->z12_jac_elem(elem_idx, z_local_arr);
+    d_data->x_cur_jac_elem(elem_idx, x_local_arr);
+    d_data->y_cur_jac_elem(elem_idx, y_local_arr);
+    d_data->z_cur_jac_elem(elem_idx, z_local_arr);
     Map<VectorXR> x_loc(x_local_arr, Quadrature::N_SHAPE_3443);
     Map<VectorXR> y_loc(y_local_arr, Quadrature::N_SHAPE_3443);
     Map<VectorXR> z_loc(z_local_arr, Quadrature::N_SHAPE_3443);
@@ -197,9 +197,9 @@ __global__ void mass_matrix_qp_kernel(GPU_ANCF3443_Data* d_data) {
         // Get local nodal coordinates for this element
         Real x_local_arr[Quadrature::N_SHAPE_3443], y_local_arr[Quadrature::N_SHAPE_3443],
             z_local_arr[Quadrature::N_SHAPE_3443];
-        d_data->x12_jac_elem(elem, x_local_arr);
-        d_data->y12_jac_elem(elem, y_local_arr);
-        d_data->z12_jac_elem(elem, z_local_arr);
+        d_data->x_cur_jac_elem(elem, x_local_arr);
+        d_data->y_cur_jac_elem(elem, y_local_arr);
+        d_data->z_cur_jac_elem(elem, z_local_arr);
         Map<VectorXR> x_loc(x_local_arr, Quadrature::N_SHAPE_3443);
         Map<VectorXR> y_loc(y_local_arr, Quadrature::N_SHAPE_3443);
         Map<VectorXR> z_loc(z_local_arr, Quadrature::N_SHAPE_3443);
@@ -692,15 +692,15 @@ void GPU_ANCF3443_Data::RetrieveConstraintJacobianToCPU(MatrixXR& constraint_jac
     }
 }
 
-void GPU_ANCF3443_Data::RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) {
+void GPU_ANCF3443_Data::RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) {
     int expected_size = n_coef;
-    da_x12.ToHost();
-    da_y12.ToHost();
-    da_z12.ToHost();
+    da_x_cur.ToHost();
+    da_y_cur.ToHost();
+    da_z_cur.ToHost();
     // Map is a no-copy host view; the assignment to VectorXR deep-copies the data.
-    x12 = Map<VectorXR>(da_x12.host(), expected_size).eval();
-    y12 = Map<VectorXR>(da_y12.host(), expected_size).eval();
-    z12 = Map<VectorXR>(da_z12.host(), expected_size).eval();
+    x_cur = Map<VectorXR>(da_x_cur.host(), expected_size).eval();
+    y_cur = Map<VectorXR>(da_y_cur.host(), expected_size).eval();
+    z_cur = Map<VectorXR>(da_z_cur.host(), expected_size).eval();
 }
 
 __global__ void compute_internal_force_kernel(GPU_ANCF3443_Data* d_data) {

@@ -118,7 +118,7 @@ class ElementBase {
     virtual void RetrieveInternalForceToCPU(VectorXR& internal_force) = 0;
     virtual void RetrieveConstraintDataToCPU(VectorXR& constraint) = 0;
     virtual void RetrieveConstraintJacobianToCPU(MatrixXR& constraint_jac) = 0;
-    virtual void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) = 0;
+    virtual void RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) = 0;
     virtual void RetrieveDeformationGradientToCPU(std::vector<std::vector<MatrixXR>>& deformation_gradient) = 0;
     virtual void RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>& p_from_F) = 0;
 };

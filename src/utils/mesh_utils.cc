@@ -277,17 +277,16 @@ void AppendANCF3243VectorWeldedConstraint(LinearConstraintBuilder& builder,
 
 void AppendANCF3243FixedCoefficient(LinearConstraintBuilder& builder,
                                     int coef_index,
-                                    const VectorXR& x12_ref,
-                                    const VectorXR& y12_ref,
-                                    const VectorXR& z12_ref) {
-    if (coef_index < 0 || coef_index >= x12_ref.size() || coef_index >= y12_ref.size() ||
-        coef_index >= z12_ref.size()) {
+                                    const VectorXR& x_ref,
+                                    const VectorXR& y_ref,
+                                    const VectorXR& z_ref) {
+    if (coef_index < 0 || coef_index >= x_ref.size() || coef_index >= y_ref.size() || coef_index >= z_ref.size()) {
         throw std::out_of_range("AppendANCF3243FixedCoefficient: coef_index out of range");
     }
 
-    builder.AddFixedDof(coef_index * 3 + 0, x12_ref(coef_index));
-    builder.AddFixedDof(coef_index * 3 + 1, y12_ref(coef_index));
-    builder.AddFixedDof(coef_index * 3 + 2, z12_ref(coef_index));
+    builder.AddFixedDof(coef_index * 3 + 0, x_ref(coef_index));
+    builder.AddFixedDof(coef_index * 3 + 1, y_ref(coef_index));
+    builder.AddFixedDof(coef_index * 3 + 2, z_ref(coef_index));
 }
 
 // ============================================================
@@ -488,9 +487,9 @@ bool ReadANCF3243MeshFromFile(const std::string& path, ANCF3243Mesh& out, std::s
 
     out.n_nodes = n_nodes;
     out.node_family.assign(static_cast<size_t>(n_nodes), "");
-    out.x12.resize(4 * n_nodes);
-    out.y12.resize(4 * n_nodes);
-    out.z12.resize(4 * n_nodes);
+    out.x_cur.resize(4 * n_nodes);
+    out.y_cur.resize(4 * n_nodes);
+    out.z_cur.resize(4 * n_nodes);
     std::vector<bool> seen_node(static_cast<size_t>(n_nodes), false);
 
     for (int i = 0; i < n_nodes; ++i) {
@@ -525,20 +524,20 @@ bool ReadANCF3243MeshFromFile(const std::string& path, ANCF3243Mesh& out, std::s
         }
 
         const int base = 4 * node_id;
-        out.x12(base + 0) = vals[0];
-        out.x12(base + 1) = vals[1];
-        out.x12(base + 2) = vals[2];
-        out.x12(base + 3) = vals[3];
+        out.x_cur(base + 0) = vals[0];
+        out.x_cur(base + 1) = vals[1];
+        out.x_cur(base + 2) = vals[2];
+        out.x_cur(base + 3) = vals[3];
 
-        out.y12(base + 0) = vals[4];
-        out.y12(base + 1) = vals[5];
-        out.y12(base + 2) = vals[6];
-        out.y12(base + 3) = vals[7];
+        out.y_cur(base + 0) = vals[4];
+        out.y_cur(base + 1) = vals[5];
+        out.y_cur(base + 2) = vals[6];
+        out.y_cur(base + 3) = vals[7];
 
-        out.z12(base + 0) = vals[8];
-        out.z12(base + 1) = vals[9];
-        out.z12(base + 2) = vals[10];
-        out.z12(base + 3) = vals[11];
+        out.z_cur(base + 0) = vals[8];
+        out.z_cur(base + 1) = vals[9];
+        out.z_cur(base + 2) = vals[10];
+        out.z_cur(base + 3) = vals[11];
     }
 
     for (bool ok : seen_node) {
@@ -747,9 +746,9 @@ bool ReadANCF3443MeshFromFile(const std::string& path, ANCF3443Mesh& out, std::s
 
     out.n_nodes = n_nodes;
     out.node_family.assign(static_cast<size_t>(n_nodes), "");
-    out.x12 = VectorXR::Zero(4 * n_nodes);
-    out.y12 = VectorXR::Zero(4 * n_nodes);
-    out.z12 = VectorXR::Zero(4 * n_nodes);
+    out.x_cur = VectorXR::Zero(4 * n_nodes);
+    out.y_cur = VectorXR::Zero(4 * n_nodes);
+    out.z_cur = VectorXR::Zero(4 * n_nodes);
 
     std::vector<bool> seen_node(static_cast<size_t>(n_nodes), false);
 
@@ -784,20 +783,20 @@ bool ReadANCF3443MeshFromFile(const std::string& path, ANCF3443Mesh& out, std::s
             }
         }
         const int base = 4 * node_id;
-        out.x12(base + 0) = vals[0];
-        out.x12(base + 1) = vals[1];
-        out.x12(base + 2) = vals[2];
-        out.x12(base + 3) = vals[3];
+        out.x_cur(base + 0) = vals[0];
+        out.x_cur(base + 1) = vals[1];
+        out.x_cur(base + 2) = vals[2];
+        out.x_cur(base + 3) = vals[3];
 
-        out.y12(base + 0) = vals[4];
-        out.y12(base + 1) = vals[5];
-        out.y12(base + 2) = vals[6];
-        out.y12(base + 3) = vals[7];
+        out.y_cur(base + 0) = vals[4];
+        out.y_cur(base + 1) = vals[5];
+        out.y_cur(base + 2) = vals[6];
+        out.y_cur(base + 3) = vals[7];
 
-        out.z12(base + 0) = vals[8];
-        out.z12(base + 1) = vals[9];
-        out.z12(base + 2) = vals[10];
-        out.z12(base + 3) = vals[11];
+        out.z_cur(base + 0) = vals[8];
+        out.z_cur(base + 1) = vals[9];
+        out.z_cur(base + 2) = vals[10];
+        out.z_cur(base + 3) = vals[11];
     }
 
     for (bool ok : seen_node) {

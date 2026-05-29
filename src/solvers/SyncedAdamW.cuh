@@ -103,12 +103,12 @@ class SyncedAdamWSolver : public SolverBase {
         da_lambda_guess_.BindDevicePointer(&d_lambda_guess_);
         da_g_.resize(static_cast<size_t>(n_coef_) * 3);
         da_g_.BindDevicePointer(&d_g_);
-        da_x12_prev_.resize(static_cast<size_t>(n_coef_));
-        da_x12_prev_.BindDevicePointer(&d_x12_prev);
-        da_y12_prev_.resize(static_cast<size_t>(n_coef_));
-        da_y12_prev_.BindDevicePointer(&d_y12_prev);
-        da_z12_prev_.resize(static_cast<size_t>(n_coef_));
-        da_z12_prev_.BindDevicePointer(&d_z12_prev);
+        da_x_prev_.resize(static_cast<size_t>(n_coef_));
+        da_x_prev_.BindDevicePointer(&d_x_prev);
+        da_y_prev_.resize(static_cast<size_t>(n_coef_));
+        da_y_prev_.BindDevicePointer(&d_y_prev);
+        da_z_prev_.resize(static_cast<size_t>(n_coef_));
+        da_z_prev_.BindDevicePointer(&d_z_prev);
     }
 
     ~SyncedAdamWSolver() {
@@ -119,9 +119,9 @@ class SyncedAdamWSolver : public SolverBase {
         da_v_next_.free();
         da_lambda_guess_.free();
         da_g_.free();
-        da_x12_prev_.free();
-        da_y12_prev_.free();
-        da_z12_prev_.free();
+        da_x_prev_.free();
+        da_y_prev_.free();
+        da_z_prev_.free();
 
         cudaFree(d_norm_g_);
         cudaFree(d_inner_flag_);
@@ -174,12 +174,12 @@ class SyncedAdamWSolver : public SolverBase {
     }
 
     void Setup() {
-        da_x12_prev_.SetVal(Real(0));
-        da_x12_prev_.ToDevice();
-        da_y12_prev_.SetVal(Real(0));
-        da_y12_prev_.ToDevice();
-        da_z12_prev_.SetVal(Real(0));
-        da_z12_prev_.ToDevice();
+        da_x_prev_.SetVal(Real(0));
+        da_x_prev_.ToDevice();
+        da_y_prev_.SetVal(Real(0));
+        da_y_prev_.ToDevice();
+        da_z_prev_.SetVal(Real(0));
+        da_z_prev_.ToDevice();
 
         da_v_guess_.SetVal(Real(0));
         da_v_guess_.ToDevice();
@@ -284,14 +284,14 @@ class SyncedAdamWSolver : public SolverBase {
         return *d_convergence_check_interval_;
     }
 
-    __device__ Map<VectorXR> x12_prev() {
-        return Map<VectorXR>(d_x12_prev, n_coef_);
+    __device__ Map<VectorXR> x_prev() {
+        return Map<VectorXR>(d_x_prev, n_coef_);
     }
-    __device__ Map<VectorXR> y12_prev() {
-        return Map<VectorXR>(d_y12_prev, n_coef_);
+    __device__ Map<VectorXR> y_prev() {
+        return Map<VectorXR>(d_y_prev, n_coef_);
     }
-    __device__ Map<VectorXR> z12_prev() {
-        return Map<VectorXR>(d_z12_prev, n_coef_);
+    __device__ Map<VectorXR> z_prev() {
+        return Map<VectorXR>(d_z_prev, n_coef_);
     }
 #endif
 
@@ -323,11 +323,11 @@ class SyncedAdamWSolver : public SolverBase {
     // DualArrays for long arrays (manage both pinned host and device memory).
     mophi::DualArray<Real> da_v_guess_, da_v_prev_, da_v_k_, da_v_next_;
     mophi::DualArray<Real> da_lambda_guess_, da_g_;
-    mophi::DualArray<Real> da_x12_prev_, da_y12_prev_, da_z12_prev_;
+    mophi::DualArray<Real> da_x_prev_, da_y_prev_, da_z_prev_;
 
     // Raw device pointers for GPU kernel access (bound to DualArrays above).
     // Nodal x/y/z positions from the previous half-step (used in the momentum update).
-    Real *d_x12_prev, *d_y12_prev, *d_z12_prev;
+    Real *d_x_prev, *d_y_prev, *d_z_prev;
     // Generalized coordinate (velocity/position DOF) vectors at successive AdamW stages:
     //   d_v_guess_  – initial guess for the current outer iteration
     //   d_v_prev_   – accepted solution from the previous outer iteration

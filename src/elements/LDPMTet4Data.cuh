@@ -29,8 +29,8 @@
 //
 // DOF layout
 // ──────────
-//  • Translational positions: d_x12, d_y12, d_z12  [n_nodes each]
-//  • Rotational positions:    d_rx12, d_ry12, d_rz12 [n_nodes each]
+//  • Translational positions: d_x_cur, d_y_cur, d_z_cur  [n_nodes each]
+//  • Rotational positions:    d_rot_x_cur, d_rot_y_cur, d_rot_z_cur [n_nodes each]
 //  • Translational forces:    d_f_int_t, d_f_ext_t  [n_nodes*3 each]
 //  • Rotational moments:      d_f_int_r, d_f_ext_r  [n_nodes*3 each]
 //
@@ -54,44 +54,44 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── Translational nodal positions ────────────────────────────────────────
 
-    __device__ Map<VectorXR> x12() {
-        return Map<VectorXR>(d_x12, n_nodes);
+    __device__ Map<VectorXR> x_cur() {
+        return Map<VectorXR>(d_x_cur, n_nodes);
     }
-    __device__ const Map<VectorXR> x12() const {
-        return Map<VectorXR>(d_x12, n_nodes);
+    __device__ const Map<VectorXR> x_cur() const {
+        return Map<VectorXR>(d_x_cur, n_nodes);
     }
-    __device__ Map<VectorXR> y12() {
-        return Map<VectorXR>(d_y12, n_nodes);
+    __device__ Map<VectorXR> y_cur() {
+        return Map<VectorXR>(d_y_cur, n_nodes);
     }
-    __device__ const Map<VectorXR> y12() const {
-        return Map<VectorXR>(d_y12, n_nodes);
+    __device__ const Map<VectorXR> y_cur() const {
+        return Map<VectorXR>(d_y_cur, n_nodes);
     }
-    __device__ Map<VectorXR> z12() {
-        return Map<VectorXR>(d_z12, n_nodes);
+    __device__ Map<VectorXR> z_cur() {
+        return Map<VectorXR>(d_z_cur, n_nodes);
     }
-    __device__ const Map<VectorXR> z12() const {
-        return Map<VectorXR>(d_z12, n_nodes);
+    __device__ const Map<VectorXR> z_cur() const {
+        return Map<VectorXR>(d_z_cur, n_nodes);
     }
 
     // ── Rotational nodal positions (θ_x, θ_y, θ_z per node) ─────────────────
 
-    __device__ Map<VectorXR> rx12() {
-        return Map<VectorXR>(d_rx12, n_nodes);
+    __device__ Map<VectorXR> rot_x_cur() {
+        return Map<VectorXR>(d_rot_x_cur, n_nodes);
     }
-    __device__ const Map<VectorXR> rx12() const {
-        return Map<VectorXR>(d_rx12, n_nodes);
+    __device__ const Map<VectorXR> rot_x_cur() const {
+        return Map<VectorXR>(d_rot_x_cur, n_nodes);
     }
-    __device__ Map<VectorXR> ry12() {
-        return Map<VectorXR>(d_ry12, n_nodes);
+    __device__ Map<VectorXR> rot_y_cur() {
+        return Map<VectorXR>(d_rot_y_cur, n_nodes);
     }
-    __device__ const Map<VectorXR> ry12() const {
-        return Map<VectorXR>(d_ry12, n_nodes);
+    __device__ const Map<VectorXR> rot_y_cur() const {
+        return Map<VectorXR>(d_rot_y_cur, n_nodes);
     }
-    __device__ Map<VectorXR> rz12() {
-        return Map<VectorXR>(d_rz12, n_nodes);
+    __device__ Map<VectorXR> rot_z_cur() {
+        return Map<VectorXR>(d_rot_z_cur, n_nodes);
     }
-    __device__ const Map<VectorXR> rz12() const {
-        return Map<VectorXR>(d_rz12, n_nodes);
+    __device__ const Map<VectorXR> rot_z_cur() const {
+        return Map<VectorXR>(d_rot_z_cur, n_nodes);
     }
 
     // ── Translational nodal forces ───────────────────────────────────────────
@@ -274,8 +274,8 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     }
     void RetrieveConstraintDataToCPU(VectorXR&) override {}
     void RetrieveConstraintJacobianToCPU(MatrixXR&) override {}
-    void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) override;
-    void RetrieveRotationToCPU(VectorXR& rx12, VectorXR& ry12, VectorXR& rz12);
+    void RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) override;
+    void RetrieveRotationToCPU(VectorXR& rot_x_cur, VectorXR& rot_y_cur, VectorXR& rot_z_cur);
     void RetrieveDeformationGradientToCPU(std::vector<std::vector<MatrixXR>>&) override {}
     void RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>&) override {}
 
@@ -422,24 +422,24 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Must be called after SetupFromMesh().
     void AdvanceDrivenNodesZ(const int* d_driven_idx, int n_driven, Real dz);
 
-    const Real* GetX12DevicePtr() const {
-        return d_x12;
+    const Real* GetXCurDevicePtr() const {
+        return d_x_cur;
     }
-    const Real* GetY12DevicePtr() const {
-        return d_y12;
+    const Real* GetYCurDevicePtr() const {
+        return d_y_cur;
     }
-    const Real* GetZ12DevicePtr() const {
-        return d_z12;
+    const Real* GetZCurDevicePtr() const {
+        return d_z_cur;
     }
     // Non-const accessors for externally driven (kinematic BC) position updates.
-    Real* GetX12WritableDevicePtr() {
-        return d_x12;
+    Real* GetXCurWritableDevicePtr() {
+        return d_x_cur;
     }
-    Real* GetY12WritableDevicePtr() {
-        return d_y12;
+    Real* GetYCurWritableDevicePtr() {
+        return d_y_cur;
     }
-    Real* GetZ12WritableDevicePtr() {
-        return d_z12;
+    Real* GetZCurWritableDevicePtr() {
+        return d_z_cur;
     }
     Real* GetExternalForceDevicePtr() {
         return d_f_ext_t;
@@ -490,12 +490,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
   private:
     // ── Translational position arrays ────────────────────────────────────────
-    mophi::DualArray<Real> da_x12, da_y12, da_z12;
-    Real *d_x12, *d_y12, *d_z12;
+    mophi::DualArray<Real> da_x_cur, da_y_cur, da_z_cur;
+    Real *d_x_cur, *d_y_cur, *d_z_cur;
 
     // ── Rotational position arrays ───────────────────────────────────────────
-    mophi::DualArray<Real> da_rx12, da_ry12, da_rz12;
-    Real *d_rx12, *d_ry12, *d_rz12;
+    mophi::DualArray<Real> da_rot_x_cur, da_rot_y_cur, da_rot_z_cur;
+    Real *d_rot_x_cur, *d_rot_y_cur, *d_rot_z_cur;
 
     // ── Translational force arrays ───────────────────────────────────────────
     mophi::DualArray<Real> da_f_int_t, da_f_ext_t;

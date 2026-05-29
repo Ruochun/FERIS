@@ -95,13 +95,12 @@ When adding a new solver, you must:
 ## 5. Code Style
 
 - Follow the existing `.clang-format` configuration.
-- After making changes, run `./.format_all` before committing so all formatted 
-  source files stay consistent with the repository style.
 - File header comments (`Project`, `File`, `Brief`) must be updated when the
   file's purpose or public interface changes significantly.
 - Keep the `namespace feris {` wrapping around all library code.
 - Prefer `__host__ __device__` accessors over raw member access for portability.
 - Add `override` to every virtual method in derived classes.
+- New variables and methods should follow [`docs/NAMING_CONVENTIONS.md`](docs/NAMING_CONVENTIONS.md).
 - For user-facing methods that accept or return collections of 3D quantities
   (for example forces, velocities, moments, or displacements), prefer
   `Real3` / `VectorReal3`-based APIs rather than flat `VectorXR` arrays of

@@ -158,7 +158,7 @@ struct ANCF3243Mesh {
     int n_nodes = 0;
     int n_elements = 0;
     std::vector<std::string> node_family;  // size = n_nodes ("H"/"V"/...)
-    VectorXR x12, y12, z12;                // size = 4 * n_nodes each
+    VectorXR x_cur, y_cur, z_cur;          // size = 4 * n_nodes each
     MatrixXi element_connectivity;         // n_elements x 2 (node IDs)
 
     // Linear constraints encoded in scalar-DOF space (see LinearConstraintCSR).
@@ -181,7 +181,7 @@ struct ANCF3443Mesh {
     int n_nodes = 0;
     int n_elements = 0;
     std::vector<std::string> node_family;  // size = n_nodes ("R"/"S"/...)
-    VectorXR x12, y12, z12;                // size = 4 * n_nodes each
+    VectorXR x_cur, y_cur, z_cur;          // size = 4 * n_nodes each
 
     std::vector<std::string> element_family;  // size = n_elements
     VectorXR element_L;                       // size = n_elements
@@ -222,12 +222,12 @@ void AppendANCF3243VectorWeldedConstraint(LinearConstraintBuilder& builder,
                                           const Matrix3R& Q);
 
 // Appends a "fixed coefficient" constraint for coef_index (ANCF coefficient
-// index): component-wise equality to the provided reference (x12/y12/z12).
+// index): component-wise equality to the provided reference (x_cur/y_cur/z_cur).
 void AppendANCF3243FixedCoefficient(LinearConstraintBuilder& builder,
                                     int coef_index,
-                                    const VectorXR& x12_ref,
-                                    const VectorXR& y12_ref,
-                                    const VectorXR& z12_ref);
+                                    const VectorXR& x_ref,
+                                    const VectorXR& y_ref,
+                                    const VectorXR& z_ref);
 
 /**
  * Write FEAT10 tetrahedral mesh to VTK format for visualization

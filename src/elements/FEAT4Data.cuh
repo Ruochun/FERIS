@@ -70,40 +70,40 @@ struct GPU_FEAT4_Data : public ElementBase {
         return d_tet1pt_weights[qp_idx];
     }
 
-    __device__ Map<VectorXR> x12() {
-        return Map<VectorXR>(d_h_x12, n_coef);
+    __device__ Map<VectorXR> x_cur() {
+        return Map<VectorXR>(d_h_x_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const x12() const {
-        return Map<VectorXR>(d_h_x12, n_coef);
+    __device__ Map<VectorXR> const x_cur() const {
+        return Map<VectorXR>(d_h_x_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> y12() {
-        return Map<VectorXR>(d_h_y12, n_coef);
+    __device__ Map<VectorXR> y_cur() {
+        return Map<VectorXR>(d_h_y_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const y12() const {
-        return Map<VectorXR>(d_h_y12, n_coef);
+    __device__ Map<VectorXR> const y_cur() const {
+        return Map<VectorXR>(d_h_y_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> z12() {
-        return Map<VectorXR>(d_h_z12, n_coef);
+    __device__ Map<VectorXR> z_cur() {
+        return Map<VectorXR>(d_h_z_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const z12() const {
-        return Map<VectorXR>(d_h_z12, n_coef);
+    __device__ Map<VectorXR> const z_cur() const {
+        return Map<VectorXR>(d_h_z_cur, n_coef);
     }
 
-    __device__ Map<VectorXR> const x12_jac() const {
-        return Map<VectorXR>(d_h_x12_jac, n_coef);
+    __device__ Map<VectorXR> const x_cur_jac() const {
+        return Map<VectorXR>(d_h_x_cur_jac, n_coef);
     }
 
-    __device__ Map<VectorXR> const y12_jac() const {
-        return Map<VectorXR>(d_h_y12_jac, n_coef);
+    __device__ Map<VectorXR> const y_cur_jac() const {
+        return Map<VectorXR>(d_h_y_cur_jac, n_coef);
     }
 
-    __device__ Map<VectorXR> const z12_jac() const {
-        return Map<VectorXR>(d_h_z12_jac, n_coef);
+    __device__ Map<VectorXR> const z_cur_jac() const {
+        return Map<VectorXR>(d_h_z_cur_jac, n_coef);
     }
 
     __device__ Map<MatrixXR> F(int elem_idx, int qp_idx) {
@@ -348,7 +348,7 @@ struct GPU_FEAT4_Data : public ElementBase {
 
     void RetrieveConstraintJacobianToCPU(MatrixXR& constraint_jac) override {}
 
-    void RetrievePositionToCPU(VectorXR& x12, VectorXR& y12, VectorXR& z12) override;
+    void RetrievePositionToCPU(VectorXR& x_cur, VectorXR& y_cur, VectorXR& z_cur) override;
 
     void RetrieveDeformationGradientToCPU(std::vector<std::vector<MatrixXR>>& deformation_gradient) override {}
 
@@ -366,18 +366,18 @@ struct GPU_FEAT4_Data : public ElementBase {
     }
 
     void Initialize() {
-        da_h_x12.resize(n_coef);
-        da_h_x12.BindDevicePointer(&d_h_x12);
-        da_h_y12.resize(n_coef);
-        da_h_y12.BindDevicePointer(&d_h_y12);
-        da_h_z12.resize(n_coef);
-        da_h_z12.BindDevicePointer(&d_h_z12);
-        da_h_x12_jac.resize(n_coef);
-        da_h_x12_jac.BindDevicePointer(&d_h_x12_jac);
-        da_h_y12_jac.resize(n_coef);
-        da_h_y12_jac.BindDevicePointer(&d_h_y12_jac);
-        da_h_z12_jac.resize(n_coef);
-        da_h_z12_jac.BindDevicePointer(&d_h_z12_jac);
+        da_h_x_cur.resize(n_coef);
+        da_h_x_cur.BindDevicePointer(&d_h_x_cur);
+        da_h_y_cur.resize(n_coef);
+        da_h_y_cur.BindDevicePointer(&d_h_y_cur);
+        da_h_z_cur.resize(n_coef);
+        da_h_z_cur.BindDevicePointer(&d_h_z_cur);
+        da_h_x_cur_jac.resize(n_coef);
+        da_h_x_cur_jac.BindDevicePointer(&d_h_x_cur_jac);
+        da_h_y_cur_jac.resize(n_coef);
+        da_h_y_cur_jac.BindDevicePointer(&d_h_y_cur_jac);
+        da_h_z_cur_jac.resize(n_coef);
+        da_h_z_cur_jac.BindDevicePointer(&d_h_z_cur_jac);
         da_element_connectivity.resize(n_elem * Quadrature::N_NODE_T4_4);
         da_element_connectivity.BindDevicePointer(&d_element_connectivity);
         da_tet1pt_x.resize(Quadrature::N_QP_T4_1);
@@ -424,27 +424,27 @@ struct GPU_FEAT4_Data : public ElementBase {
                const VectorXR& tet1pt_y_host,
                const VectorXR& tet1pt_z_host,
                const VectorXR& tet1pt_weights_host,
-               const VectorXR& h_x12,
-               const VectorXR& h_y12,
-               const VectorXR& h_z12,
+               const VectorXR& h_x_cur,
+               const VectorXR& h_y_cur,
+               const VectorXR& h_z_cur,
                const MatrixXi& element_connectivity) {
         if (is_setup) {
             MOPHI_ERROR(std::string("GPU_FEAT4_Data is already set up."));
             return;
         }
 
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12.host());
-        da_h_x12.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12.host());
-        da_h_y12.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12.host());
-        da_h_z12.ToDevice();
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12_jac.host());
-        da_h_x12_jac.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12_jac.host());
-        da_h_y12_jac.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12_jac.host());
-        da_h_z12_jac.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur.host());
+        da_h_x_cur.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur.host());
+        da_h_y_cur.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur.host());
+        da_h_z_cur.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur_jac.host());
+        da_h_x_cur_jac.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur_jac.host());
+        da_h_y_cur_jac.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur_jac.host());
+        da_h_z_cur_jac.ToDevice();
 
         std::copy(element_connectivity.data(), element_connectivity.data() + n_elem * Quadrature::N_NODE_T4_4,
                   da_element_connectivity.host());
@@ -586,16 +586,16 @@ struct GPU_FEAT4_Data : public ElementBase {
         SetExternalForce(flat);
     }
 
-    const Real* GetX12DevicePtr() const {
-        return d_h_x12;
+    const Real* GetXCurDevicePtr() const {
+        return d_h_x_cur;
     }
 
-    const Real* GetY12DevicePtr() const {
-        return d_h_y12;
+    const Real* GetYCurDevicePtr() const {
+        return d_h_y_cur;
     }
 
-    const Real* GetZ12DevicePtr() const {
-        return d_h_z12;
+    const Real* GetZCurDevicePtr() const {
+        return d_h_z_cur;
     }
 
     Real* GetExternalForceDevicePtr() {
@@ -606,30 +606,30 @@ struct GPU_FEAT4_Data : public ElementBase {
         return d_f_ext;
     }
 
-    void UpdatePositions(const VectorXR& h_x12, const VectorXR& h_y12, const VectorXR& h_z12) {
-        if (h_x12.size() != n_coef || h_y12.size() != n_coef || h_z12.size() != n_coef) {
+    void UpdatePositions(const VectorXR& h_x_cur, const VectorXR& h_y_cur, const VectorXR& h_z_cur) {
+        if (h_x_cur.size() != n_coef || h_y_cur.size() != n_coef || h_z_cur.size() != n_coef) {
             MOPHI_ERROR("Position vector size mismatch.");
             return;
         }
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12.host());
-        da_h_x12.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12.host());
-        da_h_y12.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12.host());
-        da_h_z12.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur.host());
+        da_h_x_cur.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur.host());
+        da_h_y_cur.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur.host());
+        da_h_z_cur.ToDevice();
     }
 
-    void UpdateConstraintTargets(const VectorXR& h_x12, const VectorXR& h_y12, const VectorXR& h_z12) {
-        if (h_x12.size() != n_coef || h_y12.size() != n_coef || h_z12.size() != n_coef) {
+    void UpdateConstraintTargets(const VectorXR& h_x_cur, const VectorXR& h_y_cur, const VectorXR& h_z_cur) {
+        if (h_x_cur.size() != n_coef || h_y_cur.size() != n_coef || h_z_cur.size() != n_coef) {
             MOPHI_ERROR("Position vector size mismatch.");
             return;
         }
-        std::copy(h_x12.data(), h_x12.data() + n_coef, da_h_x12_jac.host());
-        da_h_x12_jac.ToDevice();
-        std::copy(h_y12.data(), h_y12.data() + n_coef, da_h_y12_jac.host());
-        da_h_y12_jac.ToDevice();
-        std::copy(h_z12.data(), h_z12.data() + n_coef, da_h_z12_jac.host());
-        da_h_z12_jac.ToDevice();
+        std::copy(h_x_cur.data(), h_x_cur.data() + n_coef, da_h_x_cur_jac.host());
+        da_h_x_cur_jac.ToDevice();
+        std::copy(h_y_cur.data(), h_y_cur.data() + n_coef, da_h_y_cur_jac.host());
+        da_h_y_cur_jac.ToDevice();
+        std::copy(h_z_cur.data(), h_z_cur.data() + n_coef, da_h_z_cur_jac.host());
+        da_h_z_cur_jac.ToDevice();
     }
 
     void SetNodalFixed(const VectorXi& fixed_nodes);
@@ -637,12 +637,12 @@ struct GPU_FEAT4_Data : public ElementBase {
     void UpdateNodalFixed(const VectorXi& fixed_nodes);
 
     void Destroy() {
-        da_h_x12.free();
-        da_h_y12.free();
-        da_h_z12.free();
-        da_h_x12_jac.free();
-        da_h_y12_jac.free();
-        da_h_z12_jac.free();
+        da_h_x_cur.free();
+        da_h_y_cur.free();
+        da_h_z_cur.free();
+        da_h_x_cur_jac.free();
+        da_h_y_cur_jac.free();
+        da_h_z_cur_jac.free();
         da_element_connectivity.free();
 
         if (is_csr_setup) {
@@ -733,8 +733,8 @@ struct GPU_FEAT4_Data : public ElementBase {
     int n_constraint;
 
   private:
-    mophi::DualArray<Real> da_h_x12, da_h_y12, da_h_z12;
-    mophi::DualArray<Real> da_h_x12_jac, da_h_y12_jac, da_h_z12_jac;
+    mophi::DualArray<Real> da_h_x_cur, da_h_y_cur, da_h_z_cur;
+    mophi::DualArray<Real> da_h_x_cur_jac, da_h_y_cur_jac, da_h_z_cur_jac;
     mophi::DualArray<int> da_element_connectivity;
     mophi::DualArray<Real> da_tet1pt_x, da_tet1pt_y, da_tet1pt_z, da_tet1pt_weights;
     mophi::DualArray<Real> da_grad_N_ref;
@@ -744,8 +744,8 @@ struct GPU_FEAT4_Data : public ElementBase {
     mophi::DualArray<Real> da_constraint;
     mophi::DualArray<int> da_fixed_nodes;
 
-    Real *d_h_x12, *d_h_y12, *d_h_z12;
-    Real *d_h_x12_jac, *d_h_y12_jac, *d_h_z12_jac;
+    Real *d_h_x_cur, *d_h_y_cur, *d_h_z_cur;
+    Real *d_h_x_cur_jac, *d_h_y_cur_jac, *d_h_z_cur_jac;
 
     int* d_element_connectivity;  // (n_elem, 4)
 

@@ -120,9 +120,9 @@ __global__ void dn_du_pre_feat4_kernel(GPU_FEAT4_Data* d_data) {
     Real X_elem[4][3];
     for (int node = 0; node < 4; node++) {
         int global_node_idx = d_data->element_connectivity()(elem_idx, node);
-        X_elem[node][0] = d_data->x12()(global_node_idx);
-        X_elem[node][1] = d_data->y12()(global_node_idx);
-        X_elem[node][2] = d_data->z12()(global_node_idx);
+        X_elem[node][0] = d_data->x_cur()(global_node_idx);
+        X_elem[node][1] = d_data->y_cur()(global_node_idx);
+        X_elem[node][2] = d_data->z_cur()(global_node_idx);
     }
 
     // Jacobian J = Σ(X_node ⊗ dN_dxi) for 4-node tet
@@ -580,16 +580,16 @@ void GPU_FEAT4_Data::RetrieveExternalForceToCPU(VectorXR& external_force) {
     std::copy(da_f_ext.host(), da_f_ext.host() + n_coef * 3, external_force.data());
 }
 
-void GPU_FEAT4_Data::RetrievePositionToCPU(VectorXR& x12_out, VectorXR& y12_out, VectorXR& z12_out) {
-    x12_out.resize(n_coef);
-    y12_out.resize(n_coef);
-    z12_out.resize(n_coef);
-    da_h_x12.ToHost();
-    da_h_y12.ToHost();
-    da_h_z12.ToHost();
-    std::copy(da_h_x12.host(), da_h_x12.host() + n_coef, x12_out.data());
-    std::copy(da_h_y12.host(), da_h_y12.host() + n_coef, y12_out.data());
-    std::copy(da_h_z12.host(), da_h_z12.host() + n_coef, z12_out.data());
+void GPU_FEAT4_Data::RetrievePositionToCPU(VectorXR& x_cur_out, VectorXR& y_cur_out, VectorXR& z_cur_out) {
+    x_cur_out.resize(n_coef);
+    y_cur_out.resize(n_coef);
+    z_cur_out.resize(n_coef);
+    da_h_x_cur.ToHost();
+    da_h_y_cur.ToHost();
+    da_h_z_cur.ToHost();
+    std::copy(da_h_x_cur.host(), da_h_x_cur.host() + n_coef, x_cur_out.data());
+    std::copy(da_h_y_cur.host(), da_h_y_cur.host() + n_coef, y_cur_out.data());
+    std::copy(da_h_z_cur.host(), da_h_z_cur.host() + n_coef, z_cur_out.data());
 }
 
 void GPU_FEAT4_Data::RetrievePFromFToCPU(std::vector<std::vector<MatrixXR>>& p_from_F) {
