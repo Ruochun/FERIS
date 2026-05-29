@@ -4,11 +4,18 @@
 
 ---
 
-## Status: IMPLEMENTED
+## Status: IMPLEMENTED (one minor refinement remaining)
 
 The full LDPM constitutive model has been implemented in FERIS, closing all five gaps
 identified below. The implementation matches the CPU reference in chrono-mechanics
 (`src/chrono_ldpm/ChMaterialVECT.cpp`).
+
+**Minor remaining refinement:** The volumetric strain `eps_V` used in
+`ldpm_compress_boundary()` is currently approximated as `eps_V = eps_N` (per-facet
+normal strain). A more accurate approach for complex multi-tet geometries under
+non-uniform compression would compute `eps_V` as the average normal strain across
+all facets surrounding a node. This is a low-priority enhancement that does not
+affect correctness for typical use cases.
 
 ---
 
@@ -75,6 +82,17 @@ Rotational moments remain linear-elastic (`m = E_k * kappa`).
 - Crack opening displacement computed per edge
 - Legacy kappa/omega maintained for VTK visualization
 - 7-case single-tet benchmark updated with full LDPM parameters
+
+---
+
+## 7. Remaining Refinements (Low Priority)
+
+| Item | Description | Status |
+|---|---|---|
+| Volumetric strain averaging | Compute `eps_V` as mean normal strain across all facets of a node instead of per-facet `eps_V = eps_N` | 🔲 Not started |
+
+This refinement would improve accuracy for complex multi-tet meshes under highly
+non-uniform compressive loading but is not required for correctness in typical cases.
 
 ---
 

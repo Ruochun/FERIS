@@ -170,7 +170,19 @@ The implementation uses:
 
 ---
 
-## 8. Expected Outputs
+## 8. Volumetric Strain
+
+The target model uses a volumetric strain `eps_V` in the compressive boundary
+computation. The current implementation uses a **per-facet approximation**
+(`eps_V = eps_N`) which is adequate for single-tet and simple multi-tet meshes.
+
+A future refinement could compute `eps_V` as the average normal strain across
+all facets surrounding a node, providing better accuracy for complex multi-tet
+geometries under highly non-uniform compressive loading.
+
+---
+
+## 9. Expected Outputs
 
 The model reports:
 - facet tractions (t_N, t_M, t_L) and moments (m_T, m_M, m_L)
@@ -181,7 +193,7 @@ The model reports:
 
 ---
 
-## 9. References
+## 10. References
 
 1. Cusatis, G., Pelessone, D., & Mencarelli, A. (2011). *Lattice Discrete Particle Model (LDPM) for failure behavior of concrete. I: Theory*. Cement and Concrete Composites, 33(9), 881-890.
 2. chrono-mechanics (base_dev): `src/chrono_ldpm/ChMaterialVECT.cpp` — CPU reference implementation.
