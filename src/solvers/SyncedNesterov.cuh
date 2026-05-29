@@ -170,40 +170,92 @@ class SyncedNesterovSolver : public SolverBase {
 
 #if defined(__CUDACC__)
     // Device accessors (define as __device__ in .cuh or .cu as needed)
-    __device__ Map<VectorXR> v_guess() { return Map<VectorXR>(d_v_guess_, n_coef_ * 3); }
-    __device__ Map<VectorXR> v_prev() { return Map<VectorXR>(d_v_prev_, n_coef_ * 3); }
-    __device__ Map<VectorXR> v_k() { return Map<VectorXR>(d_v_k_, n_coef_ * 3); }
-    __device__ Map<VectorXR> v_next() { return Map<VectorXR>(d_v_next_, n_coef_ * 3); }
-    __device__ Map<VectorXR> lambda_guess() { return Map<VectorXR>(d_lambda_guess_, n_constraints_); }
-    __device__ Map<VectorXR> g() { return Map<VectorXR>(d_g_, 3 * n_coef_); }
+    __device__ Map<VectorXR> v_guess() {
+        return Map<VectorXR>(d_v_guess_, n_coef_ * 3);
+    }
+    __device__ Map<VectorXR> v_prev() {
+        return Map<VectorXR>(d_v_prev_, n_coef_ * 3);
+    }
+    __device__ Map<VectorXR> v_k() {
+        return Map<VectorXR>(d_v_k_, n_coef_ * 3);
+    }
+    __device__ Map<VectorXR> v_next() {
+        return Map<VectorXR>(d_v_next_, n_coef_ * 3);
+    }
+    __device__ Map<VectorXR> lambda_guess() {
+        return Map<VectorXR>(d_lambda_guess_, n_constraints_);
+    }
+    __device__ Map<VectorXR> g() {
+        return Map<VectorXR>(d_g_, 3 * n_coef_);
+    }
 
-    __device__ int gpu_n_constraints() { return n_constraints_; }
-    __device__ int gpu_n_total_qp() { return n_total_qp_; }
-    __device__ int gpu_n_shape() { return n_shape_; }
+    __device__ int gpu_n_constraints() {
+        return n_constraints_;
+    }
+    __device__ int gpu_n_total_qp() {
+        return n_total_qp_;
+    }
+    __device__ int gpu_n_shape() {
+        return n_shape_;
+    }
 
-    __device__ Real* prev_norm_g() { return d_prev_norm_g_; }
-    __device__ Real* norm_g() { return d_norm_g_; }
-    __device__ int* inner_flag() { return d_inner_flag_; }
-    __device__ int* outer_flag() { return d_outer_flag_; }
-    __device__ Real* solver_rho() { return d_solver_rho_; }
-    __device__ Real solver_alpha() const { return *d_alpha_; }
-    __device__ Real solver_inner_tol() const { return *d_inner_tol_; }
-    __device__ Real solver_outer_tol() const { return *d_outer_tol_; }
-    __device__ int solver_max_outer() const { return *d_max_outer_; }
-    __device__ int solver_max_inner() const { return *d_max_inner_; }
-    __device__ Real solver_time_step() const { return *d_time_step_; }
+    __device__ Real* prev_norm_g() {
+        return d_prev_norm_g_;
+    }
+    __device__ Real* norm_g() {
+        return d_norm_g_;
+    }
+    __device__ int* inner_flag() {
+        return d_inner_flag_;
+    }
+    __device__ int* outer_flag() {
+        return d_outer_flag_;
+    }
+    __device__ Real* solver_rho() {
+        return d_solver_rho_;
+    }
+    __device__ Real solver_alpha() const {
+        return *d_alpha_;
+    }
+    __device__ Real solver_inner_tol() const {
+        return *d_inner_tol_;
+    }
+    __device__ Real solver_outer_tol() const {
+        return *d_outer_tol_;
+    }
+    __device__ int solver_max_outer() const {
+        return *d_max_outer_;
+    }
+    __device__ int solver_max_inner() const {
+        return *d_max_inner_;
+    }
+    __device__ Real solver_time_step() const {
+        return *d_time_step_;
+    }
 
-    __device__ Map<VectorXR> x_prev() { return Map<VectorXR>(d_x_prev, n_coef_); }
-    __device__ Map<VectorXR> y_prev() { return Map<VectorXR>(d_y_prev, n_coef_); }
-    __device__ Map<VectorXR> z_prev() { return Map<VectorXR>(d_z_prev, n_coef_); }
+    __device__ Map<VectorXR> x_prev() {
+        return Map<VectorXR>(d_x_prev, n_coef_);
+    }
+    __device__ Map<VectorXR> y_prev() {
+        return Map<VectorXR>(d_y_prev, n_coef_);
+    }
+    __device__ Map<VectorXR> z_prev() {
+        return Map<VectorXR>(d_z_prev, n_coef_);
+    }
 #endif
 
-    __host__ __device__ int get_n_coef() const { return n_coef_; }
-    __host__ __device__ int get_n_beam() const { return n_beam_; }
+    __host__ __device__ int get_n_coef() const {
+        return n_coef_;
+    }
+    __host__ __device__ int get_n_beam() const {
+        return n_beam_;
+    }
 
     void OneStepNesterov();
 
-    void Solve() override { OneStepNesterov(); }
+    void Solve() override {
+        OneStepNesterov();
+    }
 
   private:
     ElementType type_;
