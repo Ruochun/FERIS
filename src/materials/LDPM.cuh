@@ -147,7 +147,7 @@ __device__ __forceinline__ Real ldpm_fracture_boundary(Real eps_N,
     const Real eps_max = sqrt(max_eps_N * max_eps_N + alpha * max_eps_T * max_eps_T);
 
     // Stress boundary with exponential softening
-    const Real decay_arg = H0 * max(eps_max - eps0, Real(0)) / sigma0;
+    const Real decay_arg = H0 * std::max(eps_max - eps0, Real(0)) / sigma0;
     const Real sigma_bt = sigma0 * exp(-decay_arg);
 
     // Unloading check
@@ -159,7 +159,7 @@ __device__ __forceinline__ Real ldpm_fracture_boundary(Real eps_N,
 
     // Elastic predictor
     const Real strs_ela = E0 * (eps_Q - prev_eff_strain) + prev_eff_stress;
-    Real sigma_fr = min(max(strs_ela, Real(0)), sigma_bt_eff);
+    Real sigma_fr = std::min(std::max(strs_ela, Real(0)), sigma_bt_eff);
 
     if (p.elastic_flag) {
         sigma_fr = strs_ela;
@@ -201,7 +201,7 @@ ldpm_compress_boundary(Real eps_N, Real eps_V, Real prev_sigma_N, Real prev_eps_
     }
 
     // Confinement-sensitive hardening modulus
-    const Real Hc = (H_c0 - H_c1) / (Real(1) + kc2 * max(r_DV - kc1, Real(0))) + H_c1;
+    const Real Hc = (H_c0 - H_c1) / (Real(1) + kc2 * std::max(r_DV - kc1, Real(0))) + H_c1;
     const Real sigma_c1 = sigma_c0 + (eps_c1 - eps_c0) * Hc;
 
     // Compressive boundary stress
@@ -209,7 +209,7 @@ ldpm_compress_boundary(Real eps_N, Real eps_V, Real prev_sigma_N, Real prev_eps_
     if (-eps_DV <= Real(0)) {
         sigma_bc = sigma_c0;
     } else if (-eps_DV > Real(0) && -eps_DV <= eps_c1) {
-        sigma_bc = sigma_c0 + max(-eps_DV - eps_c0, Real(0)) * Hc;
+        sigma_bc = sigma_c0 + std::max(-eps_DV - eps_c0, Real(0)) * Hc;
     } else {
         sigma_bc = sigma_c1 * exp((-eps_DV - eps_c1) * Hc / sigma_c1);
     }
@@ -224,7 +224,7 @@ ldpm_compress_boundary(Real eps_N, Real eps_V, Real prev_sigma_N, Real prev_eps_
 
     // Elastic predictor clamped to boundary
     const Real sigma_ela = prev_sigma_N + ENc * (eps_N - prev_eps_N);
-    Real sigma_com = min(max(sigma_ela, -sigma_bc), Real(0));
+    Real sigma_com = std::min(std::max(sigma_ela, -sigma_bc), Real(0));
 
     if (p.elastic_flag) {
         sigma_com = sigma_ela;
@@ -264,7 +264,7 @@ __device__ __forceinline__ void ldpm_shear_boundary(Real eps_M,
     const Real sigma_L_ela = prev_sigma_L + (eps_L - prev_eps_L) * ET;
     const Real sigma_T_ela = sqrt(sigma_M_ela * sigma_M_ela + sigma_L_ela * sigma_L_ela);
 
-    Real sigma_T = min(max(sigma_T_ela, Real(0)), sigma_bs);
+    Real sigma_T = std::min(std::max(sigma_T_ela, Real(0)), sigma_bs);
 
     if (p.elastic_flag) {
         sigma_T = sigma_T_ela;

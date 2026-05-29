@@ -156,7 +156,7 @@ __device__ __forceinline__ void compute_p(int edge_idx,
         d_data->edge_kappa(edge_idx) = statev[8];
         const Real crack_w = statev[11];
         const Real eff_crack = (l0 > Real(0)) ? crack_w / l0 : Real(0);
-        d_data->edge_omega(edge_idx) = min(eff_crack / max(statev[8], Real(1e-30)), Real(1));
+        d_data->edge_omega(edge_idx) = std::min(eff_crack / std::max(statev[8], Real(1e-30)), Real(1));
     } else {
         // Legacy Cusatis tensile-shear damage model
         Real kappa_new, omega_new;

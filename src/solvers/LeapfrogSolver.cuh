@@ -129,26 +129,44 @@ class LeapfrogSolver : public SolverBase {
 
 #if defined(__CUDACC__)
     // Half-step nodal velocity vector (length 3*n_coef_).
-    __device__ Map<VectorXR> v() { return Map<VectorXR>(d_v_, n_coef_ * 3); }
+    __device__ Map<VectorXR> v() {
+        return Map<VectorXR>(d_v_, n_coef_ * 3);
+    }
 
     // Lumped nodal mass vector (length n_coef_).
-    __device__ Map<VectorXR> mass_lump() { return Map<VectorXR>(d_mass_lump_, n_coef_); }
+    __device__ Map<VectorXR> mass_lump() {
+        return Map<VectorXR>(d_mass_lump_, n_coef_);
+    }
 
     // Half-step rotational velocity vector for TYPE_LDPM_TET4 (length 3*n_coef_).
     // Stored immediately after the translational velocities in da_v_.
-    __device__ Map<VectorXR> v_rot() { return Map<VectorXR>(d_v_ + n_coef_ * 3, n_coef_ * 3); }
+    __device__ Map<VectorXR> v_rot() {
+        return Map<VectorXR>(d_v_ + n_coef_ * 3, n_coef_ * 3);
+    }
 
     // Per-node rotational inertia for TYPE_LDPM_TET4 (length n_coef_).
     // Stored immediately after the translational masses in da_mass_lump_.
-    __device__ Map<VectorXR> mass_inertia() { return Map<VectorXR>(d_mass_lump_ + n_coef_, n_coef_); }
+    __device__ Map<VectorXR> mass_inertia() {
+        return Map<VectorXR>(d_mass_lump_ + n_coef_, n_coef_);
+    }
 
-    __device__ Real solver_time_step() const { return *d_time_step_; }
+    __device__ Real solver_time_step() const {
+        return *d_time_step_;
+    }
 #endif
 
-    __host__ __device__ int get_n_coef() const { return n_coef_; }
-    __host__ __device__ int get_n_beam() const { return n_beam_; }
-    __host__ __device__ int get_n_total_qp() const { return n_total_qp_; }
-    __host__ __device__ int get_n_shape() const { return n_shape_; }
+    __host__ __device__ int get_n_coef() const {
+        return n_coef_;
+    }
+    __host__ __device__ int get_n_beam() const {
+        return n_beam_;
+    }
+    __host__ __device__ int get_n_total_qp() const {
+        return n_total_qp_;
+    }
+    __host__ __device__ int get_n_shape() const {
+        return n_shape_;
+    }
 
     // Seed specific nodal translational velocities into the leapfrog velocity
     // array (da_v_).  Call after SetParameters() (which zeroes all velocities)
@@ -354,7 +372,9 @@ class LeapfrogSolver : public SolverBase {
     // Advance one leapfrog time step.
     void OneStepLeapfrog();
 
-    void Solve() override { OneStepLeapfrog(); }
+    void Solve() override {
+        OneStepLeapfrog();
+    }
 
     // Backward half-kick to initialize the staggered leapfrog from a
     // full-step initial velocity v_0 stored in da_v_:
