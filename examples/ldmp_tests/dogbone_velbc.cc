@@ -72,6 +72,7 @@
 #include <MoPhiEssentials.h>
 
 #include "../src/elements/LDPMTet4Data.cuh"
+#include "../src/materials/LDPM.cuh"
 #include "../src/solvers/LeapfrogSolver.cuh"
 #include "../src/types.h"
 #include "../src/utils/ldpm_mesh_utils.h"
@@ -80,14 +81,31 @@ using namespace feris;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
-// Material parameters — identical to dogbone_forcebc.cc.
+// Full LDPM material parameters (Cusatis et al., 2011).
 // Unit system: mm-tonne-s (stress in N/mm² = MPa).
-static constexpr Real E_N_VAL = Real(60273.0);   // N/mm²  normal modulus (E₀)
-static constexpr Real ALPHA_T = Real(0.25);      // E_T / E_N  shear-to-normal ratio
-static constexpr Real BETA_K = Real(0.25);       // rotational coupling
-static constexpr Real RHO_VAL = Real(2.338e-9);  // tonne/mm³  (= 2338 kg/m³)
-static constexpr Real SIGMA_T_VAL = Real(3.44);  // N/mm²  mesoscale tensile strength
-static constexpr Real G_FT_VAL = Real(0.0491);   // N/mm   mode-I fracture energy
+static constexpr Real E_N_VAL = Real(60273.0);       // N/mm²  normal modulus (E₀)
+static constexpr Real ALPHA_VAL = Real(0.25);        // E_T / E_N  shear-to-normal ratio
+static constexpr Real RHO_VAL = Real(2.338e-9);      // tonne/mm³  (= 2338 kg/m³)
+static constexpr Real SIGMA_T_VAL = Real(3.44);      // N/mm²  tensile strength
+static constexpr Real L_T_VAL = Real(500.0);         // mm  tensile characteristic length
+static constexpr Real G_FT_VAL = Real(0.0491);       // N/mm  fracture energy (l_t * sigma_t^2 / (2*E0))
+static constexpr Real R_ST_VAL = Real(2.6);          // shear strength ratio (sigma_s / sigma_t)
+static constexpr Real N_T_VAL = Real(0.4);           // softening exponent
+static constexpr Real SIGMA_C0_VAL = Real(150.0);    // MPa  compressive yielding strength
+static constexpr Real HC0_RATIO = Real(0.40);        // initial hardening modulus ratio (H_c0/E_0)
+static constexpr Real KC0_VAL = Real(4.0);           // transitional strain ratio
+static constexpr Real KC1_VAL = Real(1.0);           // deviatoric strain threshold ratio
+static constexpr Real KC2_VAL = Real(5.0);           // deviatoric damage parameter
+static constexpr Real MU_0_VAL = Real(0.4);          // initial friction
+static constexpr Real MU_INF_VAL = Real(0.0);        // asymptotic friction
+static constexpr Real SIGMA_N0_VAL = Real(600.0);    // MPa  transitional stress
+static constexpr Real ED_RATIO = Real(1.0);          // densification ratio (E_d/E_0)
+static constexpr Real BETA_VAL = Real(0.0);          // volumetric-deviatoric coupling
+static constexpr Real K_T_VAL = Real(0.0);           // tensile unloading
+static constexpr Real R_S_VAL = Real(0.0);           // shear softening modulus ratio
+static constexpr Real HC1_RATIO = Real(0.1);         // final hardening modulus ratio (H_c1/E_0)
+static constexpr bool ELASTIC_FLAG = false;          // elastic analysis flag
+static constexpr Real BETA_K = Real(0.25);           // rotational coupling
 
 // Prescribed velocity of the top (driven) plate in mm/s.
 // A 1 mm/s loading rate is quasi-static relative to the elastic wave speed:
@@ -173,16 +191,12 @@ int main() {
     }
     std::cout << "  Min edge length: " << l_min << " mm\n";
 
-    // Derived material parameters.
-    const Real E_T_VAL = ALPHA_T * E_N_VAL;
+    // Derived rotational moduli [N·mm²] = beta_k * E_N * l_min².
     const Real E_kT_VAL = BETA_K * E_N_VAL * l_min * l_min;
     const Real E_kM_VAL = E_kT_VAL;
     const Real E_kL_VAL = E_kT_VAL;
 
-    // Cusatis softening modulus H_t ≈ l_min * σ_t / G_ft.
-    const Real H_T_VAL = l_min * SIGMA_T_VAL / G_FT_VAL;
     std::cout << "  Damage threshold strain e_t0 = " << SIGMA_T_VAL / E_N_VAL << "\n";
-    std::cout << "  Cusatis softening modulus H_t = " << H_T_VAL << "\n";
 
     // ──────────────────────────────────────────────────────────────────────────
     // 3. Identify fixed (bottom) and driven (top) particles
@@ -241,9 +255,34 @@ int main() {
 
     std::cout << "  Unique edges: " << element_data.n_edge << "\n";
 
-    element_data.SetMaterial(E_N_VAL, E_T_VAL, E_kT_VAL, E_kM_VAL, E_kL_VAL);
-    element_data.SetDamageParams(SIGMA_T_VAL, H_T_VAL);
-    element_data.SetDensity(RHO_VAL);
+    // Full LDPM parameter set.
+    LDPMParams ldpm_params{};
+    ldpm_params.E0 = E_N_VAL;
+    ldpm_params.alpha = ALPHA_VAL;
+    ldpm_params.sigma_t = SIGMA_T_VAL;
+    ldpm_params.sigma_s = R_ST_VAL * SIGMA_T_VAL;
+    ldpm_params.n_t = N_T_VAL;
+    ldpm_params.l_t = L_T_VAL;
+    ldpm_params.r_s = R_S_VAL;
+    ldpm_params.k_t = K_T_VAL;
+    ldpm_params.E_d = ED_RATIO * E_N_VAL;
+    ldpm_params.sigma_c0 = SIGMA_C0_VAL;
+    ldpm_params.H_c0 = HC0_RATIO * E_N_VAL;
+    ldpm_params.H_c1 = HC1_RATIO * E_N_VAL;
+    ldpm_params.kc0 = KC0_VAL;
+    ldpm_params.kc1 = KC1_VAL;
+    ldpm_params.kc2 = KC2_VAL;
+    ldpm_params.kc3 = Real(0);
+    ldpm_params.beta = BETA_VAL;
+    ldpm_params.mu_0 = MU_0_VAL;
+    ldpm_params.mu_inf = MU_INF_VAL;
+    ldpm_params.sigma_N0 = SIGMA_N0_VAL;
+    ldpm_params.E_kT = E_kT_VAL;
+    ldpm_params.E_kM = E_kM_VAL;
+    ldpm_params.E_kL = E_kL_VAL;
+    ldpm_params.rho = RHO_VAL;
+    ldpm_params.elastic_flag = ELASTIC_FLAG;
+    element_data.SetLDPMParams(ldpm_params);
 
     // No external forces — the top plate is driven kinematically.
     VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles));
