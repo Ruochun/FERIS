@@ -141,8 +141,8 @@ __device__ __forceinline__ void compute_p(int edge_idx,
         statev[k] = d_data->edge_statev(edge_idx, k);
     }
 
-    ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L, kappa_T, kappa_M, kappa_L, eps_V, l0,
-                                d_data->ldpm_params(), statev, t_N, t_M, t_L, m_T, m_M, m_L);
+    ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L, kappa_T, kappa_M, kappa_L, eps_V, l0, d_data->ldpm_params(),
+                                statev, t_N, t_M, t_L, m_T, m_M, m_L);
 
     // Write back updated state
     for (int k = 0; k < LDPM_N_STATEV; ++k) {

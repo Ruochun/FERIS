@@ -83,29 +83,29 @@ using namespace feris;
 
 // Full LDPM material parameters (Cusatis et al., 2011).
 // Unit system: mm-tonne-s (stress in N/mm² = MPa).
-static constexpr Real E_N_VAL = Real(60273.0);       // N/mm²  normal modulus (E₀)
-static constexpr Real ALPHA_VAL = Real(0.25);        // E_T / E_N  shear-to-normal ratio
-static constexpr Real RHO_VAL = Real(2.338e-9);      // tonne/mm³  (= 2338 kg/m³)
-static constexpr Real SIGMA_T_VAL = Real(3.44);      // N/mm²  tensile strength
-static constexpr Real L_T_VAL = Real(500.0);         // mm  tensile characteristic length
-static constexpr Real G_FT_VAL = Real(0.0491);       // N/mm  fracture energy (l_t * sigma_t^2 / (2*E0))
-static constexpr Real R_ST_VAL = Real(2.6);          // shear strength ratio (sigma_s / sigma_t)
-static constexpr Real N_T_VAL = Real(0.4);           // softening exponent
-static constexpr Real SIGMA_C0_VAL = Real(150.0);    // MPa  compressive yielding strength
-static constexpr Real HC0_RATIO = Real(0.40);        // initial hardening modulus ratio (H_c0/E_0)
-static constexpr Real KC0_VAL = Real(4.0);           // transitional strain ratio
-static constexpr Real KC1_VAL = Real(1.0);           // deviatoric strain threshold ratio
-static constexpr Real KC2_VAL = Real(5.0);           // deviatoric damage parameter
-static constexpr Real MU_0_VAL = Real(0.4);          // initial friction
-static constexpr Real MU_INF_VAL = Real(0.0);        // asymptotic friction
-static constexpr Real SIGMA_N0_VAL = Real(600.0);    // MPa  transitional stress
-static constexpr Real ED_RATIO = Real(1.0);          // densification ratio (E_d/E_0)
-static constexpr Real BETA_VAL = Real(0.0);          // volumetric-deviatoric coupling
-static constexpr Real K_T_VAL = Real(0.0);           // tensile unloading
-static constexpr Real R_S_VAL = Real(0.0);           // shear softening modulus ratio
-static constexpr Real HC1_RATIO = Real(0.1);         // final hardening modulus ratio (H_c1/E_0)
-static constexpr bool ELASTIC_FLAG = false;          // elastic analysis flag
-static constexpr Real BETA_K = Real(0.25);           // rotational coupling
+static constexpr Real E_N_VAL = Real(60273.0);     // N/mm²  normal modulus (E₀)
+static constexpr Real ALPHA_VAL = Real(0.25);      // E_T / E_N  shear-to-normal ratio
+static constexpr Real RHO_VAL = Real(2.338e-9);    // tonne/mm³  (= 2338 kg/m³)
+static constexpr Real SIGMA_T_VAL = Real(3.44);    // N/mm²  tensile strength
+static constexpr Real L_T_VAL = Real(500.0);       // mm  tensile characteristic length
+static constexpr Real G_FT_VAL = Real(0.0491);     // N/mm  fracture energy (l_t * sigma_t^2 / (2*E0))
+static constexpr Real R_ST_VAL = Real(2.6);        // shear strength ratio (sigma_s / sigma_t)
+static constexpr Real N_T_VAL = Real(0.4);         // softening exponent
+static constexpr Real SIGMA_C0_VAL = Real(150.0);  // MPa  compressive yielding strength
+static constexpr Real HC0_RATIO = Real(0.40);      // initial hardening modulus ratio (H_c0/E_0)
+static constexpr Real KC0_VAL = Real(4.0);         // transitional strain ratio
+static constexpr Real KC1_VAL = Real(1.0);         // deviatoric strain threshold ratio
+static constexpr Real KC2_VAL = Real(5.0);         // deviatoric damage parameter
+static constexpr Real MU_0_VAL = Real(0.4);        // initial friction
+static constexpr Real MU_INF_VAL = Real(0.0);      // asymptotic friction
+static constexpr Real SIGMA_N0_VAL = Real(600.0);  // MPa  transitional stress
+static constexpr Real ED_RATIO = Real(1.0);        // densification ratio (E_d/E_0)
+static constexpr Real BETA_VAL = Real(0.0);        // volumetric-deviatoric coupling
+static constexpr Real K_T_VAL = Real(0.0);         // tensile unloading
+static constexpr Real R_S_VAL = Real(0.0);         // shear softening modulus ratio
+static constexpr Real HC1_RATIO = Real(0.1);       // final hardening modulus ratio (H_c1/E_0)
+static constexpr bool ELASTIC_FLAG = false;        // elastic analysis flag
+static constexpr Real BETA_K = Real(0.25);         // rotational coupling
 
 // Prescribed velocity of the top (driven) plate in mm/s.
 // A 1 mm/s loading rate is quasi-static relative to the elastic wave speed:

@@ -660,7 +660,6 @@ void GPU_LDPMTet4_Data::SetDensity(Real rho_val) {
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 }
 
-
 void GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params) {
     if (!is_setup) {
         MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting LDPM parameters.");

@@ -338,7 +338,9 @@ int main(int argc, char* argv[]) {
     element_data.CalcMassMatrix();
 
     const Real c_N = std::sqrt(E0_VAL / RHO_VAL);
-    const Real dt = Real(0.5) * (l_min / c_N);
+    // Using bigger dt like 1e-5 seems to have no negative affect. This demo is hugely CPU--GPU transfer-dominate, so
+    // using bigger dt here is crucial in making it run reasonably fast.
+    const Real dt = 1e-5;  // Real(0.5) * (l_min / c_N);
     const Real T_SIM = case_def.key_times->back();
     const int n_steps = static_cast<int>(std::ceil(T_SIM / dt));
     const int vtk_interval = std::max(1, static_cast<int>(std::round(T_VTK / dt)));
