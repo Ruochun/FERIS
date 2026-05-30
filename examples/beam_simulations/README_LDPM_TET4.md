@@ -55,11 +55,18 @@ See `examples/ldmp_tests/dogbone_forcebc.cc` (force-BC) and
 ### Shared steps (both paths)
 
 ```cpp
-// Set 5 material moduli (Pa or Pa·m² for rotational ones)
-element.SetMaterial(E_N, E_T, E_kT, E_kM, E_kL);
-
-// Set density (kg/m³)
-element.SetDensity(rho);
+// Set LDPM parameters (full model with tensile fracture, compression, friction)
+LDPMParams ldpm_params{};
+ldpm_params.E0 = E_N;
+ldpm_params.alpha = alpha;       // E_T / E_N ratio
+ldpm_params.E_kT = E_kT;
+ldpm_params.E_kM = E_kM;
+ldpm_params.E_kL = E_kL;
+ldpm_params.rho = rho;
+ldpm_params.sigma_t = sigma_t;   // tensile strength
+// ... (set remaining LDPMParams fields as needed)
+ldpm_params.elastic_flag = false; // set true for elastic-only
+element.SetLDPMParams(ldpm_params);
 
 // Boundary conditions
 element.SetNodalFixed(fixed_nodes);     // clamp nodes

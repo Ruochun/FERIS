@@ -202,11 +202,8 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     __device__ const LDPMParams& ldpm_params() const {
         return *d_ldpm_params;
     }
-    __device__ bool use_full_ldpm() const {
-        return d_use_full_ldpm;
-    }
 
-    // ── Material parameters (legacy) ─────────────────────────────────────────
+    // ── Material parameters ──────────────────────────────────────────────────
 
     __device__ Real E_N() const {
         return *d_E_N;
@@ -222,12 +219,6 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     }
     __device__ Real E_kL() const {
         return *d_E_kL;
-    }
-    __device__ Real sigma_t() const {
-        return *d_sigma_t;
-    }
-    __device__ Real H_t() const {
-        return *d_H_t;
     }
 
     // ── Per-node rotational inertia ──────────────────────────────────────────
@@ -337,19 +328,8 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // E_kL – bending modulus, l-direction (Pa·m²)
     void SetMaterial(Real E_N_val, Real E_T_val, Real E_kT_val, Real E_kM_val, Real E_kL_val);
 
-    // Set Cusatis tensile damage parameters.  Must be called after Setup().
-    // sigma_t – mesoscale tensile strength  (same units as E_N, e.g. N/mm²)
-    // H_t     – softening modulus [dimensionless, i.e. per unit strain]
-    //           Typical value: H_t ≈ l_ch * sigma_t / G_ft
-    //           where l_ch is a characteristic edge length and G_ft the
-    //           mode-I fracture energy per unit area.
-    //           If SetDamageParams is not called, sigma_t defaults to 0
-    //           and no damage is applied (falls back to linear elastic).
-    void SetDamageParams(Real sigma_t_val, Real H_t_val);
-
     // Set the full LDPM parameter set.  Must be called after Setup().
-    // Switches the constitutive law from the legacy simplified model to
-    // the full LDPM model with tensile fracture, compression, and friction.
+    // Configures the full LDPM model with tensile fracture, compression, and friction.
     void SetLDPMParams(const LDPMParams& params);
 
     void SetDensity(Real rho_val);
@@ -566,7 +546,6 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // ── Full LDPM material parameters (device) ───────────────────────────────
     LDPMParams* d_ldpm_params = nullptr;
-    bool d_use_full_ldpm = false;
 
     // ── Subfacet → global edge index (built by SetupFromMesh) ─────────────────
     // da_subfacet_edge_idx[sf] = global edge index for sub-facet sf.
@@ -595,8 +574,6 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     Real* d_E_kM;
     Real* d_E_kL;
     Real* d_rho;
-    Real* d_sigma_t;  // Cusatis tensile strength
-    Real* d_H_t;      // Cusatis softening modulus
     Real h_rho;
 
     bool is_setup = false;

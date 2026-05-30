@@ -16,13 +16,7 @@
    - 3.2 [Path B: File-based override (SetupFromMesh)](#32-path-b-file-based-override-setupfrommesh)
 4. [Nodal State — 6 DOFs per Particle](#4-nodal-state--6-dofs-per-particle)
 5. [Strain Computation — compute_p](#5-strain-computation--compute_p)
-6. [Constitutive Law — Cusatis Tensile-Shear Damage](#6-constitutive-law--cusatis-tensile-shear-damage)
-   - 6.1 [Damage driving strain](#61-damage-driving-strain)
-   - 6.2 [History variable — irreversibility](#62-history-variable--irreversibility)
-   - 6.3 [Crack and failure definition](#63-crack-and-failure-definition)
-   - 6.4 [Traction law — asymmetric tension/compression](#64-traction-law--asymmetric-tensioncompression)
-   - 6.5 [Rotational moments — always elastic](#65-rotational-moments--always-elastic)
-   - 6.6 [Code implementation — full function signature](#66-code-implementation--full-function-signature)
+6. [Constitutive Law — Full LDPM Model](#6-constitutive-law)
 7. [Force Assembly — Facet Tractions to Nodal Forces](#7-force-assembly--facet-tractions-to-nodal-forces)
 8. [Mass Matrix](#8-mass-matrix)
 9. [Leapfrog Time Integration](#9-leapfrog-time-integration)
@@ -40,12 +34,9 @@ rigid **particles** (nodes) whose interactions are carried by Voronoi-polyhedral
 is not prescribed globally but emerges spontaneously when enough individual facets
 lose their load-carrying capacity.
 
-The implementation supports **two constitutive law modes**:
-
-1. **Full LDPM model** (activated via `SetLDPMParams`): tensile fracture with mode-mixity,
-   compressive yielding/hardening/densification, pressure-dependent friction.
-2. **Legacy simplified model** (via `SetMaterial` + `SetDamageParams`): single tensile-shear
-   damage variable, elastic compression.
+The implementation uses the **full LDPM constitutive model** (activated via `SetLDPMParams`):
+tensile fracture with mode-mixity, compressive yielding/hardening/densification, and
+pressure-dependent friction.
 
 This implementation runs the full LDPM workflow on the GPU. The main types involved are:
 
@@ -57,8 +48,7 @@ This implementation runs the full LDPM workflow on the GPU. The main types invol
 | `ldpm_fracture_boundary` | `LDPM.cuh` | Device function: tensile-shear fracture with mode-mixity softening |
 | `ldpm_compress_boundary` | `LDPM.cuh` | Device function: compressive yielding / hardening / pore collapse |
 | `ldpm_shear_boundary` | `LDPM.cuh` | Device function: pressure-dependent frictional shear limit |
-| `ldpm_tet4_cusatis_traction` | `LDPM.cuh` | Device function: legacy simplified constitutive law (backward compat) |
-| `compute_p` | `LDPMTet4DataFunc.cuh` | Device function: strains → constitutive dispatch → tractions for one edge |
+| `compute_p` | `LDPMTet4DataFunc.cuh` | Device function: strains → constitutive update → tractions for one edge |
 | `compute_internal_force` | `LDPMTet4DataFunc.cuh` | Device function: scatter tractions to nodal forces |
 | `LeapfrogSolver` | `LeapfrogSolver.cu` | Explicit time integrator; dispatches all CUDA kernels |
 
@@ -234,8 +224,8 @@ Six separate GPU device arrays hold the per-particle state, each of length `n_no
 
 ```cpp
 // LDPMTet4Data.cuh — device accessors
-__device__ Map<VectorXR> x12()     { return Map<VectorXR>(d_x12,  n_nodes); }
-__device__ Map<VectorXR> rx12()    { return Map<VectorXR>(d_rx12, n_nodes); }  // θ_x
+__device__ Map<VectorXR> x_cur()     { return Map<VectorXR>(d_x_cur,  n_nodes); }
+__device__ Map<VectorXR> rot_x_cur() { return Map<VectorXR>(d_rot_x_cur, n_nodes); }  // θ_x
 
 __device__ Map<VectorXR> f_int()   { return Map<VectorXR>(d_f_int_t, n_nodes*3); }
 __device__ Map<VectorXR> f_int_r() { return Map<VectorXR>(d_f_int_r, n_nodes*3); }
@@ -286,9 +276,9 @@ kinematics.
 ```cpp
 // LDPMTet4DataFunc.cuh — translational strains
 Real r[3];
-r[0] = d_data->x12()(nj) - d_data->x12()(ni);   // current edge vector
-r[1] = d_data->y12()(nj) - d_data->y12()(ni);
-r[2] = d_data->z12()(nj) - d_data->z12()(ni);
+r[0] = d_data->x_cur()(nj) - d_data->x_cur()(ni);   // current edge vector
+r[1] = d_data->y_cur()(nj) - d_data->y_cur()(ni);
+r[2] = d_data->z_cur()(nj) - d_data->z_cur()(ni);
 
 // Relative displacement from reference: Δu = r − l₀·n_ref
 const Real du0 = r[0] - l0 * n0;
@@ -300,9 +290,9 @@ const Real e_M = (du0*m0 + du1*m1 + du2*m2) * inv_l0;
 const Real e_L = (du0*l_0 + du1*l_1 + du2*l_2) * inv_l0;
 
 // Rotational strains
-const Real dt0 = d_data->rx12()(nj) - d_data->rx12()(ni);   // Δθ
-const Real dt1 = d_data->ry12()(nj) - d_data->ry12()(ni);
-const Real dt2 = d_data->rz12()(nj) - d_data->rz12()(ni);
+const Real dt0 = d_data->rot_x_cur()(nj) - d_data->rot_x_cur()(ni);   // Δθ
+const Real dt1 = d_data->rot_y_cur()(nj) - d_data->rot_y_cur()(ni);
+const Real dt2 = d_data->rot_z_cur()(nj) - d_data->rot_z_cur()(ni);
 
 const Real kappa_T = (dt0*n0 + dt1*n1 + dt2*n2) * inv_l0;
 const Real kappa_M = (dt0*m0 + dt1*m1 + dt2*m2) * inv_l0;
@@ -322,36 +312,25 @@ const Real kappa_L = (dt0*l_0 + dt1*l_1 + dt2*l_2) * inv_l0;
 ## 6. Constitutive Law
 
 The constitutive law is the core of the failure model.  `compute_p()` in
-`LDPMTet4DataFunc.cuh` dispatches to one of two constitutive paths based on
-`d_data->use_full_ldpm()` (set to `true` by `SetLDPMParams()`):
+`LDPMTet4DataFunc.cuh` invokes the full LDPM constitutive update via
+`ldpm_tet4_full_constitutive()` in `LDPM.cuh`.
 
-- **Full LDPM model** → `ldpm_tet4_full_constitutive()` in `LDPM.cuh`
-- **Legacy model** → `ldpm_tet4_cusatis_traction()` in `LDPM.cuh`
-
-### 6.0 Constitutive dispatch in `compute_p()`
+### 6.0 Constitutive update in `compute_p()`
 
 ```cpp
 // LDPMTet4DataFunc.cuh
-if (d_data->use_full_ldpm()) {
-    // Strain increments relative to stored accumulated state
-    const Real d_eps_N = e_N - statev[0];
-    const Real d_eps_M = e_M - statev[1];
-    const Real d_eps_L = e_L - statev[2];
-    const Real eps_V = e_N;  // volumetric strain approximation
+// Strain increments relative to stored accumulated state
+const Real d_eps_N = e_N - statev[0];
+const Real d_eps_M = e_M - statev[1];
+const Real d_eps_L = e_L - statev[2];
+const Real eps_V = e_N;  // volumetric strain approximation
 
-    ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L,
-        kappa_T, kappa_M, kappa_L, eps_V, l0,
-        d_data->ldpm_params(), statev,
-        t_N, t_M, t_L, m_T, m_M, m_L);
+ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L,
+    kappa_T, kappa_M, kappa_L, eps_V, l0,
+    d_data->ldpm_params(), statev,
+    t_N, t_M, t_L, m_T, m_M, m_L);
 
-    // Write back state + maintain legacy kappa/omega for VTK output
-} else {
-    ldpm_tet4_cusatis_traction(e_N, e_M, e_L,
-        kappa_T, kappa_M, kappa_L,
-        E_N, E_T, E_kT, E_kM, E_kL, sigma_t, H_t,
-        kappa_in, kappa_out, omega_out,
-        t_N, t_M, t_L, m_T, m_M, m_L);
-}
+// Write back state + maintain kappa/omega for VTK output
 ```
 
 ---
@@ -456,10 +435,10 @@ After stress update, the function computes:
 - **Dissipated energy** (based on inelastic strain increments): added to `statev[15]`
 - **Crack opening displacement:** `w = sqrt(w_N² + w_M² + w_L²)` stored in `statev[11]`
 
-#### 6.A.7 Legacy kappa/omega maintenance
+#### 6.A.7 Kappa/omega maintenance for VTK output
 
-For backward-compatible VTK output, the full model also updates the legacy
-`d_kappa[]` and `d_omega[]` arrays:
+The constitutive update also maintains the per-edge `d_kappa[]` and `d_omega[]`
+arrays used for crack-distance visualisation:
 
 ```cpp
 // LDPMTet4DataFunc.cuh — after full constitutive update
@@ -467,205 +446,6 @@ d_data->edge_kappa(edge_idx) = statev[8];  // effective strain as kappa proxy
 const Real crack_w = statev[11];
 const Real eff_crack = (l0 > 0) ? crack_w / l0 : 0;
 d_data->edge_omega(edge_idx) = min(eff_crack / max(statev[8], 1e-30), 1.0);
-```
-
----
-
-### 6.B Legacy Model (`ldpm_tet4_cusatis_traction`)
-
-The legacy model is a simplified single-variable tensile-shear damage law. It is
-used when `SetLDPMParams()` has **not** been called (i.e., only `SetMaterial` +
-`SetDamageParams` are used). It is kept for backward compatibility.
-
-### 6.B.1 Damage driving strain
-
-The model couples the tensile opening strain and the two shear strains into a single
-scalar **damage driving strain** e_D:
-
-```
-e_D = sqrt( ⟨e_N⟩₊²  +  α (e_M² + e_L²) )
-```
-
-where `⟨e_N⟩₊ = max(e_N, 0)` (only tensile opening contributes) and
-`α = E_T / E_N` (the shear-to-normal stiffness ratio).
-
-A facet that is sliding with zero normal opening can still accumulate damage as long
-as the shear is large enough to drive e_D above the tensile threshold.
-
-```cpp
-// LDPM.cuh
-const Real e_N_pos = (e_N > Real(0)) ? e_N : Real(0);
-const Real alpha   = (E_N > Real(0)) ? E_T / E_N : Real(0);
-const Real e_D     = sqrt(e_N_pos*e_N_pos + alpha*(e_M*e_M + e_L*e_L));
-```
-
-### 6.B.2 History variable — irreversibility
-
-`κ` (kappa) is the **maximum value of e_D ever reached** by a facet. It is a
-persistent per-edge GPU state variable stored in `d_kappa[]` that can only grow
-monotonically:
-
-```
-κ_new = max(κ_old, e_D)
-```
-
-```cpp
-// LDPM.cuh
-kappa_out = (e_D > kappa_in) ? e_D : kappa_in;
-```
-
-This ratchet mechanism means damage is **irreversible**: once a facet has been
-strained beyond its elastic limit, κ retains that peak value even if the load is
-subsequently removed or reversed.
-
-### 6.B.3 Crack and failure definition
-
-This is the central concept for understanding how fracture is represented in the code.
-
-**Cracking is defined at the facet level**, not at the specimen level. There is no
-explicit "crack flag" or "crack surface" variable. Instead, the scalar damage
-variable `ω` (omega) for each facet completely encodes its fracture state:
-
-```
-ω = 0                                                 if κ ≤ e_t0   (elastic — no damage)
-ω = 1 − (e_t0 / κ) · exp(−H_t · (κ − e_t0))         if κ > e_t0   (softening — cracked)
-```
-
-where `e_t0 = σ_t / E_N` is the **peak strain** — the strain at which the facet
-first reaches its tensile strength σ_t and begins to crack.
-
-The damage variable ω ranges continuously from 0 to 1:
-
-| ω | Physical meaning |
-|---|---|
-| 0 | Facet is fully intact; behaviour is linear-elastic |
-| 0 < ω < 1 | Facet has **cracked** but still transmits a residual (degraded) force — the softening branch |
-| ω ≈ 1 | Facet is **fully failed** — it no longer transmits any tensile or shear force |
-
-A **macroscopic crack** in the simulation is an emergent phenomenon: it appears as a
-contiguous band or surface of facets that have all reached ω ≈ 1. There is no
-prescribed crack path; the crack propagates wherever the damage state variable reaches
-the fully-failed condition.
-
-**In code**, a facet is cracked as soon as `kappa > e_t0`. It is fully failed when
-`omega ≈ 1`. Both values are read directly from the device arrays `d_kappa[]` and
-`d_omega[]` at any time step:
-
-```cpp
-// LDPM.cuh — damage variable computation
-const Real e_t0 = (E_N > Real(0)) ? sigma_t / E_N : Real(0);
-
-Real omega = Real(0);
-if (kappa_out > e_t0 && e_t0 > Real(0)) {
-    // Exponential softening: omega grows from 0 toward 1 as kappa grows
-    omega = Real(1) - (e_t0 / kappa_out) * exp(-H_t * (kappa_out - e_t0));
-    // Clamp to [0, 1] for numerical robustness
-    omega = (omega < Real(0)) ? Real(0) : omega;
-    omega = (omega > Real(1)) ? Real(1) : omega;
-}
-omega_out = omega;
-```
-
-After the constitutive call, `compute_p()` writes both updated values back to the
-per-edge persistent arrays:
-
-```cpp
-// LDPMTet4DataFunc.cuh — persist damage state across time steps
-d_data->edge_kappa(edge_idx) = kappa_new;
-d_data->edge_omega(edge_idx) = omega_new;
-```
-
-The parameter `H_t` (softening modulus) controls the rate at which ω approaches 1
-after the peak. It is related to the mode-I fracture energy G_ft and a characteristic
-crack-bandwidth length l_ch (approximately equal to the strut edge length l₀):
-
-```
-H_t ≈ l_ch · σ_t / G_ft
-```
-
-A larger H_t means a steeper (more brittle) softening branch; H_t → 0 gives
-perfectly plastic behaviour. For normal-strength concrete (representative values given
-in the `LDPM.cuh` header):
-
-```
-σ_t = 4 N/mm², E_N = 60 000 N/mm², G_ft = 0.05 N/mm, l_ch = 10 mm
-→ e_t0 = 6.67 × 10⁻⁵,   H_t ≈ 800
-```
-
-### 6.B.4 Traction law — asymmetric tension/compression
-
-The traction law uses ω to degrade facet stiffness, but applies damage
-**asymmetrically**:
-
-```
-t_N = E_N · e_N                    for e_N ≤ 0   (compression — always fully elastic)
-t_N = E_N · e_N · (1 − ω)          for e_N > 0   (tension — degraded by damage)
-
-t_M = E_T · e_M · (1 − ω)          (shear always degraded)
-t_L = E_T · e_L · (1 − ω)
-```
-
-The asymmetry is physically correct: crack surfaces can close and still carry
-compressive contact forces through the concrete matrix, even when the facet has fully
-failed in tension and shear.
-
-```cpp
-// LDPM.cuh — asymmetric traction
-t_N = (e_N > Real(0)) ? E_N * e_N * (Real(1) - omega) : E_N * e_N;
-t_M = E_T * e_M * (Real(1) - omega);
-t_L = E_T * e_L * (Real(1) - omega);
-```
-
-### 6.B.5 Rotational moments — always elastic
-
-The first-order Cusatis formulation does not couple bending or twist to the
-tensile-shear damage. Rotational moments remain linear-elastic throughout:
-
-```
-m_T = E_kT · κ_T,   m_M = E_kM · κ_M,   m_L = E_kL · κ_L
-```
-
-```cpp
-// LDPM.cuh
-m_T = E_kT * kappa_T;
-m_M = E_kM * kappa_M;
-m_L = E_kL * kappa_L;
-```
-
-### 6.B.6 Code implementation — full function signature
-
-`ldpm_tet4_cusatis_traction()` in `LDPM.cuh` implements everything above as a
-`__device__ __forceinline__` function called once per edge per step:
-
-```cpp
-__device__ __forceinline__ void ldpm_tet4_cusatis_traction(
-    Real e_N, Real e_M, Real e_L,             // translational strains (inputs)
-    Real kappa_T, Real kappa_M, Real kappa_L, // rotational strains (inputs)
-    Real E_N, Real E_T,                       // translational moduli
-    Real E_kT, Real E_kM, Real E_kL,          // rotational moduli
-    Real sigma_t,                             // mesoscale tensile strength
-    Real H_t,                                 // softening modulus
-    Real kappa_in,                            // history variable on entry (input)
-    Real& kappa_out,                          // updated history variable (output)
-    Real& omega_out,                          // damage variable (output, ∈ [0,1])
-    Real& t_N, Real& t_M, Real& t_L,         // tractions (outputs)
-    Real& m_T, Real& m_M, Real& m_L          // moments (outputs)
-)
-```
-
-The results are cached in the per-edge traction array and the per-edge damage arrays:
-
-```cpp
-// LDPMTet4DataFunc.cuh — cache results
-d_data->edge_kappa(edge_idx) = kappa_new;   // d_kappa[edge_idx]
-d_data->edge_omega(edge_idx) = omega_new;   // d_omega[edge_idx]
-
-d_data->facet_t(edge_idx, 0) = t_N;        // d_facet_t[edge_idx*6 + 0]
-d_data->facet_t(edge_idx, 1) = t_M;
-d_data->facet_t(edge_idx, 2) = t_L;
-d_data->facet_t(edge_idx, 3) = m_T;
-d_data->facet_t(edge_idx, 4) = m_M;
-d_data->facet_t(edge_idx, 5) = m_L;
 ```
 
 ---
@@ -838,10 +618,10 @@ Position advances:
 
 ```cpp
 // Translational:  x_{n+1} = xₙ + dt · v_{n+½}
-d_data->x12()(tid) += dt * d_solver->v()(tid * 3 + 0);
+d_data->x_cur()(tid) += dt * d_solver->v()(tid * 3 + 0);
 
 // Rotational:  θ_{n+1} = θₙ + dt · ω_{n+½}
-d_data->rx12()(tid) += dt * d_solver->v_rot()(tid * 3 + 0);
+d_data->rot_x_cur()(tid) += dt * d_solver->v_rot()(tid * 3 + 0);
 ```
 
 ---
@@ -925,11 +705,7 @@ GPU_LDPMTet4_Data::SetupFromMesh()
     └─ Override A, m̂, l̂ from facets.dat sub-facet data (richer geometry)
          Build subfacet→edge index table d_subfacet_edge_idx[]
     ↓
-SetMaterial(E_N, E_T, E_kT, E_kM, E_kL)    ← legacy path
-SetDamageParams(σ_t, H_t)                  ← legacy cracking threshold
-   ──  OR  ──
-SetLDPMParams(params)                      ← full LDPM model (sets use_full_ldpm = true)
-SetDensity(ρ)
+SetLDPMParams(params)                      ← full LDPM model
 SetExternalForce(f_ext)
 SetNodalFixed(fixed_nodes)
     ↓
@@ -948,11 +724,7 @@ LeapfrogSolver::Setup()
     │    │    e_N = (Δu·n)/l₀,  e_M = (Δu·m)/l₀,  e_L = (Δu·l)/l₀
     │    │    κ_T = (Δθ·n)/l₀,  κ_M = (Δθ·m)/l₀,  κ_L = (Δθ·l)/l₀
     │    │
-    │    └─ Constitutive dispatch:
-    │
-    │         ═══ IF use_full_ldpm (SetLDPMParams path) ═══
-    │
-    │         ldpm_tet4_full_constitutive():
+    │    └─ Constitutive update (ldpm_tet4_full_constitutive):
     │           if eps_N > 0:
     │             sigma_fr = ldpm_fracture_boundary()   ← mode-mixity softening
     │             Project sigma_fr onto (N, M, L) via eps_Q
@@ -960,19 +732,7 @@ LeapfrogSolver::Setup()
     │             sigma_N = ldpm_compress_boundary()    ← yield/harden/compact
     │             (sigma_M, sigma_L) = ldpm_shear_boundary()  ← friction
     │           Update energy, crack opening, and 16-component state vector
-    │           Maintain legacy kappa/omega for VTK
-    │
-    │         ═══ ELSE (legacy SetMaterial/SetDamageParams path) ═══
-    │
-    │         ldpm_tet4_cusatis_traction():
-    │           e_D    = sqrt(⟨e_N⟩₊² + α(e_M² + e_L²))
-    │           κ_new  = max(κ_old, e_D)            ← irreversible history
-    │           e_t0   = σ_t / E_N                  ← cracking threshold
-    │           ω = damage from exponential softening
-    │           t_N = E_N·e_N·(1−ω) if e_N > 0, else E_N·e_N  (asymmetric)
-    │           t_M = E_T·e_M·(1−ω)
-    │           t_L = E_T·e_L·(1−ω)
-    │           m_T = E_kT·κ_T,  m_M = E_kM·κ_M,  m_L = E_kL·κ_L  (elastic)
+    │           Maintain kappa/omega for VTK
     │
     │         Write d_facet_t[edge × 6 + {0..5}]
     │
@@ -1017,8 +777,8 @@ LeapfrogSolver::Setup()
 
 | Theory symbol | Physical meaning | Device array / accessor | Source file |
 |---|---|---|---|
-| **x**ᵢ | Particle position | `d_x12`, `d_y12`, `d_z12` | `LDPMTet4Data.cuh` |
-| **θ**ᵢ | Particle rotation | `d_rx12`, `d_ry12`, `d_rz12` | `LDPMTet4Data.cuh` |
+| **x**ᵢ | Particle position | `d_x_cur`, `d_y_cur`, `d_z_cur` | `LDPMTet4Data.cuh` |
+| **θ**ᵢ | Particle rotation | `d_rot_x_cur`, `d_rot_y_cur`, `d_rot_z_cur` | `LDPMTet4Data.cuh` |
 | l₀ | Reference edge length | `d_l0[edge]` → `edge_l0(e)` | `LDPMTet4Data.cuh` |
 | **n** | Facet unit normal | `d_edge_n[edge*3+k]` → `edge_n_comp(e,k)` | `LDPMTet4Data.cuh` |
 | **m** | Facet first tangent | `d_edge_m[edge*3+k]` → `edge_m_comp(e,k)` | `LDPMTet4Data.cuh` |
@@ -1029,14 +789,10 @@ LeapfrogSolver::Setup()
 | α = E_T/E_N | Shear-normal coupling ratio | `LDPMParams::alpha` or local var | `LDPM.cuh` |
 | `LDPMParams` | Full model material parameters (24) | `d_ldpm_params` → `ldpm_params()` | `LDPM.cuh` / `LDPMTet4Data.cuh` |
 | `statev[0..15]` | Per-edge 16-component state vector | `d_edge_statev[edge*16+k]` → `edge_statev(e,k)` | `LDPMTet4Data.cuh` |
-| `use_full_ldpm` | Flag selecting full vs legacy model | `d_use_full_ldpm` → `use_full_ldpm()` | `LDPMTet4Data.cuh` |
-| e_D | Damage driving strain (legacy) | local var `e_D` | `LDPM.cuh` |
-| σ_t | Mesoscale tensile strength | `LDPMParams::sigma_t` or `*d_sigma_t` | `LDPM.cuh` / `LDPMTet4Data.cuh` |
-| E_N | Normal modulus | `LDPMParams::E0` or `*d_E_N` | `LDPM.cuh` / `LDPMTet4Data.cuh` |
-| e_t0 = σ_t/E_N | Cracking threshold strain (legacy) | local var `e_t0` | `LDPM.cuh` |
+| σ_t | Mesoscale tensile strength | `LDPMParams::sigma_t` | `LDPM.cuh` |
+| E_N | Normal modulus | `LDPMParams::E0` | `LDPM.cuh` |
 | κ | History max strain (ratchet) | `d_kappa[edge]` → `edge_kappa(e)` | `LDPMTet4Data.cuh` |
 | ω | Damage / fracture state (0=intact, 1=failed) | `d_omega[edge]` → `edge_omega(e)` | `LDPMTet4Data.cuh` |
-| H_t | Softening modulus (legacy) | `*d_H_t` → `H_t()` | `LDPMTet4Data.cuh` |
 | t_N, t_M, t_L | Facet tractions | `d_facet_t[edge*6+0..2]` → `facet_t(e,0..2)` | `LDPMTet4Data.cuh` |
 | m_T, m_M, m_L | Facet moments | `d_facet_t[edge*6+3..5]` → `facet_t(e,3..5)` | `LDPMTet4Data.cuh` |
 | **f**_int | Translational internal force | `d_f_int_t[node*3+k]` → `f_int()(node*3+k)` | `LDPMTet4Data.cuh` |

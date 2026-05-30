@@ -148,3 +148,11 @@ When adding a new solver, you must:
   their file header comment and in the compatibility matrix.
 - Do not remove deprecated code without a corresponding update to all call
   sites in `examples/` and documentation.
+
+---
+
+## 10. Formatting
+
+- Agents do **not** need to run `.format_all` after making changes.  The other
+  developers will take care of formatting.  Do not run `.format_all` in your
+  sessions.

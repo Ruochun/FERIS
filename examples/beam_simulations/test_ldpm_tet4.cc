@@ -203,8 +203,16 @@ int main() {
     }
     element_data.SetExternalForce(h_f_ext);
 
-    element_data.SetMaterial(E_N_val, E_T_val, E_kT_val, E_kM_val, E_kL_val);
-    element_data.SetDensity(rho_val);
+    // Set up LDPM parameters (elastic-only for this demo)
+    LDPMParams ldpm_params{};
+    ldpm_params.E0 = E_N_val;
+    ldpm_params.alpha = alpha_t;
+    ldpm_params.E_kT = E_kT_val;
+    ldpm_params.E_kM = E_kM_val;
+    ldpm_params.E_kL = E_kL_val;
+    ldpm_params.rho = rho_val;
+    ldpm_params.elastic_flag = true;  // linear elastic, no damage
+    element_data.SetLDPMParams(ldpm_params);
 
     // ──────────────────────────────────────────────────────────────────────────
     // 6. Build diagonal lumped mass and rotational inertia
