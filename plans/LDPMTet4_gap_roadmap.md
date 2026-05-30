@@ -29,7 +29,7 @@ affect correctness for typical use cases.
 | Shear under compression | ✅ Done | Pressure-dependent friction via `ldpm_shear_boundary()` |
 | Facet state | ✅ Done | 16-component per-edge state vector (`LDPM_N_STATEV`) |
 | Rotational response | ✅ Done | Elastic only (unchanged, first-order LDPM) |
-| Backward compatibility | ✅ Done | Legacy `ldpm_tet4_cusatis_traction()` still available |
+| Backward compatibility | ✅ Done | Legacy `ldpm_tet4_cusatis_traction()` removed (superseded by full model) |
 
 ---
 

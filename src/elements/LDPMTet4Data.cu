@@ -374,8 +374,6 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     MOPHI_GPU_CALL(cudaMalloc(&d_E_kM, sizeof(Real)));
     MOPHI_GPU_CALL(cudaMalloc(&d_E_kL, sizeof(Real)));
     MOPHI_GPU_CALL(cudaMalloc(&d_rho, sizeof(Real)));
-    MOPHI_GPU_CALL(cudaMalloc(&d_sigma_t, sizeof(Real)));
-    MOPHI_GPU_CALL(cudaMalloc(&d_H_t, sizeof(Real)));
 
     const Real default_val = Real(0);
     MOPHI_GPU_CALL(cudaMemcpy(d_E_N, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
@@ -384,8 +382,6 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     MOPHI_GPU_CALL(cudaMemcpy(d_E_kM, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_E_kL, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_rho, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_H_t, &default_val, sizeof(Real), cudaMemcpyHostToDevice));
 
     // ── 10. Allocate per-node rotational inertia (filled in CalcMassMatrix) ───
 
@@ -664,15 +660,6 @@ void GPU_LDPMTet4_Data::SetDensity(Real rho_val) {
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 }
 
-void GPU_LDPMTet4_Data::SetDamageParams(Real sigma_t_val, Real H_t_val) {
-    if (!is_setup) {
-        MOPHI_ERROR("GPU_LDPMTet4_Data must be set up before setting damage parameters.");
-        return;
-    }
-    MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &sigma_t_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_H_t, &H_t_val, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
-}
 
 void GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params) {
     if (!is_setup) {
@@ -694,16 +681,14 @@ void GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params) {
     }
     MOPHI_GPU_CALL(cudaMemcpy(d_ldpm_params, &params, sizeof(LDPMParams), cudaMemcpyHostToDevice));
 
-    // Also set the legacy material parameters for backward-compatible output
+    // Also set the material parameters used by the force assembly
     MOPHI_GPU_CALL(cudaMemcpy(d_E_N, &params.E0, sizeof(Real), cudaMemcpyHostToDevice));
     Real E_T_val = params.alpha * params.E0;
     MOPHI_GPU_CALL(cudaMemcpy(d_E_T, &E_T_val, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_E_kT, &params.E_kT, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_E_kM, &params.E_kM, sizeof(Real), cudaMemcpyHostToDevice));
     MOPHI_GPU_CALL(cudaMemcpy(d_E_kL, &params.E_kL, sizeof(Real), cudaMemcpyHostToDevice));
-    MOPHI_GPU_CALL(cudaMemcpy(d_sigma_t, &params.sigma_t, sizeof(Real), cudaMemcpyHostToDevice));
 
-    d_use_full_ldpm = true;
     h_rho = params.rho;
     MOPHI_GPU_CALL(cudaMemcpy(d_rho, &params.rho, sizeof(Real), cudaMemcpyHostToDevice));
 
@@ -1038,8 +1023,6 @@ void GPU_LDPMTet4_Data::Destroy() {
     MOPHI_GPU_CALL(cudaFree(d_E_kM));
     MOPHI_GPU_CALL(cudaFree(d_E_kL));
     MOPHI_GPU_CALL(cudaFree(d_rho));
-    MOPHI_GPU_CALL(cudaFree(d_sigma_t));
-    MOPHI_GPU_CALL(cudaFree(d_H_t));
     if (d_ldpm_params != nullptr) {
         MOPHI_GPU_CALL(cudaFree(d_ldpm_params));
     }
