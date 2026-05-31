@@ -79,6 +79,82 @@ __global__ void clear_f_int_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
     clear_internal_force(d_data);
 }
 
+// ─── GPU kernel: compute per-tet volumetric strain ───────────────────────────
+//
+// For each tet, computes current volume from the 4 node positions and
+// returns eps_V = (V_cur - V_ref) / (3 * V_ref), matching the CPU reference
+// in chrono-mechanics ChElementLDPM::ComputeVolume().
+__global__ void compute_tet_volumetric_strain_kernel(int n_elem,
+                                                     const int* __restrict__ tet_conn,
+                                                     const Real* __restrict__ x_cur,
+                                                     const Real* __restrict__ y_cur,
+                                                     const Real* __restrict__ z_cur,
+                                                     const Real* __restrict__ vol_ref,
+                                                     Real* __restrict__ vol_strain) {
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= n_elem)
+        return;
+
+    const int n0 = tet_conn[tid * 4 + 0];
+    const int n1 = tet_conn[tid * 4 + 1];
+    const int n2 = tet_conn[tid * 4 + 2];
+    const int n3 = tet_conn[tid * 4 + 3];
+
+    // Edge vectors from node 0
+    const Real a0 = x_cur[n1] - x_cur[n0];
+    const Real a1 = y_cur[n1] - y_cur[n0];
+    const Real a2 = z_cur[n1] - z_cur[n0];
+
+    const Real b0 = x_cur[n2] - x_cur[n0];
+    const Real b1 = y_cur[n2] - y_cur[n0];
+    const Real b2 = z_cur[n2] - z_cur[n0];
+
+    const Real c0 = x_cur[n3] - x_cur[n0];
+    const Real c1 = y_cur[n3] - y_cur[n0];
+    const Real c2 = z_cur[n3] - z_cur[n0];
+
+    // Cross product b × c
+    const Real bc0 = b1 * c2 - b2 * c1;
+    const Real bc1 = b2 * c0 - b0 * c2;
+    const Real bc2 = b0 * c1 - b1 * c0;
+
+    // V_cur = |det| / 6
+    const Real det = a0 * bc0 + a1 * bc1 + a2 * bc2;
+    const Real V_cur = abs(det) / Real(6);
+
+    const Real V_ref = vol_ref[tid];
+    vol_strain[tid] = (V_ref > Real(0)) ? (V_cur - V_ref) / (Real(3) * V_ref) : Real(0);
+}
+
+// ─── GPU kernel: average tet volumetric strain onto edges ────────────────────
+//
+// For each edge, averages the volumetric strain of the tets sharing that edge
+// using a CSR (compressed sparse row) mapping.
+__global__ void average_tet_volumetric_strain_to_edges_kernel(int n_edge,
+                                                              const int* __restrict__ edge_tet_offsets,
+                                                              const int* __restrict__ edge_tet_indices,
+                                                              const Real* __restrict__ tet_vol_strain,
+                                                              Real* __restrict__ edge_vol_strain) {
+    const int eidx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (eidx >= n_edge)
+        return;
+
+    const int start = edge_tet_offsets[eidx];
+    const int end = edge_tet_offsets[eidx + 1];
+    const int count = end - start;
+
+    if (count <= 0) {
+        edge_vol_strain[eidx] = Real(0);
+        return;
+    }
+
+    Real sum = Real(0);
+    for (int i = start; i < end; ++i) {
+        sum += tet_vol_strain[edge_tet_indices[i]];
+    }
+    edge_vol_strain[eidx] = sum / static_cast<Real>(count);
+}
+
 __global__ void compute_f_int_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
     const int total = d_data->gpu_n_edge() * 2;
@@ -365,6 +441,71 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_omega.BindDevicePointer(&d_omega);
     da_omega.SetVal(Real(0));
     da_omega.ToDevice();
+
+    // ── Volumetric strain averaging: tet connectivity, reference volumes, ────
+    //    edge-to-tet CSR mapping, and per-edge volumetric strain scratch.
+
+    // Store tet connectivity on device [n_elem * 4]
+    da_tet_conn.resize(static_cast<size_t>(n_elem) * 4);
+    da_tet_conn.BindDevicePointer(&d_tet_conn);
+    std::copy(h_tet_conn_vec.begin(), h_tet_conn_vec.end(), da_tet_conn.host());
+    da_tet_conn.ToDevice();
+
+    // Compute and store reference tet volumes [n_elem]
+    da_tet_vol_ref.resize(n_elem);
+    da_tet_vol_ref.BindDevicePointer(&d_tet_vol_ref);
+    for (int e = 0; e < n_elem; e++) {
+        const int n0_t = h_tet_conn_vec[e * 4 + 0];
+        const int n1_t = h_tet_conn_vec[e * 4 + 1];
+        const int n2_t = h_tet_conn_vec[e * 4 + 2];
+        const int n3_t = h_tet_conn_vec[e * 4 + 3];
+
+        const Real a[3] = {h_x(n1_t) - h_x(n0_t), h_y(n1_t) - h_y(n0_t), h_z(n1_t) - h_z(n0_t)};
+        const Real b[3] = {h_x(n2_t) - h_x(n0_t), h_y(n2_t) - h_y(n0_t), h_z(n2_t) - h_z(n0_t)};
+        const Real c[3] = {h_x(n3_t) - h_x(n0_t), h_y(n3_t) - h_y(n0_t), h_z(n3_t) - h_z(n0_t)};
+
+        const Real cross_bc[3] = {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2], b[0] * c[1] - b[1] * c[0]};
+        const Real vol = std::abs(a[0] * cross_bc[0] + a[1] * cross_bc[1] + a[2] * cross_bc[2]) / Real(6);
+        da_tet_vol_ref.host()[e] = vol;
+    }
+    da_tet_vol_ref.ToDevice();
+
+    // Per-tet volumetric strain scratch [n_elem] (recomputed each step)
+    da_tet_vol_strain.resize(n_elem);
+    da_tet_vol_strain.BindDevicePointer(&d_tet_vol_strain);
+    da_tet_vol_strain.SetVal(Real(0));
+    da_tet_vol_strain.ToDevice();
+
+    // Build CSR edge-to-tet mapping from edge_to_tets map (still in scope)
+    {
+        std::vector<int> h_offsets(n_edge + 1, 0);
+        std::vector<int> h_indices;
+
+        int ei = 0;
+        for (const auto& kv : edge_to_tets) {
+            h_offsets[ei + 1] = h_offsets[ei] + static_cast<int>(kv.second.size());
+            for (int t : kv.second) {
+                h_indices.push_back(t);
+            }
+            ++ei;
+        }
+
+        da_edge_tet_offsets.resize(static_cast<size_t>(n_edge) + 1);
+        da_edge_tet_offsets.BindDevicePointer(&d_edge_tet_offsets);
+        std::copy(h_offsets.begin(), h_offsets.end(), da_edge_tet_offsets.host());
+        da_edge_tet_offsets.ToDevice();
+
+        da_edge_tet_indices.resize(h_indices.size());
+        da_edge_tet_indices.BindDevicePointer(&d_edge_tet_indices);
+        std::copy(h_indices.begin(), h_indices.end(), da_edge_tet_indices.host());
+        da_edge_tet_indices.ToDevice();
+    }
+
+    // Per-edge volumetric strain [n_edge] (averaged from tets each step)
+    da_edge_vol_strain.resize(n_edge);
+    da_edge_vol_strain.BindDevicePointer(&d_edge_vol_strain);
+    da_edge_vol_strain.SetVal(Real(0));
+    da_edge_vol_strain.ToDevice();
 
     // ── 9. Allocate device material scalars with safe defaults ────────────────
 
@@ -829,6 +970,20 @@ void GPU_LDPMTet4_Data::CalcP() {
     if (n_edge == 0)
         return;
     constexpr int threads = 256;
+
+    // Step A: Compute per-tet volumetric strain from current positions.
+    if (n_elem > 0 && d_tet_conn != nullptr) {
+        const int blocks_tet = (n_elem + threads - 1) / threads;
+        compute_tet_volumetric_strain_kernel<<<blocks_tet, threads>>>(n_elem, d_tet_conn, d_x_cur, d_y_cur, d_z_cur,
+                                                                      d_tet_vol_ref, d_tet_vol_strain);
+
+        // Step B: Average tet volumetric strains onto edges via CSR mapping.
+        const int blocks_edge = (n_edge + threads - 1) / threads;
+        average_tet_volumetric_strain_to_edges_kernel<<<blocks_edge, threads>>>(
+            n_edge, d_edge_tet_offsets, d_edge_tet_indices, d_tet_vol_strain, d_edge_vol_strain);
+    }
+
+    // Step C: Compute facet strains, constitutive response, and tractions.
     const int blocks = (n_edge + threads - 1) / threads;
     calc_p_ldpm_tet4_kernel<<<blocks, threads>>>(d_data);
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
@@ -1006,6 +1161,12 @@ void GPU_LDPMTet4_Data::Destroy() {
     da_kappa.free();
     da_omega.free();
     da_statev.free();
+    da_tet_conn.free();
+    da_tet_vol_ref.free();
+    da_tet_vol_strain.free();
+    da_edge_tet_offsets.free();
+    da_edge_tet_indices.free();
+    da_edge_vol_strain.free();
     da_subfacet_edge_idx.free();
     da_fixed_nodes.free();
     da_I_lump.free();

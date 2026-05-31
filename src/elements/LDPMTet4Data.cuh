@@ -197,6 +197,12 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         return d_statev[edge_idx * LDPM_N_STATEV + comp];
     }
 
+    // ── Per-edge precomputed volumetric strain ───────────────────────────────
+
+    __device__ Real edge_vol_strain(int edge_idx) const {
+        return d_edge_vol_strain[edge_idx];
+    }
+
     // ── Full LDPM parameters (device struct) ─────────────────────────────────
 
     __device__ const LDPMParams& ldpm_params() const {
@@ -543,6 +549,30 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // ── Per-edge full LDPM state vector [n_edge * LDPM_N_STATEV] ─────────────
     mophi::DualArray<Real> da_statev;
     Real* d_statev = nullptr;
+
+    // ── Volumetric strain averaging data ─────────────────────────────────────
+    // Tet connectivity on device [n_elem * 4]
+    mophi::DualArray<int> da_tet_conn;
+    int* d_tet_conn = nullptr;
+
+    // Reference tet volumes [n_elem]
+    mophi::DualArray<Real> da_tet_vol_ref;
+    Real* d_tet_vol_ref = nullptr;
+
+    // Per-tet current volumetric strain [n_elem] (scratch, computed each step)
+    mophi::DualArray<Real> da_tet_vol_strain;
+    Real* d_tet_vol_strain = nullptr;
+
+    // CSR edge-to-tet mapping: for each edge, which tets share it.
+    // d_edge_tet_offsets[n_edge+1], d_edge_tet_indices[nnz]
+    mophi::DualArray<int> da_edge_tet_offsets;
+    mophi::DualArray<int> da_edge_tet_indices;
+    int* d_edge_tet_offsets = nullptr;
+    int* d_edge_tet_indices = nullptr;
+
+    // Per-edge averaged volumetric strain [n_edge]
+    mophi::DualArray<Real> da_edge_vol_strain;
+    Real* d_edge_vol_strain = nullptr;
 
     // ── Full LDPM material parameters (device) ───────────────────────────────
     LDPMParams* d_ldpm_params = nullptr;

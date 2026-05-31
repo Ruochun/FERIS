@@ -15,7 +15,7 @@
    - 3.1 [Path A: TET4-derived geometry (Setup)](#31-path-a-tet4-derived-geometry-setup)
    - 3.2 [Path B: File-based override (SetupFromMesh)](#32-path-b-file-based-override-setupfrommesh)
 4. [Nodal State — 6 DOFs per Particle](#4-nodal-state--6-dofs-per-particle)
-5. [Strain Computation — compute_p](#5-strain-computation--compute_p)
+5. [Strain Computation — compute_ldpm_facet_strain_and_stress](#5-strain-computation--compute_ldpm_facet_strain_and_stress)
 6. [Constitutive Law — Full LDPM Model](#6-constitutive-law)
 7. [Force Assembly — Facet Tractions to Nodal Forces](#7-force-assembly--facet-tractions-to-nodal-forces)
 8. [Mass Matrix](#8-mass-matrix)
@@ -48,7 +48,7 @@ This implementation runs the full LDPM workflow on the GPU. The main types invol
 | `ldpm_fracture_boundary` | `LDPM.cuh` | Device function: tensile-shear fracture with mode-mixity softening |
 | `ldpm_compress_boundary` | `LDPM.cuh` | Device function: compressive yielding / hardening / pore collapse |
 | `ldpm_shear_boundary` | `LDPM.cuh` | Device function: pressure-dependent frictional shear limit |
-| `compute_p` | `LDPMTet4DataFunc.cuh` | Device function: strains → constitutive update → tractions for one edge |
+| `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` | Device function: strains → constitutive update → tractions for one edge |
 | `compute_internal_force` | `LDPMTet4DataFunc.cuh` | Device function: scatter tractions to nodal forces |
 | `LeapfrogSolver` | `LeapfrogSolver.cu` | Explicit time integrator; dispatches all CUDA kernels |
 
@@ -247,7 +247,7 @@ da_mass_lump_[n_nodes … 2*n_nodes−1]  ← rotational inertia Iᵢ
 
 ---
 
-## 5. Strain Computation — compute_p
+## 5. Strain Computation — compute_ldpm_facet_strain_and_stress
 
 ### Theory
 
@@ -271,7 +271,8 @@ kinematics.
 
 ### Implementation
 
-`compute_p()` in `LDPMTet4DataFunc.cuh` is called once per edge per time step:
+`compute_ldpm_facet_strain_and_stress()` in `LDPMTet4DataFunc.cuh` is called once per edge per time step
+(via the `compute_p` solver-template wrapper):
 
 ```cpp
 // LDPMTet4DataFunc.cuh — translational strains
@@ -311,11 +312,11 @@ const Real kappa_L = (dt0*l_0 + dt1*l_1 + dt2*l_2) * inv_l0;
 
 ## 6. Constitutive Law
 
-The constitutive law is the core of the failure model.  `compute_p()` in
+The constitutive law is the core of the failure model.  `compute_ldpm_facet_strain_and_stress()` in
 `LDPMTet4DataFunc.cuh` invokes the full LDPM constitutive update via
 `ldpm_tet4_full_constitutive()` in `LDPM.cuh`.
 
-### 6.0 Constitutive update in `compute_p()`
+### 6.0 Constitutive update in `compute_ldpm_facet_strain_and_stress()`
 
 ```cpp
 // LDPMTet4DataFunc.cuh
@@ -323,7 +324,9 @@ The constitutive law is the core of the failure model.  `compute_p()` in
 const Real d_eps_N = e_N - statev[0];
 const Real d_eps_M = e_M - statev[1];
 const Real d_eps_L = e_L - statev[2];
-const Real eps_V = e_N;  // volumetric strain approximation
+
+// Volumetric strain: precomputed per-tet average (matches CPU reference)
+const Real eps_V = d_data->edge_vol_strain(edge_idx);
 
 ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L,
     kappa_T, kappa_M, kappa_L, eps_V, l0,
@@ -559,7 +562,7 @@ The leapfrog (central-difference) explicit integrator advances the simulation by
 one time step Δt:
 
 ```
-1.  Compute strains e and κ at all facets  (= compute_p)
+1.  Compute strains e and κ at all facets  (= compute_ldpm_facet_strain_and_stress)
 2.  Apply constitutive law → tractions t, moments m, updated κ and ω
 3.  Assemble nodal forces:  f_int, M_int
 4.  Velocity update:
@@ -784,8 +787,8 @@ LeapfrogSolver::Setup()
 | **m** | Facet first tangent | `d_edge_m[edge*3+k]` → `edge_m_comp(e,k)` | `LDPMTet4Data.cuh` |
 | **l** | Facet second tangent | `d_edge_lv[edge*3+k]` → `edge_lv_comp(e,k)` | `LDPMTet4Data.cuh` |
 | A | Voronoi facet area | `d_facet_area[edge]` → `facet_area(e)` | `LDPMTet4Data.cuh` |
-| e_N, e_M, e_L | Translational strains | local vars in `compute_p` | `LDPMTet4DataFunc.cuh` |
-| κ_T, κ_M, κ_L | Rotational strains | local vars in `compute_p` | `LDPMTet4DataFunc.cuh` |
+| e_N, e_M, e_L | Translational strains | local vars in `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` |
+| κ_T, κ_M, κ_L | Rotational strains | local vars in `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` |
 | α = E_T/E_N | Shear-normal coupling ratio | `LDPMParams::alpha` or local var | `LDPM.cuh` |
 | `LDPMParams` | Full model material parameters (24) | `d_ldpm_params` → `ldpm_params()` | `LDPM.cuh` / `LDPMTet4Data.cuh` |
 | `statev[0..15]` | Per-edge 16-component state vector | `d_edge_statev[edge*16+k]` → `edge_statev(e,k)` | `LDPMTet4Data.cuh` |

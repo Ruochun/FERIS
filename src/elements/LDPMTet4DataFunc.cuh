@@ -10,11 +10,15 @@
  *          templated LeapfrogSolver kernels:
  *
  *          compute_p(edge_idx, qp_idx, d_data, v_guess, dt)
+ *              Thin wrapper calling compute_ldpm_facet_strain_and_stress.
+ *
+ *          compute_ldpm_facet_strain_and_stress(edge_idx, d_data)
  *              Resolves both the relative translational displacement
  *              and the difference of nodal rotation vectors onto the
  *              reference facet frame (n, m, l).  Computes 6 strains
- *              (e_N, e_M, e_L, kappa_T, kappa_M, kappa_L) and stores
- *              the resulting 6 traction/moment components.
+ *              (e_N, e_M, e_L, kappa_T, kappa_M, kappa_L) and evaluates
+ *              the full LDPM constitutive law to produce 6 traction/moment
+ *              components.
  *
  *          compute_internal_force(edge_idx, node_local, d_data)
  *              Assembles both the translational facet force and the
@@ -38,39 +42,21 @@
 namespace feris {
 
 // ---------------------------------------------------------------------------
-// compute_p for LDPMTet4
+// compute_ldpm_facet_strain_and_stress
 //
-// Called by leapfrog_compute_p_kernel<GPU_LDPMTet4_Data> with
-//   edge_idx  = elem_idx   (one "element" per edge)
-//   qp_idx    = 0          (one facet per edge)
-//   v_guess   = half-step translational nodal velocity (unused here)
-//   dt        = time step  (unused for quasi-static constitutive law)
-//
-// Translational strains:
-//   delta_u = (x_j - x_i) - l0 * n_ref
-//   e_N = (delta_u · n) / l0
-//   e_M = (delta_u · m) / l0
-//   e_L = (delta_u · l) / l0
-//
-// Rotational strains (linearised rotation difference):
-//   delta_theta = theta_j - theta_i   (component-wise)
-//   kappa_T = (delta_theta · n) / l0
-//   kappa_M = (delta_theta · m) / l0
-//   kappa_L = (delta_theta · l) / l0
-//
-// Constitutive law:
-//   Uses the full LDPM model with tensile fracture, compression, and friction
-//   from ldpm_tet4_full_constitutive().
+// Core LDPM constitutive computation for a single edge (facet strut).
+// Resolves the relative translational displacement and rotation difference
+// onto the reference facet frame (n, m, l), computes 6 strains
+// (e_N, e_M, e_L, kappa_T, kappa_M, kappa_L), and evaluates the full LDPM
+// constitutive law (tensile fracture, compression with volumetric strain
+// averaging, and frictional shear).
 //
 // Stores results in d_data->facet_t(edge_idx, {0..5}):
 //   comp 0 = t_N, 1 = t_M, 2 = t_L  (tractions)
 //   comp 3 = m_T, 4 = m_M, 5 = m_L  (moments)
 // ---------------------------------------------------------------------------
-__device__ __forceinline__ void compute_p(int edge_idx,
-                                          int /*qp_idx*/,
-                                          GPU_LDPMTet4_Data* d_data,
-                                          const Real* /*v_guess*/,
-                                          Real /*dt*/) {
+__device__ __forceinline__ void compute_ldpm_facet_strain_and_stress(int edge_idx,
+                                                                     GPU_LDPMTet4_Data* d_data) {
     const int ni = d_data->edge_node(edge_idx, 0);
     const int nj = d_data->edge_node(edge_idx, 1);
 
@@ -130,10 +116,10 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     const Real d_eps_M = e_M - prev_eps_M;
     const Real d_eps_L = e_L - prev_eps_L;
 
-    // Volumetric strain approximation: use normal strain component
-    // (for a single tet this is adequate; for multi-tet meshes a
-    // proper volumetric average could be computed externally).
-    const Real eps_V = e_N;
+    // Volumetric strain: precomputed as the average of the volumetric
+    // strains of the tets sharing this edge (matches CPU reference where
+    // eps_V = (V_cur - V_ref) / (3 * V_ref) per tet element).
+    const Real eps_V = d_data->edge_vol_strain(edge_idx);
 
     // Local copy of state vector for the constitutive update
     Real statev[LDPM_N_STATEV];
@@ -163,6 +149,21 @@ __device__ __forceinline__ void compute_p(int edge_idx,
     d_data->facet_t(edge_idx, 3) = m_T;
     d_data->facet_t(edge_idx, 4) = m_M;
     d_data->facet_t(edge_idx, 5) = m_L;
+}
+
+// ---------------------------------------------------------------------------
+// compute_p for LDPMTet4
+//
+// Thin wrapper satisfying the solver template interface
+// (leapfrog_compute_p_kernel calls compute_p for each element type).
+// Delegates to compute_ldpm_facet_strain_and_stress.
+// ---------------------------------------------------------------------------
+__device__ __forceinline__ void compute_p(int edge_idx,
+                                          int /*qp_idx*/,
+                                          GPU_LDPMTet4_Data* d_data,
+                                          const Real* /*v_guess*/,
+                                          Real /*dt*/) {
+    compute_ldpm_facet_strain_and_stress(edge_idx, d_data);
 }
 
 // ---------------------------------------------------------------------------
