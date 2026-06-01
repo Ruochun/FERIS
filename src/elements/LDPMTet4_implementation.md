@@ -72,13 +72,13 @@ TET elements share each unique edge:
 
 ```cpp
 // LDPMTet4Data.cu — Setup(), step 5
-static const int LOCAL_EDGES[6][2] = {{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+constexpr int LDPM_TET4_LOCAL_EDGES[6][2] = {{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
 
 std::map<std::pair<int,int>, std::vector<int>> edge_to_tets;
 for (int e = 0; e < n_elem; e++) {
     for (int le = 0; le < 6; le++) {
-        int a = tet_connectivity(e, LOCAL_EDGES[le][0]);
-        int b = tet_connectivity(e, LOCAL_EDGES[le][1]);
+        int a = tet_connectivity(e, LDPM_TET4_LOCAL_EDGES[le][0]);
+        int b = tet_connectivity(e, LDPM_TET4_LOCAL_EDGES[le][1]);
         if (a > b) std::swap(a, b);
         edge_to_tets[{a, b}].push_back(e);
     }
@@ -272,32 +272,26 @@ kinematics.
 ### Implementation
 
 `compute_ldpm_facet_strain_and_stress()` in `LDPMTet4DataFunc.cuh` is called once per edge per time step
-(via the `compute_p` solver-template wrapper):
+(via the `compute_p` solver-template wrapper). The strain projection itself is
+centralized in `compute_ldpm_facet_kinematics()`:
 
 ```cpp
-// LDPMTet4DataFunc.cuh — translational strains
-Real r[3];
-r[0] = d_data->x_cur()(nj) - d_data->x_cur()(ni);   // current edge vector
-r[1] = d_data->y_cur()(nj) - d_data->y_cur()(ni);
-r[2] = d_data->z_cur()(nj) - d_data->z_cur()(ni);
+// LDPMTet4DataFunc.cuh — compute_ldpm_facet_kinematics()
+const Real du0 = d_data->x_cur()(nj) - d_data->x_cur()(ni) - l0 * n0;
+const Real du1 = d_data->y_cur()(nj) - d_data->y_cur()(ni) - l0 * n1;
+const Real du2 = d_data->z_cur()(nj) - d_data->z_cur()(ni) - l0 * n2;
 
-// Relative displacement from reference: Δu = r − l₀·n_ref
-const Real du0 = r[0] - l0 * n0;
-const Real du1 = r[1] - l0 * n1;
-const Real du2 = r[2] - l0 * n2;
-
-const Real e_N = (du0*n0 + du1*n1 + du2*n2) * inv_l0;
-const Real e_M = (du0*m0 + du1*m1 + du2*m2) * inv_l0;
-const Real e_L = (du0*l_0 + du1*l_1 + du2*l_2) * inv_l0;
-
-// Rotational strains
 const Real dt0 = d_data->rot_x_cur()(nj) - d_data->rot_x_cur()(ni);   // Δθ
 const Real dt1 = d_data->rot_y_cur()(nj) - d_data->rot_y_cur()(ni);
 const Real dt2 = d_data->rot_z_cur()(nj) - d_data->rot_z_cur()(ni);
 
-const Real kappa_T = (dt0*n0 + dt1*n1 + dt2*n2) * inv_l0;
-const Real kappa_M = (dt0*m0 + dt1*m1 + dt2*m2) * inv_l0;
-const Real kappa_L = (dt0*l_0 + dt1*l_1 + dt2*l_2) * inv_l0;
+LDPMFacetKinematics kin;
+kin.e_N = (du0*n0 + du1*n1 + du2*n2) * inv_l0;
+kin.e_M = (du0*m0 + du1*m1 + du2*m2) * inv_l0;
+kin.e_L = (du0*lvec0 + du1*lvec1 + du2*lvec2) * inv_l0;
+kin.kappa_T = (dt0*n0 + dt1*n1 + dt2*n2) * inv_l0;
+kin.kappa_M = (dt0*m0 + dt1*m1 + dt2*m2) * inv_l0;
+kin.kappa_L = (dt0*lvec0 + dt1*lvec1 + dt2*lvec2) * inv_l0;
 ```
 
 > **Linearised-kinematics note:** All reference geometry (`l0`, `n`, `m`, `l`) is
@@ -321,15 +315,15 @@ The constitutive law is the core of the failure model.  `compute_ldpm_facet_stra
 ```cpp
 // LDPMTet4DataFunc.cuh
 // Strain increments relative to stored accumulated state
-const Real d_eps_N = e_N - statev[0];
-const Real d_eps_M = e_M - statev[1];
-const Real d_eps_L = e_L - statev[2];
+const Real d_eps_N = kin.e_N - statev[0];
+const Real d_eps_M = kin.e_M - statev[1];
+const Real d_eps_L = kin.e_L - statev[2];
 
 // Volumetric strain: precomputed per-tet average (matches CPU reference)
 const Real eps_V = d_data->edge_vol_strain(edge_idx);
 
 ldpm_tet4_full_constitutive(d_eps_N, d_eps_M, d_eps_L,
-    kappa_T, kappa_M, kappa_L, eps_V, l0,
+    kin.kappa_T, kin.kappa_M, kin.kappa_L, eps_V, kin.l0,
     d_data->ldpm_params(), statev,
     t_N, t_M, t_L, m_T, m_M, m_L);
 
@@ -562,14 +556,15 @@ The leapfrog (central-difference) explicit integrator advances the simulation by
 one time step Δt:
 
 ```
-1.  Compute strains e and κ at all facets  (= compute_ldpm_facet_strain_and_stress)
-2.  Apply constitutive law → tractions t, moments m, updated κ and ω
-3.  Assemble nodal forces:  f_int, M_int
-4.  Velocity update:
+1.  Compute per-TET volumetric strain and average it onto edges
+2.  Compute strains e and κ at all facets  (= compute_ldpm_facet_strain_and_stress)
+3.  Apply constitutive law → tractions t, moments m, updated κ and ω
+4.  Assemble nodal forces:  f_int, M_int
+5.  Velocity update:
       v_{n+½}  = v_{n−½}  + Δt · M_lump⁻¹  · (f_ext  − f_int)
       ω_{n+½} = ω_{n−½} + Δt · I_lump⁻¹  · (M_ext − M_int)
-5.  Enforce BCs: zero velocity at fixed nodes (all 6 DOFs)
-6.  Position advance:
+6.  Enforce BCs: zero velocity at fixed nodes (all 6 DOFs)
+7.  Position advance:
       x_{n+1} = xₙ + Δt · v_{n+½}
       θ_{n+1} = θₙ + Δt · ω_{n+½}
 ```
@@ -582,7 +577,10 @@ CUDA kernel groups:
 ```cpp
 // LeapfrogSolver.cu — LDPM_TET4 branch
 
-// Step 1+2: facet strains → constitutive law → tractions (grid-stride over n_edge)
+// Step 0: volumetric strain precompute on host-launched LDPM kernels
+ldpm_host_data_->ComputeVolumetricStrain();
+
+// Step 1: facet strains → constitutive law → tractions (grid-stride over n_edge)
 leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
 
 // Step 3: assemble internal forces (clear first, then atomicAdd)
@@ -703,7 +701,7 @@ GPU_LDPMTet4_Data::SetupFromMesh()
     │    └─ Allocate GPU arrays:
     │         positions (x,y,z), rotations (θx,θy,θz),
     │         forces (f_int, f_ext), moments (f_int_r, f_ext_r),
-    │         traction cache (facet_t, 6 × n_edge),
+    │         traction cache (facet_t, LDPM_FACET_N_COMPONENTS × n_edge),
     │         damage history: d_kappa[], d_omega[]  ← initialised to 0
     └─ Override A, m̂, l̂ from facets.dat sub-facet data (richer geometry)
          Build subfacet→edge index table d_subfacet_edge_idx[]
@@ -721,6 +719,10 @@ LeapfrogSolver::Setup()
     ↓
 ─────────────────── Time loop ───────────────────
     │
+    ├─ ComputeVolumetricStrain():
+    │    ├─ Compute eps_V = (V_cur - V_ref) / (3 * V_ref) per TET
+    │    └─ Average per-TET eps_V onto each edge via edge-to-TET CSR mapping
+    │
     ├─ leapfrog_compute_p_kernel  (one GPU thread per edge):
     │    │
     │    ├─ Compute 6 strains from Δu and Δθ projected onto (n, m, l)
@@ -737,7 +739,7 @@ LeapfrogSolver::Setup()
     │           Update energy, crack opening, and 16-component state vector
     │           Maintain kappa/omega for VTK
     │
-    │         Write d_facet_t[edge × 6 + {0..5}]
+    │         Write d_facet_t[edge × LDPM_FACET_N_COMPONENTS + LDPMFacetComponent]
     │
     ├─ clear f_int and f_int_r
     │
@@ -787,8 +789,8 @@ LeapfrogSolver::Setup()
 | **m** | Facet first tangent | `d_edge_m[edge*3+k]` → `edge_m_comp(e,k)` | `LDPMTet4Data.cuh` |
 | **l** | Facet second tangent | `d_edge_lv[edge*3+k]` → `edge_lv_comp(e,k)` | `LDPMTet4Data.cuh` |
 | A | Voronoi facet area | `d_facet_area[edge]` → `facet_area(e)` | `LDPMTet4Data.cuh` |
-| e_N, e_M, e_L | Translational strains | local vars in `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` |
-| κ_T, κ_M, κ_L | Rotational strains | local vars in `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` |
+| e_N, e_M, e_L | Translational strains | `LDPMFacetKinematics` from `compute_ldpm_facet_kinematics` | `LDPMTet4DataFunc.cuh` |
+| κ_T, κ_M, κ_L | Rotational strains | `LDPMFacetKinematics` from `compute_ldpm_facet_kinematics` | `LDPMTet4DataFunc.cuh` |
 | α = E_T/E_N | Shear-normal coupling ratio | `LDPMParams::alpha` or local var | `LDPM.cuh` |
 | `LDPMParams` | Full model material parameters (24) | `d_ldpm_params` → `ldpm_params()` | `LDPM.cuh` / `LDPMTet4Data.cuh` |
 | `statev[0..15]` | Per-edge 16-component state vector | `d_edge_statev[edge*16+k]` → `edge_statev(e,k)` | `LDPMTet4Data.cuh` |
@@ -796,8 +798,8 @@ LeapfrogSolver::Setup()
 | E_N | Normal modulus | `LDPMParams::E0` | `LDPM.cuh` |
 | κ | History max strain (ratchet) | `d_kappa[edge]` → `edge_kappa(e)` | `LDPMTet4Data.cuh` |
 | ω | Damage / fracture state (0=intact, 1=failed) | `d_omega[edge]` → `edge_omega(e)` | `LDPMTet4Data.cuh` |
-| t_N, t_M, t_L | Facet tractions | `d_facet_t[edge*6+0..2]` → `facet_t(e,0..2)` | `LDPMTet4Data.cuh` |
-| m_T, m_M, m_L | Facet moments | `d_facet_t[edge*6+3..5]` → `facet_t(e,3..5)` | `LDPMTet4Data.cuh` |
+| t_N, t_M, t_L | Facet tractions | `d_facet_t[edge*LDPM_FACET_N_COMPONENTS + LDPM_FACET_T_*]` → `facet_t(e, LDPM_FACET_T_*)` | `LDPMTet4Data.cuh` |
+| m_T, m_M, m_L | Facet moments | `d_facet_t[edge*LDPM_FACET_N_COMPONENTS + LDPM_FACET_M_*]` → `facet_t(e, LDPM_FACET_M_*)` | `LDPMTet4Data.cuh` |
 | **f**_int | Translational internal force | `d_f_int_t[node*3+k]` → `f_int()(node*3+k)` | `LDPMTet4Data.cuh` |
 | **M**_int | Rotational internal moment | `d_f_int_r[node*3+k]` → `f_int_r()(node*3+k)` | `LDPMTet4Data.cuh` |
 | mᵢ | Translational lumped mass | `d_csr_values[i]` → `mass_lump()(i)` | `LeapfrogSolver.cuh` |

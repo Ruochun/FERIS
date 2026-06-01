@@ -173,12 +173,21 @@ The implementation uses:
 ## 8. Volumetric Strain
 
 The target model uses a volumetric strain `eps_V` in the compressive boundary
-computation. The current implementation uses a **per-facet approximation**
-(`eps_V = eps_N`) which is adequate for single-tet and simple multi-tet meshes.
+computation. FERIS computes `eps_V` as a true per-TET volumetric strain:
 
-A future refinement could compute `eps_V` as the average normal strain across
-all facets surrounding a node, providing better accuracy for complex multi-tet
-geometries under highly non-uniform compressive loading.
+```cpp
+eps_V_tet = (V_cur - V_ref) / (3 * V_ref)
+```
+
+Each time step, `GPU_LDPMTet4_Data::ComputeVolumetricStrain()` computes this
+value for every TET from the current particle positions, then averages the
+values across all TETs sharing each edge through the precomputed edge-to-TET CSR
+mapping. The per-edge averaged value is stored in `d_edge_vol_strain` and read by
+`compute_ldpm_facet_strain_and_stress()` as `edge_vol_strain(edge_idx)`.
+
+This replaces the earlier per-facet approximation `eps_V = eps_N` and matches
+the volume-strain approach used by `ChElementLDPM::ComputeVolume()` in the CPU
+reference.
 
 ---
 
