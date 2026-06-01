@@ -50,6 +50,16 @@ namespace feris {
 // Rotational inertia scaling factor  (I = alpha * m * l_min^2).
 static constexpr Real LDPM_TET4_ALPHA_ROT = Real(0.25);
 
+enum LDPMFacetComponent {
+    LDPM_FACET_T_N = 0,
+    LDPM_FACET_T_M = 1,
+    LDPM_FACET_T_L = 2,
+    LDPM_FACET_M_T = 3,
+    LDPM_FACET_M_M = 4,
+    LDPM_FACET_M_L = 5,
+    LDPM_FACET_N_COMPONENTS = 6
+};
+
 struct GPU_LDPMTet4_Data : public ElementBase {
 #if defined(__CUDACC__)
 
@@ -162,13 +172,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     }
 
     // ── Per-step facet tractions and moments ─────────────────────────────────
-    // Layout per edge: [t_N, t_M, t_L, m_T, m_M, m_L]  (6 components)
+    // Layout per edge uses LDPMFacetComponent:
+    // [t_N, t_M, t_L, m_T, m_M, m_L].
 
     __device__ Real& facet_t(int edge_idx, int comp) {
-        return d_facet_t[edge_idx * 6 + comp];
+        return d_facet_t[edge_idx * LDPM_FACET_N_COMPONENTS + comp];
     }
     __device__ Real facet_t(int edge_idx, int comp) const {
-        return d_facet_t[edge_idx * 6 + comp];
+        return d_facet_t[edge_idx * LDPM_FACET_N_COMPONENTS + comp];
     }
 
     // ── Per-edge damage state (legacy) ──────────────────────────────────────────
@@ -374,7 +385,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     void RetrieveFacetDamageToCPU(VectorXR& omega_out);
 
     // Retrieve per-edge facet traction/moment components from GPU to host.
-    // out size: 6 * n_edge, layout per edge:
+    // out size: LDPM_FACET_N_COMPONENTS * n_edge, layout per edge:
     // [t_N, t_M, t_L, m_T, m_M, m_L].
     void RetrieveFacetTractionToCPU(VectorXR& out);
 
@@ -544,7 +555,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     std::vector<Real> h_l0_vec;
 
     // ── Per-step facet tractions and moments ──────────────────────────────────
-    mophi::DualArray<Real> da_facet_t;  // [n_edge * 6]
+    mophi::DualArray<Real> da_facet_t;  // [n_edge * LDPM_FACET_N_COMPONENTS]
     Real* d_facet_t;
 
     // ── Per-edge damage state (legacy) ───────────────────────────────────────────

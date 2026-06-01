@@ -23,18 +23,18 @@
  *   statev[0]  = eps_N  (normal strain, accumulated)
  *   statev[1]  = eps_M  (shear M strain, accumulated)
  *   statev[2]  = eps_L  (shear L strain, accumulated)
- *   statev[3]  = sigma_N (normal stress, previous step)
- *   statev[4]  = sigma_M (shear M stress, previous step)
- *   statev[5]  = sigma_L (shear L stress, previous step)
+ *   statev[3]  = sigma_N (normal stress; previous step on entry, current step on return)
+ *   statev[4]  = sigma_M (shear M stress; previous step on entry, current step on return)
+ *   statev[5]  = sigma_L (shear L stress; previous step on entry, current step on return)
  *   statev[6]  = max_eps_N (max normal strain history)
  *   statev[7]  = max_eps_T (max shear magnitude history)
- *   statev[8]  = effective strain
- *   statev[9]  = effective stress
+ *   statev[8]  = effective strain (previous step on entry, current step on return)
+ *   statev[9]  = effective stress (previous step on entry, current step on return)
  *   statev[10] = internal work
  *   statev[11] = crack opening
- *   statev[12] = eps_N net (for eigenstrain path)
- *   statev[13] = eps_M net (for eigenstrain path)
- *   statev[14] = eps_L net (for eigenstrain path)
+ *   statev[12] = eps_N net (reserved for a future eigenstrain path; currently not updated)
+ *   statev[13] = eps_M net (reserved for a future eigenstrain path; currently not updated)
+ *   statev[14] = eps_L net (reserved for a future eigenstrain path; currently not updated)
  *   statev[15] = dissipated energy
  *
  *==============================================================
@@ -316,6 +316,9 @@ __device__ __forceinline__ void ldpm_tet4_full_constitutive(Real d_eps_N,
     const Real E0 = params.E0;
     const Real alpha = params.alpha;
 
+    // The state vector follows the external LDPM reference layout. Slots 0..5
+    // are previous-step values on entry and are overwritten with current-step
+    // values before return.
     // Accumulate total strains
     const Real eps_N = statev[0] + d_eps_N;
     const Real eps_M = statev[1] + d_eps_M;

@@ -33,6 +33,49 @@
 
 namespace feris {
 
+namespace {
+
+constexpr int LDPM_TET4_LOCAL_EDGES[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+
+__host__ __device__ __forceinline__ Real ldpm_tet_abs_volume(Real x0,
+                                                             Real y0,
+                                                             Real z0,
+                                                             Real x1,
+                                                             Real y1,
+                                                             Real z1,
+                                                             Real x2,
+                                                             Real y2,
+                                                             Real z2,
+                                                             Real x3,
+                                                             Real y3,
+                                                             Real z3) {
+    const Real a0 = x1 - x0;
+    const Real a1 = y1 - y0;
+    const Real a2 = z1 - z0;
+
+    const Real b0 = x2 - x0;
+    const Real b1 = y2 - y0;
+    const Real b2 = z2 - z0;
+
+    const Real c0 = x3 - x0;
+    const Real c1 = y3 - y0;
+    const Real c2 = z3 - z0;
+
+    const Real bc0 = b1 * c2 - b2 * c1;
+    const Real bc1 = b2 * c0 - b0 * c2;
+    const Real bc2 = b0 * c1 - b1 * c0;
+
+    const Real det = a0 * bc0 + a1 * bc1 + a2 * bc2;
+    return ((det >= Real(0)) ? det : -det) / Real(6);
+}
+
+static inline Real
+ldpm_host_tet_abs_volume(const Real* x, const Real* y, const Real* z, int n0, int n1, int n2, int n3) {
+    return ldpm_tet_abs_volume(x[n0], y[n0], z[n0], x[n1], y[n1], z[n1], x[n2], y[n2], z[n2], x[n3], y[n3], z[n3]);
+}
+
+}  // namespace
+
 // ─── GPU kernel wrappers ─────────────────────────────────────────────────────
 
 __global__ void calc_p_ldpm_tet4_kernel(GPU_LDPMTet4_Data* d_data) {
@@ -100,28 +143,8 @@ __global__ void compute_tet_volumetric_strain_kernel(int n_elem,
     const int n2 = tet_conn[tid * 4 + 2];
     const int n3 = tet_conn[tid * 4 + 3];
 
-    // Edge vectors from node 0
-    const Real a0 = x_cur[n1] - x_cur[n0];
-    const Real a1 = y_cur[n1] - y_cur[n0];
-    const Real a2 = z_cur[n1] - z_cur[n0];
-
-    const Real b0 = x_cur[n2] - x_cur[n0];
-    const Real b1 = y_cur[n2] - y_cur[n0];
-    const Real b2 = z_cur[n2] - z_cur[n0];
-
-    const Real c0 = x_cur[n3] - x_cur[n0];
-    const Real c1 = y_cur[n3] - y_cur[n0];
-    const Real c2 = z_cur[n3] - z_cur[n0];
-
-    // Cross product b × c
-    const Real bc0 = b1 * c2 - b2 * c1;
-    const Real bc1 = b2 * c0 - b0 * c2;
-    const Real bc2 = b0 * c1 - b1 * c0;
-
-    // V_cur = |det| / 6
-    const Real det = a0 * bc0 + a1 * bc1 + a2 * bc2;
-    const Real V_cur = abs(det) / Real(6);
-
+    const Real V_cur = ldpm_tet_abs_volume(x_cur[n0], y_cur[n0], z_cur[n0], x_cur[n1], y_cur[n1], z_cur[n1], x_cur[n2],
+                                           y_cur[n2], z_cur[n2], x_cur[n3], y_cur[n3], z_cur[n3]);
     const Real V_ref = vol_ref[tid];
     vol_strain[tid] = (V_ref > Real(0)) ? (V_cur - V_ref) / (Real(3) * V_ref) : Real(0);
 }
@@ -274,14 +297,12 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 
     // ── 5. Extract unique edges ───────────────────────────────────────────────
 
-    static const int LOCAL_EDGES[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
-
     std::map<std::pair<int, int>, std::vector<int>> edge_to_tets;
 
     for (int e = 0; e < n_elem; e++) {
         for (int le = 0; le < 6; le++) {
-            int a = tet_connectivity(e, LOCAL_EDGES[le][0]);
-            int b = tet_connectivity(e, LOCAL_EDGES[le][1]);
+            int a = tet_connectivity(e, LDPM_TET4_LOCAL_EDGES[le][0]);
+            int b = tet_connectivity(e, LDPM_TET4_LOCAL_EDGES[le][1]);
             if (a > b)
                 std::swap(a, b);
             edge_to_tets[{a, b}].push_back(e);
@@ -424,8 +445,8 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     std::copy(h_edge_lv.begin(), h_edge_lv.end(), da_edge_lv.host());
     da_edge_lv.ToDevice();
 
-    // 6 traction/moment components per edge
-    da_facet_t.resize(static_cast<size_t>(n_edge) * 6);
+    // LDPM_FACET_N_COMPONENTS traction/moment components per edge
+    da_facet_t.resize(static_cast<size_t>(n_edge) * LDPM_FACET_N_COMPONENTS);
     da_facet_t.BindDevicePointer(&d_facet_t);
     da_facet_t.SetVal(Real(0));
     da_facet_t.ToDevice();
@@ -455,18 +476,9 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_tet_vol_ref.resize(n_elem);
     da_tet_vol_ref.BindDevicePointer(&d_tet_vol_ref);
     for (int e = 0; e < n_elem; e++) {
-        const int n0_t = h_tet_conn_vec[e * 4 + 0];
-        const int n1_t = h_tet_conn_vec[e * 4 + 1];
-        const int n2_t = h_tet_conn_vec[e * 4 + 2];
-        const int n3_t = h_tet_conn_vec[e * 4 + 3];
-
-        const Real a[3] = {h_x(n1_t) - h_x(n0_t), h_y(n1_t) - h_y(n0_t), h_z(n1_t) - h_z(n0_t)};
-        const Real b[3] = {h_x(n2_t) - h_x(n0_t), h_y(n2_t) - h_y(n0_t), h_z(n2_t) - h_z(n0_t)};
-        const Real c[3] = {h_x(n3_t) - h_x(n0_t), h_y(n3_t) - h_y(n0_t), h_z(n3_t) - h_z(n0_t)};
-
-        const Real cross_bc[3] = {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2], b[0] * c[1] - b[1] * c[0]};
-        const Real vol = std::abs(a[0] * cross_bc[0] + a[1] * cross_bc[1] + a[2] * cross_bc[2]) / Real(6);
-        da_tet_vol_ref.host()[e] = vol;
+        da_tet_vol_ref.host()[e] =
+            ldpm_host_tet_abs_volume(h_x.data(), h_y.data(), h_z.data(), h_tet_conn_vec[e * 4 + 0],
+                                     h_tet_conn_vec[e * 4 + 1], h_tet_conn_vec[e * 4 + 2], h_tet_conn_vec[e * 4 + 3]);
     }
     da_tet_vol_ref.ToDevice();
 
@@ -624,8 +636,6 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         return;
     }
 
-    static const int LOCAL_EDGES_SF[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
-
     // Build a fast lookup: sorted node pair → global edge index.
     std::map<std::pair<int, int>, int> edge_index_map;
     for (int e = 0; e < n_edge; e++) {
@@ -666,8 +676,8 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         Real best_sign = Real(1);
 
         for (int le = 0; le < 6; le++) {
-            const int na = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[le][0]];
-            const int nb = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[le][1]];
+            const int na = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[le][0]];
+            const int nb = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[le][1]];
 
             const Real dx = hx[nb] - hx[na];
             const Real dy = hy[nb] - hy[na];
@@ -695,8 +705,8 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         }
 
         // Resolve global edge index.
-        const int na = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[best_le][0]];
-        const int nb = h_tet_conn_vec[t * 4 + LOCAL_EDGES_SF[best_le][1]];
+        const int na = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[best_le][0]];
+        const int nb = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[best_le][1]];
         const int ni = std::min(na, nb);
         const int nj = std::max(na, nb);
 
@@ -887,12 +897,7 @@ void GPU_LDPMTet4_Data::CalcMassMatrix() {
         const int n2 = h_tet_conn_vec[e * 4 + 2];
         const int n3 = h_tet_conn_vec[e * 4 + 3];
 
-        const Real a[3] = {hx[n1] - hx[n0], hy[n1] - hy[n0], hz[n1] - hz[n0]};
-        const Real b[3] = {hx[n2] - hx[n0], hy[n2] - hy[n0], hz[n2] - hz[n0]};
-        const Real c[3] = {hx[n3] - hx[n0], hy[n3] - hy[n0], hz[n3] - hz[n0]};
-
-        const Real cross_bc[3] = {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2], b[0] * c[1] - b[1] * c[0]};
-        const Real vol = std::abs(a[0] * cross_bc[0] + a[1] * cross_bc[1] + a[2] * cross_bc[2]) / Real(6);
+        const Real vol = ldpm_host_tet_abs_volume(hx, hy, hz, n0, n1, n2, n3);
 
         node_volumes[n0] += vol / Real(4);
         node_volumes[n1] += vol / Real(4);
@@ -969,21 +974,15 @@ void GPU_LDPMTet4_Data::CalcP() {
         return;
     if (n_edge == 0)
         return;
+    if (d_ldpm_params == nullptr || d_statev == nullptr) {
+        MOPHI_ERROR("GPU_LDPMTet4_Data::CalcP requires SetLDPMParams() before evaluating LDPM facet response.");
+        return;
+    }
     constexpr int threads = 256;
 
-    // Step A: Compute per-tet volumetric strain from current positions.
-    if (n_elem > 0 && d_tet_conn != nullptr) {
-        const int blocks_tet = (n_elem + threads - 1) / threads;
-        compute_tet_volumetric_strain_kernel<<<blocks_tet, threads>>>(n_elem, d_tet_conn, d_x_cur, d_y_cur, d_z_cur,
-                                                                      d_tet_vol_ref, d_tet_vol_strain);
+    ComputeVolumetricStrain();
 
-        // Step B: Average tet volumetric strains onto edges via CSR mapping.
-        const int blocks_edge = (n_edge + threads - 1) / threads;
-        average_tet_volumetric_strain_to_edges_kernel<<<blocks_edge, threads>>>(
-            n_edge, d_edge_tet_offsets, d_edge_tet_indices, d_tet_vol_strain, d_edge_vol_strain);
-    }
-
-    // Step C: Compute facet strains, constitutive response, and tractions.
+    // Compute facet strains, constitutive response, and tractions.
     const int blocks = (n_edge + threads - 1) / threads;
     calc_p_ldpm_tet4_kernel<<<blocks, threads>>>(d_data);
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
@@ -1078,9 +1077,9 @@ void GPU_LDPMTet4_Data::RetrieveFacetDamageToCPU(VectorXR& omega_out) {
 }
 
 void GPU_LDPMTet4_Data::RetrieveFacetTractionToCPU(VectorXR& out) {
-    out.resize(n_edge * 6);
+    out.resize(n_edge * LDPM_FACET_N_COMPONENTS);
     da_facet_t.ToHost();
-    std::copy(da_facet_t.host(), da_facet_t.host() + n_edge * 6, out.data());
+    std::copy(da_facet_t.host(), da_facet_t.host() + n_edge * LDPM_FACET_N_COMPONENTS, out.data());
 }
 
 void GPU_LDPMTet4_Data::RetrieveFacetKappaToCPU(VectorXR& kappa_out) {
