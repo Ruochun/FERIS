@@ -55,8 +55,7 @@ namespace feris {
 //   comp 0 = t_N, 1 = t_M, 2 = t_L  (tractions)
 //   comp 3 = m_T, 4 = m_M, 5 = m_L  (moments)
 // ---------------------------------------------------------------------------
-__device__ __forceinline__ void compute_ldpm_facet_strain_and_stress(int edge_idx,
-                                                                     GPU_LDPMTet4_Data* d_data) {
+__device__ __forceinline__ void compute_ldpm_facet_strain_and_stress(int edge_idx, GPU_LDPMTet4_Data* d_data) {
     const int ni = d_data->edge_node(edge_idx, 0);
     const int nj = d_data->edge_node(edge_idx, 1);
 
