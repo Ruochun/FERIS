@@ -266,6 +266,13 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     void CalcConstraintData() override {}
     void CalcP() override;
 
+    // Runs only the volumetric strain pre-computation steps (Steps A+B of CalcP):
+    //   A. Per-tet volumetric strain from current node positions.
+    //   B. Average per-tet strains onto per-edge values via CSR mapping.
+    // Called by the LeapfrogSolver before each facet constitutive update so
+    // that eps_V is up-to-date when compute_ldpm_facet_strain_and_stress runs.
+    void ComputeVolumetricStrain();
+
     void RetrieveInternalForceToCPU(VectorXR& internal_force) override;
     void RetrieveInternalForceToCPU(VectorReal3& internal_force) {
         VectorXR flat;

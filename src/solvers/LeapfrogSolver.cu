@@ -32,20 +32,6 @@
 
 namespace feris {
 
-// Forward declarations for volumetric strain kernels defined in LDPMTet4Data.cu
-__global__ void compute_tet_volumetric_strain_kernel(int n_elem,
-                                                     const int* __restrict__ tet_conn,
-                                                     const Real* __restrict__ x_cur,
-                                                     const Real* __restrict__ y_cur,
-                                                     const Real* __restrict__ z_cur,
-                                                     const Real* __restrict__ vol_ref,
-                                                     Real* __restrict__ vol_strain);
-__global__ void average_tet_volumetric_strain_to_edges_kernel(int n_edge,
-                                                              const int* __restrict__ edge_tet_offsets,
-                                                              const int* __restrict__ edge_tet_indices,
-                                                              const Real* __restrict__ tet_vol_strain,
-                                                              Real* __restrict__ edge_vol_strain);
-
 // ---------------------------------------------------------------------------
 // leapfrog_compute_lumped_mass_kernel
 //
@@ -464,17 +450,10 @@ void LeapfrogSolver::OneStepLeapfrog() {
         auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);
 
         // Step 0: Compute per-tet volumetric strain and average onto edges.
-        if (typed_data->n_elem > 0 && typed_data->d_tet_conn != nullptr) {
-            const int blocks_tet = (typed_data->n_elem + threadsPerBlock - 1) / threadsPerBlock;
-            compute_tet_volumetric_strain_kernel<<<blocks_tet, threadsPerBlock>>>(
-                typed_data->n_elem, typed_data->d_tet_conn, typed_data->d_x_cur, typed_data->d_y_cur,
-                typed_data->d_z_cur, typed_data->d_tet_vol_ref, typed_data->d_tet_vol_strain);
-
-            const int blocks_edge_vol = (typed_data->n_edge + threadsPerBlock - 1) / threadsPerBlock;
-            average_tet_volumetric_strain_to_edges_kernel<<<blocks_edge_vol, threadsPerBlock>>>(
-                typed_data->n_edge, typed_data->d_edge_tet_offsets, typed_data->d_edge_tet_indices,
-                typed_data->d_tet_vol_strain, typed_data->d_edge_vol_strain);
-        }
+        // ldpm_host_data_ is the host-side struct; its members (n_elem, device
+        // pointer values, etc.) are valid on the host.  typed_data is a device
+        // pointer and cannot be dereferenced here.
+        ldpm_host_data_->ComputeVolumetricStrain();
 
         // Step 1: Compute tractions and moments at all facets.
         leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
@@ -586,17 +565,7 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
         auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);
 
         // Compute per-tet volumetric strain and average onto edges.
-        if (typed_data->n_elem > 0 && typed_data->d_tet_conn != nullptr) {
-            const int blocks_tet = (typed_data->n_elem + threadsPerBlock - 1) / threadsPerBlock;
-            compute_tet_volumetric_strain_kernel<<<blocks_tet, threadsPerBlock>>>(
-                typed_data->n_elem, typed_data->d_tet_conn, typed_data->d_x_cur, typed_data->d_y_cur,
-                typed_data->d_z_cur, typed_data->d_tet_vol_ref, typed_data->d_tet_vol_strain);
-
-            const int blocks_edge_vol = (typed_data->n_edge + threadsPerBlock - 1) / threadsPerBlock;
-            average_tet_volumetric_strain_to_edges_kernel<<<blocks_edge_vol, threadsPerBlock>>>(
-                typed_data->n_edge, typed_data->d_edge_tet_offsets, typed_data->d_edge_tet_indices,
-                typed_data->d_tet_vol_strain, typed_data->d_edge_vol_strain);
-        }
+        ldpm_host_data_->ComputeVolumetricStrain();
 
         // Recompute forces and moments at the current configuration.
         leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);

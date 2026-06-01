@@ -989,6 +989,24 @@ void GPU_LDPMTet4_Data::CalcP() {
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
 }
 
+// ─── ComputeVolumetricStrain ──────────────────────────────────────────────────
+
+void GPU_LDPMTet4_Data::ComputeVolumetricStrain() {
+    if (!is_setup)
+        return;
+    if (n_elem <= 0 || d_tet_conn == nullptr)
+        return;
+    constexpr int threads = 256;
+
+    const int blocks_tet = (n_elem + threads - 1) / threads;
+    compute_tet_volumetric_strain_kernel<<<blocks_tet, threads>>>(n_elem, d_tet_conn, d_x_cur, d_y_cur, d_z_cur,
+                                                                  d_tet_vol_ref, d_tet_vol_strain);
+
+    const int blocks_edge = (n_edge + threads - 1) / threads;
+    average_tet_volumetric_strain_to_edges_kernel<<<blocks_edge, threads>>>(
+        n_edge, d_edge_tet_offsets, d_edge_tet_indices, d_tet_vol_strain, d_edge_vol_strain);
+}
+
 // ─── CalcInternalForce ────────────────────────────────────────────────────────
 
 void GPU_LDPMTet4_Data::CalcInternalForce() {
