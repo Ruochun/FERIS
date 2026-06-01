@@ -449,6 +449,12 @@ void LeapfrogSolver::OneStepLeapfrog() {
     } else if (type_ == TYPE_LDPM_TET4) {
         auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);
 
+        // Step 0: Compute per-tet volumetric strain and average onto edges.
+        // ldpm_host_data_ is the host-side struct; its members (n_elem, device
+        // pointer values, etc.) are valid on the host.  typed_data is a device
+        // pointer and cannot be dereferenced here.
+        ldpm_host_data_->ComputeVolumetricStrain();
+
         // Step 1: Compute tractions and moments at all facets.
         leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
 
@@ -557,6 +563,9 @@ void LeapfrogSolver::HalfKickImpl(Real sign) {
         half_kick_typed(static_cast<GPU_ANCF3443_Data*>(d_data_));
     } else if (type_ == TYPE_LDPM_TET4) {
         auto* typed_data = static_cast<GPU_LDPMTet4_Data*>(d_data_);
+
+        // Compute per-tet volumetric strain and average onto edges.
+        ldpm_host_data_->ComputeVolumetricStrain();
 
         // Recompute forces and moments at the current configuration.
         leapfrog_compute_p_kernel<<<blocks_p, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);

@@ -75,6 +75,9 @@ class LeapfrogSolver : public SolverBase {
         type_ = data->type;
         data->PrepareSolverData();       // no-op for FEAT/LDPM; calls CalcDsDuPre for ANCF
         d_data_ = data->GetDevicePtr();  // device-side copy pointer
+        if (type_ == TYPE_LDPM_TET4) {
+            ldpm_host_data_ = static_cast<GPU_LDPMTet4_Data*>(data);
+        }
         auto info = GetElementDispatchInfo(type_);
         n_total_qp_ = info.n_total_qp;
         n_shape_ = info.n_shape;
@@ -399,6 +402,11 @@ class LeapfrogSolver : public SolverBase {
     // Device pointer to the element data struct (GPU_FEAT4_Data, etc.).
     // Owned by the ElementBase object; not freed here.
     ElementBase* d_data_;
+    // Host-side pointer to the LDPM element data; non-null only for TYPE_LDPM_TET4.
+    // Used to call ComputeVolumetricStrain() before each facet update, since
+    // d_data_ is a device pointer and its members cannot be read on the host.
+    // Not owned here — lifetime managed by the caller.
+    GPU_LDPMTet4_Data* ldpm_host_data_ = nullptr;
     // Device-side mirror of this solver struct, copied via cudaMemcpy in Setup().
     // Passed directly to GPU kernels so they can access all device pointers and
     // scalar fields without re-deriving the host address.

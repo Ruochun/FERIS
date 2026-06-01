@@ -4,18 +4,15 @@
 
 ---
 
-## Status: IMPLEMENTED (one minor refinement remaining)
+## Status: FULLY IMPLEMENTED
 
-The full LDPM constitutive model has been implemented in FERIS, closing all five gaps
+The full LDPM constitutive model has been implemented in FERIS, closing all gaps
 identified below. The implementation matches the CPU reference in chrono-mechanics
-(`src/chrono_ldpm/ChMaterialVECT.cpp`).
+(`src/chrono_ldpm/ChMaterialVECT.cpp` and `ChElementLDPM.cpp`).
 
-**Minor remaining refinement:** The volumetric strain `eps_V` used in
-`ldpm_compress_boundary()` is currently approximated as `eps_V = eps_N` (per-facet
-normal strain). A more accurate approach for complex multi-tet geometries under
-non-uniform compression would compute `eps_V` as the average normal strain across
-all facets surrounding a node. This is a low-priority enhancement that does not
-affect correctness for typical use cases.
+All refinements are complete, including volumetric strain averaging which computes
+`eps_V = (V_cur - V_ref) / (3 * V_ref)` per tet element and averages across tets
+sharing each edge — matching the approach in `ChElementLDPM::ComputeVolume()`.
 
 ---
 
@@ -89,10 +86,11 @@ Rotational moments remain linear-elastic (`m = E_k * kappa`).
 
 | Item | Description | Status |
 |---|---|---|
-| Volumetric strain averaging | Compute `eps_V` as mean normal strain across all facets of a node instead of per-facet `eps_V = eps_N` | 🔲 Not started |
+| Volumetric strain averaging | Compute `eps_V` as mean of per-tet volumetric strain `(V_cur - V_ref) / (3 * V_ref)` averaged across all tets sharing an edge, instead of per-facet `eps_V = eps_N` | ✅ Done |
 
-This refinement would improve accuracy for complex multi-tet meshes under highly
-non-uniform compressive loading but is not required for correctness in typical cases.
+The volumetric strain averaging is now implemented: each step computes the true
+volumetric strain per TET element (matching the CPU reference `ChElementLDPM`),
+then averages across tets sharing each edge via a CSR mapping on the GPU.
 
 ---
 
