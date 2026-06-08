@@ -181,8 +181,9 @@ __device__ __forceinline__ void compute_p(int edge_idx,
 //   node i receives  -A * (...)
 //
 // Rotational moment assembly:
-//   node j receives  +A * (m_T * n + m_M * m + m_L * l)
-//   node i receives  -A * (...)
+//   node j receives  +A * (r_j × t + m_T * n + m_M * m + m_L * l)
+//   node i receives  -A * (r_i × t + m_T * n + m_M * m + m_L * l)
+// where r_i/r_j point from each endpoint to the interaction-facet center.
 // ---------------------------------------------------------------------------
 __device__ __forceinline__ void compute_internal_force(int edge_idx, int node_local, GPU_LDPMTet4_Data* d_data) {
     const int ni = d_data->edge_node(edge_idx, 0);
@@ -199,21 +200,34 @@ __device__ __forceinline__ void compute_internal_force(int edge_idx, int node_lo
     const Real m_M = d_data->facet_t(edge_idx, LDPM_FACET_M_M);
     const Real m_L = d_data->facet_t(edge_idx, LDPM_FACET_M_L);
 
+    Real f_vec[3];
+    Real couple_vec[3];
+
     // Assemble translational internal force
     for (int k = 0; k < 3; k++) {
-        const Real f_k = sign * A *
-                         (t_N * d_data->edge_n_comp(edge_idx, k) + t_M * d_data->edge_m_comp(edge_idx, k) +
-                          t_L * d_data->edge_lv_comp(edge_idx, k));
+        f_vec[k] = t_N * d_data->edge_n_comp(edge_idx, k) + t_M * d_data->edge_m_comp(edge_idx, k) +
+                   t_L * d_data->edge_lv_comp(edge_idx, k);
+        couple_vec[k] = m_T * d_data->edge_n_comp(edge_idx, k) + m_M * d_data->edge_m_comp(edge_idx, k) +
+                        m_L * d_data->edge_lv_comp(edge_idx, k);
+        const Real f_k = sign * A * f_vec[k];
         atomicAdd(&d_data->f_int()(global_node * 3 + k), f_k);
     }
 
-    // Assemble rotational internal moment
-    for (int k = 0; k < 3; k++) {
-        const Real m_k = sign * A *
-                         (m_T * d_data->edge_n_comp(edge_idx, k) + m_M * d_data->edge_m_comp(edge_idx, k) +
-                          m_L * d_data->edge_lv_comp(edge_idx, k));
-        atomicAdd(&d_data->f_int_r()(global_node * 3 + k), m_k);
-    }
+    const Real node_x = (node_local == 0) ? d_data->x_cur()(ni) : d_data->x_cur()(nj);
+    const Real node_y = (node_local == 0) ? d_data->y_cur()(ni) : d_data->y_cur()(nj);
+    const Real node_z = (node_local == 0) ? d_data->z_cur()(ni) : d_data->z_cur()(nj);
+
+    const Real r0 = d_data->edge_center_comp(edge_idx, 0) - node_x;
+    const Real r1 = d_data->edge_center_comp(edge_idx, 1) - node_y;
+    const Real r2 = d_data->edge_center_comp(edge_idx, 2) - node_z;
+
+    const Real torque0 = r1 * f_vec[2] - r2 * f_vec[1];
+    const Real torque1 = r2 * f_vec[0] - r0 * f_vec[2];
+    const Real torque2 = r0 * f_vec[1] - r1 * f_vec[0];
+
+    atomicAdd(&d_data->f_int_r()(global_node * 3 + 0), sign * A * (torque0 + couple_vec[0]));
+    atomicAdd(&d_data->f_int_r()(global_node * 3 + 1), sign * A * (torque1 + couple_vec[1]));
+    atomicAdd(&d_data->f_int_r()(global_node * 3 + 2), sign * A * (torque2 + couple_vec[2]));
 }
 
 // ---------------------------------------------------------------------------

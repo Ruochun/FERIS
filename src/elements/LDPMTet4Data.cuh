@@ -170,6 +170,9 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     __device__ Real edge_lv_comp(int edge_idx, int k) const {
         return d_edge_lv[edge_idx * 3 + k];
     }
+    __device__ Real edge_center_comp(int edge_idx, int k) const {
+        return d_edge_center[edge_idx * 3 + k];
+    }
 
     // ── Per-step facet tractions and moments ─────────────────────────────────
     // Layout per edge uses LDPMFacetComponent:
@@ -543,12 +546,14 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_edge_n;
     mophi::DualArray<Real> da_edge_m;
     mophi::DualArray<Real> da_edge_lv;
+    mophi::DualArray<Real> da_edge_center;
     int* d_edge_nodes;
     Real* d_l0;
     Real* d_facet_area;
     Real* d_edge_n;
     Real* d_edge_m;
     Real* d_edge_lv;
+    Real* d_edge_center;
 
     // Host copies of edge data for CalcMassMatrix (per-node l_min computation)
     std::vector<int> h_edge_nodes_vec;

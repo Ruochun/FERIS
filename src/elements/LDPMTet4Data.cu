@@ -319,6 +319,7 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     std::vector<Real> h_edge_n(n_edge * 3);
     std::vector<Real> h_edge_m(n_edge * 3);
     std::vector<Real> h_edge_lv(n_edge * 3);
+    std::vector<Real> h_edge_center(n_edge * 3);
 
     int edge_idx = 0;
     for (auto& kv : edge_to_tets) {
@@ -377,6 +378,9 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
         const Real xi = h_x(ni), yi = h_y(ni), zi = h_z(ni);
         const Real xj = h_x(nj), yj = h_y(nj), zj = h_z(nj);
         const Real mid[3] = {Real(0.5) * (xi + xj), Real(0.5) * (yi + yj), Real(0.5) * (zi + zj)};
+        h_edge_center[edge_idx * 3 + 0] = mid[0];
+        h_edge_center[edge_idx * 3 + 1] = mid[1];
+        h_edge_center[edge_idx * 3 + 2] = mid[2];
 
         for (int t : tets) {
             int others[4];
@@ -444,6 +448,11 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     da_edge_lv.BindDevicePointer(&d_edge_lv);
     std::copy(h_edge_lv.begin(), h_edge_lv.end(), da_edge_lv.host());
     da_edge_lv.ToDevice();
+
+    da_edge_center.resize(static_cast<size_t>(n_edge) * 3);
+    da_edge_center.BindDevicePointer(&d_edge_center);
+    std::copy(h_edge_center.begin(), h_edge_center.end(), da_edge_center.host());
+    da_edge_center.ToDevice();
 
     // LDPM_FACET_N_COMPONENTS traction/moment components per edge
     da_facet_t.resize(static_cast<size_t>(n_edge) * LDPM_FACET_N_COMPONENTS);
@@ -645,9 +654,16 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     }
 
     // Per-edge accumulators.
-    std::vector<Real> new_area(n_edge, Real(0));
-    std::vector<Real> new_m(n_edge * 3, Real(0));
-    std::vector<Real> new_l(n_edge * 3, Real(0));
+    std::vector<Real> new_area(n_edge);
+    std::vector<Real> new_m(n_edge * 3);
+    std::vector<Real> new_l(n_edge * 3);
+    std::vector<Real> new_center(n_edge * 3);
+    std::copy(da_facet_area.host(), da_facet_area.host() + n_edge, new_area.begin());
+    std::copy(da_edge_m.host(), da_edge_m.host() + n_edge * 3, new_m.begin());
+    std::copy(da_edge_lv.host(), da_edge_lv.host() + n_edge * 3, new_l.begin());
+    std::copy(da_edge_center.host(), da_edge_center.host() + n_edge * 3, new_center.begin());
+    std::vector<Real> area_accum(n_edge, Real(0));
+    std::vector<Real> center_accum(n_edge * 3, Real(0));
     std::vector<bool> frame_set(n_edge, false);
 
     // Allocate and initialise the subfacet→edge mapping array.
@@ -720,8 +736,11 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
         // Record which global edge this sub-facet belongs to.
         da_subfacet_edge_idx.host()[sf] = eidx;
 
-        // Accumulate projected area.
-        new_area[eidx] += parea;
+        // Accumulate projected area and area-weighted facet center.
+        area_accum[eidx] += parea;
+        center_accum[eidx * 3 + 0] += parea * h_subfacet_centroid(sf * 3 + 0);
+        center_accum[eidx * 3 + 1] += parea * h_subfacet_centroid(sf * 3 + 1);
+        center_accum[eidx * 3 + 2] += parea * h_subfacet_centroid(sf * 3 + 2);
 
         // Store the tangent frame from the first matching sub-facet.
         // Sign adjustment for m (q): if p is anti-parallel to the canonical
@@ -762,8 +781,16 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     // tet4-derived geometry (unlikely but handled gracefully).
     int n_frame_set = 0;
     for (int e = 0; e < n_edge; e++) {
-        if (frame_set[e])
+        if (frame_set[e]) {
             ++n_frame_set;
+            new_area[e] = area_accum[e];
+            if (area_accum[e] > Real(0)) {
+                const Real inv_area = Real(1) / area_accum[e];
+                new_center[e * 3 + 0] = center_accum[e * 3 + 0] * inv_area;
+                new_center[e * 3 + 1] = center_accum[e * 3 + 1] * inv_area;
+                new_center[e * 3 + 2] = center_accum[e * 3 + 2] * inv_area;
+            }
+        }
     }
 
     // Write updated arrays back to device.
@@ -775,6 +802,9 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
 
     std::copy(new_l.begin(), new_l.end(), da_edge_lv.host());
     da_edge_lv.ToDevice();
+
+    std::copy(new_center.begin(), new_center.end(), da_edge_center.host());
+    da_edge_center.ToDevice();
 
     // Upload subfacet→edge mapping to device.
     da_subfacet_edge_idx.ToDevice();
@@ -1174,6 +1204,7 @@ void GPU_LDPMTet4_Data::Destroy() {
     da_edge_n.free();
     da_edge_m.free();
     da_edge_lv.free();
+    da_edge_center.free();
     da_facet_t.free();
     da_kappa.free();
     da_omega.free();
