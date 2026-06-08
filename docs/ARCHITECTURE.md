@@ -101,20 +101,19 @@ the particle neighbourhood topology.
 - Translational: `x, y, z`
 - Rotational (linearised): `rx (θ_x), ry (θ_y), rz (θ_z)`
 
-**Constitutive law** (`src/materials/LDPM.cuh`) — 5 moduli:
+**Constitutive law** (`src/materials/LDPM.cuh`) — Chrono-compatible facet law:
 
 | Strain | Formula | Traction / moment | Modulus |
 |--------|---------|-------------------|---------|
-| Normal | `e_N = (Δu · n) / l₀` | `t_N = E_N · e_N` | `E_N` |
-| Shear m | `e_M = (Δu · m) / l₀` | `t_M = E_T · e_M` | `E_T` |
-| Shear l | `e_L = (Δu · l) / l₀` | `t_L = E_T · e_L` | `E_T` |
-| Twist | `κ_T = (Δθ · n) / l₀` | `m_T = E_κT · κ_T` | `E_κT` |
-| Bending m | `κ_M = (Δθ · m) / l₀` | `m_M = E_κM · κ_M` | `E_κM` |
-| Bending l | `κ_L = (Δθ · l) / l₀` | `m_L = E_κL · κ_L` | `E_κL` |
+| Normal | `e_N = (Δu_c · n) / l₀` | `t_N = E_N · e_N` | `E_N` |
+| Shear m | `e_M = (Δu_c · m) / l₀` | `t_M = E_T · e_M` | `E_T` |
+| Shear l | `e_L = (Δu_c · l) / l₀` | `t_L = E_T · e_L` | `E_T` |
 
-where `Δu = u_j − u_i` (translational displacement difference) and
-`Δθ = θ_j − θ_i` (rotation vector difference), both projected onto the
-reference facet frame `(n, m, l)`.
+where `Δu_c = (u_j + θ_j × r_j) − (u_i + θ_i × r_i)` is the relative
+displacement at the interaction facet center, `r_i/r_j` are reference vectors
+from each endpoint to that center. Rotational nodal residuals come from these
+same facet tractions acting through the reference lever arms; there is no
+separate rotational couple-stress law in the Chrono-matching path.
 
 **Rotational inertia**: `I_lump = α · m_lump · l_min²` with `α = 0.25` by default
 (configurable via `LDPM_TET4_ALPHA_ROT`).

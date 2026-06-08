@@ -75,9 +75,9 @@ struct LDPMParams {
     Real mu_0;          // Initial friction coefficient
     Real mu_inf;        // Asymptotic friction coefficient
     Real sigma_N0;      // Transitional stress for friction law
-    Real E_kT;          // Twist modulus
-    Real E_kM;          // Bending modulus (m)
-    Real E_kL;          // Bending modulus (l)
+    Real E_kT;          // Retained for API compatibility; unused by Chrono LDPM path
+    Real E_kM;          // Retained for API compatibility; unused by Chrono LDPM path
+    Real E_kL;          // Retained for API compatibility; unused by Chrono LDPM path
     Real rho;           // Density
     bool elastic_flag;  // If true, skip all inelastic updates
 };
@@ -287,7 +287,7 @@ __device__ __forceinline__ void ldpm_shear_boundary(Real eps_M,
 //
 // Inputs:
 //   d_eps_N, d_eps_M, d_eps_L — strain INCREMENTS this step
-//   kappa_T, kappa_M, kappa_L — rotational strains
+//   kappa_T, kappa_M, kappa_L — rotational strain placeholders
 //   eps_V                     — volumetric strain (mean of adjacent element)
 //   l0                        — reference edge length
 //   params                    — full LDPM material parameters
@@ -295,14 +295,14 @@ __device__ __forceinline__ void ldpm_shear_boundary(Real eps_M,
 //
 // Outputs:
 //   t_N, t_M, t_L — facet tractions
-//   m_T, m_M, m_L — facet moments per unit area
+//   m_T, m_M, m_L — facet couple moments per unit area; zero for Chrono LDPM
 // ---------------------------------------------------------------------------
 __device__ __forceinline__ void ldpm_tet4_full_constitutive(Real d_eps_N,
                                                             Real d_eps_M,
                                                             Real d_eps_L,
-                                                            Real kappa_T,
-                                                            Real kappa_M,
-                                                            Real kappa_L,
+                                                            Real /*kappa_T*/,
+                                                            Real /*kappa_M*/,
+                                                            Real /*kappa_L*/,
                                                             Real eps_V,
                                                             Real l0,
                                                             const LDPMParams& params,
@@ -403,10 +403,12 @@ __device__ __forceinline__ void ldpm_tet4_full_constitutive(Real d_eps_N,
     t_M = sigma_M;
     t_L = sigma_L;
 
-    // ── Rotational moments (linear-elastic, no damage coupling) ──────────────
-    m_T = params.E_kT * kappa_T;
-    m_M = params.E_kM * kappa_M;
-    m_L = params.E_kL * kappa_L;
+    // Chrono's LDPM element has no separate rotational couple-stress law.
+    // Nodal rotational residuals come from facet tractions acting through
+    // reference facet-center lever arms in the element assembly.
+    m_T = Real(0);
+    m_M = Real(0);
+    m_L = Real(0);
 }
 
 }  // namespace feris

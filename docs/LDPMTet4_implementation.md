@@ -252,22 +252,19 @@ da_mass_lump_[n_nodes … 2*n_nodes−1]  ← rotational inertia Iᵢ
 ### Theory
 
 For each strut (i, j), the engineering strains are projections of the
-**relative displacement** Δ**u** and the **rotation difference** Δ**θ** onto the
-three facet frame directions (n, m, l):
+**relative displacement at the interaction facet center** Δ**u**_c and the
+**rotation difference** Δ**θ** onto the three facet frame directions (n, m, l):
 
 | Strain | Formula | Physical meaning |
 |---|---|---|
-| e_N | (Δu · **n**) / l₀ | Normal opening (+) / closing (−) |
-| e_M | (Δu · **m**) / l₀ | Shear sliding, m-direction |
-| e_L | (Δu · **l**) / l₀ | Shear sliding, l-direction |
-| κ_T | (Δθ · **n**) / l₀ | Twist |
-| κ_M | (Δθ · **m**) / l₀ | Bending about m |
-| κ_L | (Δθ · **l**) / l₀ | Bending about l |
+| e_N | (Δu_c · **n**) / l₀ | Normal opening (+) / closing (−) |
+| e_M | (Δu_c · **m**) / l₀ | Shear sliding, m-direction |
+| e_L | (Δu_c · **l**) / l₀ | Shear sliding, l-direction |
 
-where Δ**u** = (**x**ⱼ − **x**ᵢ) − l₀ **n** is the displacement of the current
-edge vector relative to the reference (undeformed) configuration, and l₀ and **n**
-are fixed reference-configuration quantities consistent with LDPM's linearised
-kinematics.
+where Δ**u**_c = (**u**ⱼ + **θ**ⱼ × **r**ⱼ) − (**u**ᵢ + **θ**ᵢ × **r**ᵢ)
+is the relative displacement of the two particles at the facet center.  The
+vectors **r**ᵢ and **r**ⱼ point from each endpoint's reference position to the
+interaction facet center, matching Chrono's LDPM `A`-matrix kinematics.
 
 ### Implementation
 
@@ -277,9 +274,16 @@ centralized in `compute_ldpm_facet_kinematics()`:
 
 ```cpp
 // LDPMTet4DataFunc.cuh — compute_ldpm_facet_kinematics()
-const Real du0 = d_data->x_cur()(nj) - d_data->x_cur()(ni) - l0 * n0;
-const Real du1 = d_data->y_cur()(nj) - d_data->y_cur()(ni) - l0 * n1;
-const Real du2 = d_data->z_cur()(nj) - d_data->z_cur()(ni) - l0 * n2;
+const Real ui_c0 = ui0 + ti1 * ci2 - ti2 * ci1;  // u_i + theta_i x r_i
+const Real ui_c1 = ui1 + ti2 * ci0 - ti0 * ci2;
+const Real ui_c2 = ui2 + ti0 * ci1 - ti1 * ci0;
+const Real uj_c0 = uj0 + tj1 * cj2 - tj2 * cj1;  // u_j + theta_j x r_j
+const Real uj_c1 = uj1 + tj2 * cj0 - tj0 * cj2;
+const Real uj_c2 = uj2 + tj0 * cj1 - tj1 * cj0;
+
+const Real du0 = uj_c0 - ui_c0;
+const Real du1 = uj_c1 - ui_c1;
+const Real du2 = uj_c2 - ui_c2;
 
 const Real dt0 = d_data->rot_x_cur()(nj) - d_data->rot_x_cur()(ni);   // Δθ
 const Real dt1 = d_data->rot_y_cur()(nj) - d_data->rot_y_cur()(ni);
@@ -294,13 +298,12 @@ kin.kappa_M = (dt0*m0 + dt1*m1 + dt2*m2) * inv_l0;
 kin.kappa_L = (dt0*lvec0 + dt1*lvec1 + dt2*lvec2) * inv_l0;
 ```
 
-> **Linearised-kinematics note:** All reference geometry (`l0`, `n`, `m`, `l`) is
-> precomputed once and stored in read-only per-edge arrays. The subtraction
-> `r − l₀·n` always measures strain relative to the undeformed configuration, which
-> is correct for LDPM's engineering (first-order) strain measures.  This is *not*
-> the same as a Total-Lagrangian continuum FEA formulation (which would use the
-> deformation gradient **F** and Green–Lagrange strains); LDPM is a discrete lattice
-> model whose linearised kinematics assume small displacements and small rotations.
+> **Linearised-kinematics note:** All reference geometry (`l0`, `n`, `m`, `l`,
+> and the facet-center lever arms) is precomputed once and stored in read-only
+> per-edge arrays. This is *not* the same as a Total-Lagrangian continuum FEA
+> formulation (which would use the deformation gradient **F** and Green–Lagrange
+> strains); LDPM is a discrete lattice model whose linearised kinematics assume
+> small displacements and small rotations.
 
 ---
 
@@ -344,7 +347,7 @@ The full model uses 24 parameters stored in the `LDPMParams` struct:
 
 | Category | Parameters |
 |---|---|
-| Elastic | `E0`, `alpha`, `E_kT`, `E_kM`, `E_kL`, `rho` |
+| Elastic | `E0`, `alpha`, `rho` |
 | Tensile | `sigma_t`, `sigma_s`, `n_t`, `l_t`, `r_s`, `k_t` |
 | Compression | `sigma_c0`, `H_c0`, `H_c1`, `kc0`, `kc1`, `kc2`, `kc3`, `beta`, `E_d` |
 | Friction | `mu_0`, `mu_inf`, `sigma_N0` |
@@ -727,7 +730,7 @@ LeapfrogSolver::Setup()
     │    │
     │    ├─ Compute 6 strains from Δu and Δθ projected onto (n, m, l)
     │    │    e_N = (Δu·n)/l₀,  e_M = (Δu·m)/l₀,  e_L = (Δu·l)/l₀
-    │    │    κ_T = (Δθ·n)/l₀,  κ_M = (Δθ·m)/l₀,  κ_L = (Δθ·l)/l₀
+    │    │    θ enters Δu_c through θ × r_center
     │    │
     │    └─ Constitutive update (ldpm_tet4_full_constitutive):
     │           if eps_N > 0:
@@ -790,7 +793,7 @@ LeapfrogSolver::Setup()
 | **l** | Facet second tangent | `d_edge_lv[edge*3+k]` → `edge_lv_comp(e,k)` | `LDPMTet4Data.cuh` |
 | A | Voronoi facet area | `d_facet_area[edge]` → `facet_area(e)` | `LDPMTet4Data.cuh` |
 | e_N, e_M, e_L | Translational strains | `LDPMFacetKinematics` from `compute_ldpm_facet_kinematics` | `LDPMTet4DataFunc.cuh` |
-| κ_T, κ_M, κ_L | Rotational strains | `LDPMFacetKinematics` from `compute_ldpm_facet_kinematics` | `LDPMTet4DataFunc.cuh` |
+| κ_T, κ_M, κ_L | Rotation-difference placeholders retained for API compatibility | `LDPMFacetKinematics` from `compute_ldpm_facet_kinematics` | `LDPMTet4DataFunc.cuh` |
 | α = E_T/E_N | Shear-normal coupling ratio | `LDPMParams::alpha` or local var | `LDPM.cuh` |
 | `LDPMParams` | Full model material parameters (24) | `d_ldpm_params` → `ldpm_params()` | `LDPM.cuh` / `LDPMTet4Data.cuh` |
 | `statev[0..15]` | Per-edge 16-component state vector | `d_edge_statev[edge*16+k]` → `edge_statev(e,k)` | `LDPMTet4Data.cuh` |

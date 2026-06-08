@@ -20,7 +20,7 @@ sharing each edge — matching the approach in `ChElementLDPM::ComputeVolume()`.
 
 | Area | Status | Implementation |
 |---|---|---|
-| Elasticity | ✅ Done | `E_0`, `alpha`, `E_kT`, `E_kM`, `E_kL` in `LDPMParams` |
+| Elasticity | ✅ Done | `E_0`, `alpha` in `LDPMParams`; `E_k*` retained for API compatibility |
 | Tension | ✅ Done | Mode-mixity dependent softening via `ldpm_fracture_boundary()` |
 | Compression | ✅ Done | Yielding, hardening, pore collapse via `ldpm_compress_boundary()` |
 | Shear under compression | ✅ Done | Pressure-dependent friction via `ldpm_shear_boundary()` |
@@ -33,7 +33,7 @@ sharing each edge — matching the approach in `ChElementLDPM::ComputeVolume()`.
 ## 2. Gap 1 — Parameter Model (CLOSED)
 
 Full `LDPMParams` struct with:
-- Elastic: `E0`, `alpha`, `E_kT`, `E_kM`, `E_kL`, `rho`
+- Elastic: `E0`, `alpha`, `rho` (`E_k*` retained for API compatibility)
 - Tensile: `sigma_t`, `sigma_s`, `n_t`, `l_t`, `r_s`, `k_t`
 - Compression: `sigma_c0`, `H_c0`, `H_c1`, `kc0`, `kc1`, `kc2`, `kc3`, `beta`, `E_d`
 - Friction: `mu_0`, `mu_inf`, `sigma_N0`
@@ -69,7 +69,9 @@ Branching logic mirrors `ChMaterialVECT::ComputeStress()` from chrono-mechanics.
 
 ## 5. Gap 4 — Rotational Response (CLOSED — No Change Needed)
 
-Rotational moments remain linear-elastic (`m = E_k * kappa`).
+Rotational nodal residuals now come from Chrono-style facet tractions acting
+through reference facet-center lever arms; no separate `m = E_k * kappa`
+couple-stress law is used in the Chrono-matching path.
 
 ---
 

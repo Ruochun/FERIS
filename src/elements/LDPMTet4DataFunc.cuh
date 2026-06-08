@@ -13,12 +13,11 @@
  *              Thin wrapper calling compute_ldpm_facet_strain_and_stress.
  *
  *          compute_ldpm_facet_strain_and_stress(edge_idx, d_data)
- *              Resolves both the relative translational displacement
- *              and the difference of nodal rotation vectors onto the
- *              reference facet frame (n, m, l).  Computes 6 strains
- *              (e_N, e_M, e_L, kappa_T, kappa_M, kappa_L) and evaluates
- *              the full LDPM constitutive law to produce 6 traction/moment
- *              components.
+ *              Resolves both the relative facet-center displacement and
+ *              the difference of nodal rotation vectors onto the reference
+ *              facet frame (n, m, l).  Computes 6 strains (e_N, e_M, e_L,
+ *              kappa_T, kappa_M, kappa_L) and evaluates the full LDPM
+ *              constitutive law to produce 6 traction/moment components.
  *
  *          compute_internal_force(edge_idx, node_local, d_data)
  *              Assembles both the translational facet force and the
@@ -70,13 +69,41 @@ __device__ __forceinline__ LDPMFacetKinematics compute_ldpm_facet_kinematics(int
     const Real lvec1 = d_data->edge_lv_comp(edge_idx, 1);
     const Real lvec2 = d_data->edge_lv_comp(edge_idx, 2);
 
-    const Real du0 = d_data->x_cur()(nj) - d_data->x_cur()(ni) - l0 * n0;
-    const Real du1 = d_data->y_cur()(nj) - d_data->y_cur()(ni) - l0 * n1;
-    const Real du2 = d_data->z_cur()(nj) - d_data->z_cur()(ni) - l0 * n2;
+    const Real ui0 = d_data->x_cur()(ni) - d_data->x_ref()(ni);
+    const Real ui1 = d_data->y_cur()(ni) - d_data->y_ref()(ni);
+    const Real ui2 = d_data->z_cur()(ni) - d_data->z_ref()(ni);
+    const Real uj0 = d_data->x_cur()(nj) - d_data->x_ref()(nj);
+    const Real uj1 = d_data->y_cur()(nj) - d_data->y_ref()(nj);
+    const Real uj2 = d_data->z_cur()(nj) - d_data->z_ref()(nj);
 
-    const Real dt0 = d_data->rot_x_cur()(nj) - d_data->rot_x_cur()(ni);
-    const Real dt1 = d_data->rot_y_cur()(nj) - d_data->rot_y_cur()(ni);
-    const Real dt2 = d_data->rot_z_cur()(nj) - d_data->rot_z_cur()(ni);
+    const Real ti0 = d_data->rot_x_cur()(ni);
+    const Real ti1 = d_data->rot_y_cur()(ni);
+    const Real ti2 = d_data->rot_z_cur()(ni);
+    const Real tj0 = d_data->rot_x_cur()(nj);
+    const Real tj1 = d_data->rot_y_cur()(nj);
+    const Real tj2 = d_data->rot_z_cur()(nj);
+
+    const Real ci0 = d_data->edge_center_comp(edge_idx, 0) - d_data->x_ref()(ni);
+    const Real ci1 = d_data->edge_center_comp(edge_idx, 1) - d_data->y_ref()(ni);
+    const Real ci2 = d_data->edge_center_comp(edge_idx, 2) - d_data->z_ref()(ni);
+    const Real cj0 = d_data->edge_center_comp(edge_idx, 0) - d_data->x_ref()(nj);
+    const Real cj1 = d_data->edge_center_comp(edge_idx, 1) - d_data->y_ref()(nj);
+    const Real cj2 = d_data->edge_center_comp(edge_idx, 2) - d_data->z_ref()(nj);
+
+    const Real ui_c0 = ui0 + ti1 * ci2 - ti2 * ci1;
+    const Real ui_c1 = ui1 + ti2 * ci0 - ti0 * ci2;
+    const Real ui_c2 = ui2 + ti0 * ci1 - ti1 * ci0;
+    const Real uj_c0 = uj0 + tj1 * cj2 - tj2 * cj1;
+    const Real uj_c1 = uj1 + tj2 * cj0 - tj0 * cj2;
+    const Real uj_c2 = uj2 + tj0 * cj1 - tj1 * cj0;
+
+    const Real du0 = uj_c0 - ui_c0;
+    const Real du1 = uj_c1 - ui_c1;
+    const Real du2 = uj_c2 - ui_c2;
+
+    const Real dt0 = tj0 - ti0;
+    const Real dt1 = tj1 - ti1;
+    const Real dt2 = tj2 - ti2;
 
     LDPMFacetKinematics kin;
     kin.l0 = l0;
@@ -93,8 +120,8 @@ __device__ __forceinline__ LDPMFacetKinematics compute_ldpm_facet_kinematics(int
 // compute_ldpm_facet_strain_and_stress
 //
 // Core LDPM constitutive computation for a single edge (facet strut).
-// Resolves the relative translational displacement and rotation difference
-// onto the reference facet frame (n, m, l), computes 6 strains
+// Resolves the relative displacement at the interaction facet center and the
+// rotation difference onto the reference facet frame (n, m, l), computes 6 strains
 // (e_N, e_M, e_L, kappa_T, kappa_M, kappa_L), and evaluates the full LDPM
 // constitutive law (tensile fracture, compression with volumetric strain
 // averaging, and frictional shear).
@@ -213,9 +240,9 @@ __device__ __forceinline__ void compute_internal_force(int edge_idx, int node_lo
         atomicAdd(&d_data->f_int()(global_node * 3 + k), f_k);
     }
 
-    const Real node_x = (node_local == 0) ? d_data->x_cur()(ni) : d_data->x_cur()(nj);
-    const Real node_y = (node_local == 0) ? d_data->y_cur()(ni) : d_data->y_cur()(nj);
-    const Real node_z = (node_local == 0) ? d_data->z_cur()(ni) : d_data->z_cur()(nj);
+    const Real node_x = (node_local == 0) ? d_data->x_ref()(ni) : d_data->x_ref()(nj);
+    const Real node_y = (node_local == 0) ? d_data->y_ref()(ni) : d_data->y_ref()(nj);
+    const Real node_z = (node_local == 0) ? d_data->z_ref()(ni) : d_data->z_ref()(nj);
 
     const Real r0 = d_data->edge_center_comp(edge_idx, 0) - node_x;
     const Real r1 = d_data->edge_center_comp(edge_idx, 1) - node_y;

@@ -247,6 +247,21 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
     std::copy(h_z.data(), h_z.data() + n_nodes, da_z_cur.host());
     da_z_cur.ToDevice();
 
+    da_x_ref.resize(n_nodes);
+    da_x_ref.BindDevicePointer(&d_x_ref);
+    std::copy(h_x.data(), h_x.data() + n_nodes, da_x_ref.host());
+    da_x_ref.ToDevice();
+
+    da_y_ref.resize(n_nodes);
+    da_y_ref.BindDevicePointer(&d_y_ref);
+    std::copy(h_y.data(), h_y.data() + n_nodes, da_y_ref.host());
+    da_y_ref.ToDevice();
+
+    da_z_ref.resize(n_nodes);
+    da_z_ref.BindDevicePointer(&d_z_ref);
+    std::copy(h_z.data(), h_z.data() + n_nodes, da_z_ref.host());
+    da_z_ref.ToDevice();
+
     // ── 2. Allocate rotation arrays (initialised to zero) ────────────────────
 
     da_rot_x_cur.resize(n_nodes);
@@ -1191,6 +1206,9 @@ void GPU_LDPMTet4_Data::Destroy() {
     da_x_cur.free();
     da_y_cur.free();
     da_z_cur.free();
+    da_x_ref.free();
+    da_y_ref.free();
+    da_z_ref.free();
     da_rot_x_cur.free();
     da_rot_y_cur.free();
     da_rot_z_cur.free();

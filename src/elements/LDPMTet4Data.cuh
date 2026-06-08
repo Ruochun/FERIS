@@ -21,12 +21,13 @@
 //  • Every unique edge (i, j) of the TET4 mesh is one interaction "strut".
 //  • The Voronoi facet area A_ij is precomputed from the local tetrahedral
 //    sub-facets in Setup().
-//  • Each step, the relative displacement between particles i and j is
-//    projected onto the reference facet frame (n, m, l) to obtain strains
-//    e_N, e_M, e_L; likewise the difference in rotation vectors gives
-//    kappa_T, kappa_M, kappa_L (linearised rotations).
-//  • The linear-elastic constitutive law maps all 6 strains to 3 tractions
-//    and 3 moments, which are assembled onto the two endpoint nodes.
+//  • Each step, the relative displacement of the two endpoint particles at
+//    the interaction facet center is projected onto the reference facet frame
+//    (n, m, l) to obtain strains e_N, e_M, e_L.  Nodal rotations contribute
+//    through theta × r_center, matching Chrono's LDPM A-matrix kinematics.
+//  • The LDPM constitutive law maps the three translational facet strains to
+//    tractions.  Rotational nodal residuals are assembled from those tractions
+//    acting through reference facet-center lever arms, matching Chrono LDPM.
 //
 // DOF layout
 // ──────────
@@ -82,6 +83,24 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     }
     __device__ const Map<VectorXR> z_cur() const {
         return Map<VectorXR>(d_z_cur, n_nodes);
+    }
+    __device__ Map<VectorXR> x_ref() {
+        return Map<VectorXR>(d_x_ref, n_nodes);
+    }
+    __device__ const Map<VectorXR> x_ref() const {
+        return Map<VectorXR>(d_x_ref, n_nodes);
+    }
+    __device__ Map<VectorXR> y_ref() {
+        return Map<VectorXR>(d_y_ref, n_nodes);
+    }
+    __device__ const Map<VectorXR> y_ref() const {
+        return Map<VectorXR>(d_y_ref, n_nodes);
+    }
+    __device__ Map<VectorXR> z_ref() {
+        return Map<VectorXR>(d_z_ref, n_nodes);
+    }
+    __device__ const Map<VectorXR> z_ref() const {
+        return Map<VectorXR>(d_z_ref, n_nodes);
     }
 
     // ── Rotational nodal positions (θ_x, θ_y, θ_z per node) ─────────────────
@@ -350,9 +369,9 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Set LDPM-TET4 material moduli.  Must be called after Setup().
     // E_N  – normal translational modulus (Pa)
     // E_T  – shear translational modulus (Pa)
-    // E_kT – twist modulus (Pa·m²)
-    // E_kM – bending modulus, m-direction (Pa·m²)
-    // E_kL – bending modulus, l-direction (Pa·m²)
+    // E_kT/E_kM/E_kL are retained for API compatibility with older FERIS
+    // examples.  The Chrono-compatible LDPM path does not use a separate
+    // rotational couple-stress law.
     void SetMaterial(Real E_N_val, Real E_T_val, Real E_kT_val, Real E_kM_val, Real E_kL_val);
 
     // Set the full LDPM parameter set.  Must be called after Setup().
@@ -523,6 +542,10 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // ── Translational position arrays ────────────────────────────────────────
     mophi::DualArray<Real> da_x_cur, da_y_cur, da_z_cur;
     Real *d_x_cur, *d_y_cur, *d_z_cur;
+
+    // ── Reference translational position arrays ──────────────────────────────
+    mophi::DualArray<Real> da_x_ref, da_y_ref, da_z_ref;
+    Real *d_x_ref, *d_y_ref, *d_z_ref;
 
     // ── Rotational position arrays ───────────────────────────────────────────
     mophi::DualArray<Real> da_rot_x_cur, da_rot_y_cur, da_rot_z_cur;
