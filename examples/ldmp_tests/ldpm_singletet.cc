@@ -180,8 +180,8 @@ CaseDefinition BuildCaseDefinition(int case_id) {
             c.key_times = &kRotTimePts;
             break;
         case 7:
-            c.description = "Node 3: RZ = Rot1";
-            c.bc.push_back({2, true, 2, HistoryType::ROT_1, Real(1)});
+            c.description = "Node 4: RZ = Rot1";
+            c.bc.push_back({3, true, 2, HistoryType::ROT_1, Real(1)});
             c.key_times = &kRotTimePts;
             break;
         default:
