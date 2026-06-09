@@ -10,9 +10,10 @@ The full LDPM constitutive model has been implemented in FERIS, closing all gaps
 identified below. The implementation matches the CPU reference in chrono-mechanics
 (`src/chrono_ldpm/ChMaterialVECT.cpp` and `ChElementLDPM.cpp`).
 
-All refinements are complete, including volumetric strain averaging which computes
-`eps_V = (V_cur - V_ref) / (3 * V_ref)` per tet element and averages across tets
-sharing each edge — matching the approach in `ChElementLDPM::ComputeVolume()`.
+All refinements are complete, including per-sub-facet kinematics and volumetric
+strain mapping. Each loaded Workbench sub-facet retains its own center, frame,
+area, state, and owning-TET `eps_V = (V_cur - V_ref) / (3 * V_ref)`, matching
+`ChElementLDPM`.
 
 ---
 
@@ -24,7 +25,7 @@ sharing each edge — matching the approach in `ChElementLDPM::ComputeVolume()`.
 | Tension | ✅ Done | Mode-mixity dependent softening via `ldpm_fracture_boundary()` |
 | Compression | ✅ Done | Yielding, hardening, pore collapse via `ldpm_compress_boundary()` |
 | Shear under compression | ✅ Done | Pressure-dependent friction via `ldpm_shear_boundary()` |
-| Facet state | ✅ Done | 16-component per-edge state vector (`LDPM_N_STATEV`) |
+| Facet state | ✅ Done | 16-component per-interaction state vector (`LDPM_N_STATEV`) |
 | Rotational response | ✅ Done | Elastic only (unchanged, first-order LDPM) |
 | Backward compatibility | ✅ Done | Legacy `ldpm_tet4_cusatis_traction()` removed (superseded by full model) |
 
@@ -45,7 +46,7 @@ Set via `GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params)`.
 
 ## 3. Gap 2 — Facet History Variables (CLOSED)
 
-Per-edge state vector with 16 components tracking:
+Per-interaction state vector with 16 components tracking:
 - Accumulated strains [0-2]
 - Current stresses [3-5]
 - History maxima [6-7]
@@ -78,7 +79,7 @@ couple-stress law is used in the Chrono-matching path.
 ## 6. Gap 5 — Output and Verification (CLOSED)
 
 - Effective strain/stress exposed via state vector
-- Crack opening displacement computed per edge
+- Crack opening displacement computed per interaction
 - Legacy kappa/omega maintained for VTK visualization
 - 7-case single-tet benchmark updated with full LDPM parameters
 
@@ -88,11 +89,12 @@ couple-stress law is used in the Chrono-matching path.
 
 | Item | Description | Status |
 |---|---|---|
-| Volumetric strain averaging | Compute `eps_V` as mean of per-tet volumetric strain `(V_cur - V_ref) / (3 * V_ref)` averaged across all tets sharing an edge, instead of per-facet `eps_V = eps_N` | ✅ Done |
+| Volumetric strain mapping | Compute `eps_V = (V_cur - V_ref) / (3 * V_ref)` per TET and map it to each owned sub-facet interaction | ✅ Done |
 
-The volumetric strain averaging is now implemented: each step computes the true
-volumetric strain per TET element (matching the CPU reference `ChElementLDPM`),
-then averages across tets sharing each edge via a CSR mapping on the GPU.
+Each step computes the true volumetric strain per TET element. Workbench
+sub-facet interactions use their owning TET's value, matching the CPU reference
+`ChElementLDPM`; generic `Setup()` unique-edge interactions retain a sharing-TET
+average as a fallback.
 
 ---
 

@@ -115,6 +115,12 @@ from each endpoint to that center. Rotational nodal residuals come from these
 same facet tractions acting through the reference lever arms; there is no
 separate rotational couple-stress law in the Chrono-matching path.
 
+For Workbench meshes loaded with `SetupFromMesh()`, every row of `facets.dat`
+is a separate interaction with its own center, area, local frame, material
+state, and owning-TET volumetric strain. This matches Chrono's 12 facet
+sections per TET. The generic `Setup()` path retains one interaction per unique
+TET edge as a geometry fallback.
+
 **Rotational inertia**: `I_lump = α · m_lump · l_min²` with `α = 0.25` by default
 (configurable via `LDPM_TET4_ALPHA_ROT`).
 

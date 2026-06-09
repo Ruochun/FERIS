@@ -42,26 +42,27 @@ This implementation runs the full LDPM workflow on the GPU. The main types invol
 
 | Type | File | Role |
 |---|---|---|
-| `GPU_LDPMTet4_Data` | `LDPMTet4Data.cuh` / `LDPMTet4Data.cu` | Stores all per-particle and per-edge GPU arrays; owns Setup/Teardown |
+| `GPU_LDPMTet4_Data` | `LDPMTet4Data.cuh` / `LDPMTet4Data.cu` | Stores all per-particle and per-interaction GPU arrays; owns Setup/Teardown |
 | `LDPMParams` | `LDPM.cuh` | Struct holding all 24 material parameters for the full model |
 | `ldpm_tet4_full_constitutive` | `LDPM.cuh` | Device function: full LDPM constitutive update (fracture + compression + friction) |
 | `ldpm_fracture_boundary` | `LDPM.cuh` | Device function: tensile-shear fracture with mode-mixity softening |
 | `ldpm_compress_boundary` | `LDPM.cuh` | Device function: compressive yielding / hardening / pore collapse |
 | `ldpm_shear_boundary` | `LDPM.cuh` | Device function: pressure-dependent frictional shear limit |
-| `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` | Device function: strains → constitutive update → tractions for one edge |
+| `compute_ldpm_facet_strain_and_stress` | `LDPMTet4DataFunc.cuh` | Device function: strains → constitutive update → tractions for one interaction |
 | `compute_internal_force` | `LDPMTet4DataFunc.cuh` | Device function: scatter tractions to nodal forces |
 | `LeapfrogSolver` | `LeapfrogSolver.cu` | Explicit time integrator; dispatches all CUDA kernels |
 
 ---
 
-## 2. Mesh Discretisation — Particles, TET4, and Unique Edges
+## 2. Mesh Discretisation — Particles, TET4, and Sub-facet Interactions
 
 ### Theory
 
 LDPM places aggregate particles at random positions and connects them by a 3-D
-Delaunay triangulation (TET4 mesh). Every unique edge of the TET4 mesh is one
-**interaction strut** between two particles. Each strut is associated with a Voronoi
-polyhedral facet that sits between the two particles.
+Delaunay triangulation (TET4 mesh). Each TET contributes 12 sub-facet
+interactions: two for each of its six local particle-particle edges. Every
+sub-facet keeps its own center, area, local frame, material state, and owning-TET
+volumetric strain, matching Chrono's `ChElementLDPM` sections.
 
 ### Implementation
 
@@ -86,8 +87,11 @@ for (int e = 0; e < n_elem; e++) {
 n_edge = static_cast<int>(edge_to_tets.size());
 ```
 
-After this loop, `n_edge` unique particle–particle struts have been identified.
-The solver treats each strut as one "element": `get_n_beam()` returns `n_edge`.
+After this loop, `Setup()` has identified unique particle-particle struts for
+the generic geometry fallback. When `SetupFromMesh()` has `facets.dat` data, it
+replaces those fallback interactions with one interaction per sub-facet row.
+The legacy member `n_edge` and `get_n_beam()` therefore represent the active
+interaction count, which is `n_subfacet` for a loaded Workbench mesh.
 
 ---
 
@@ -106,7 +110,7 @@ quantities are:
 | A | Projected Voronoi facet area |
 
 All reference geometry is computed once at setup time and stored as read-only
-per-edge GPU arrays. It is **never updated** during the simulation, consistent
+per-interaction GPU arrays. It is **never updated** during the simulation, consistent
 with LDPM's **linearised (small-displacement) kinematics**: strains are
 engineering measures (Δu / l₀), so the reference frame is by definition
 the correct frame to project onto throughout.  This is *not* a
@@ -300,7 +304,7 @@ kin.kappa_L = (dt0*lvec0 + dt1*lvec1 + dt2*lvec2) * inv_l0;
 
 > **Linearised-kinematics note:** All reference geometry (`l0`, `n`, `m`, `l`,
 > and the facet-center lever arms) is precomputed once and stored in read-only
-> per-edge arrays. This is *not* the same as a Total-Lagrangian continuum FEA
+> per-interaction arrays. This is *not* the same as a Total-Lagrangian continuum FEA
 > formulation (which would use the deformation gradient **F** and Green–Lagrange
 > strains); LDPM is a discrete lattice model whose linearised kinematics assume
 > small displacements and small rotations.
@@ -355,9 +359,9 @@ The full model uses 24 parameters stored in the `LDPMParams` struct:
 
 Set via `GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params)`.
 
-#### 6.A.2 Per-edge state vector (16 components)
+#### 6.A.2 Per-interaction state vector (16 components)
 
-Each edge stores a persistent state vector (`LDPM_N_STATEV = 16`):
+Each interaction stores a persistent state vector (`LDPM_N_STATEV = 16`):
 
 | Index | Variable | Description |
 |-------|----------|-------------|
@@ -437,7 +441,7 @@ After stress update, the function computes:
 
 #### 6.A.7 Kappa/omega maintenance for VTK output
 
-The constitutive update also maintains the per-edge `d_kappa[]` and `d_omega[]`
+The constitutive update also maintains the per-interaction `d_kappa[]` and `d_omega[]`
 arrays used for crack-distance visualisation:
 
 ```cpp
@@ -468,9 +472,9 @@ M_i += −A · (m_T · n + m_M · m + m_L · l)
 
 ### Implementation
 
-`compute_internal_force()` processes one endpoint of one edge per thread. The
+`compute_internal_force()` processes one endpoint of one interaction per thread. The
 `node_local` parameter (0 = node i, sign −1; or 1 = node j, sign +1) selects
-which end is updated. `atomicAdd` is required because multiple edges share nodes
+which end is updated. `atomicAdd` is required because multiple interactions share nodes
 and run concurrently on the GPU:
 
 ```cpp
@@ -559,7 +563,7 @@ The leapfrog (central-difference) explicit integrator advances the simulation by
 one time step Δt:
 
 ```
-1.  Compute per-TET volumetric strain and average it onto edges
+1.  Compute per-TET volumetric strain and map it onto facet interactions
 2.  Compute strains e and κ at all facets  (= compute_ldpm_facet_strain_and_stress)
 3.  Apply constitutive law → tractions t, moments m, updated κ and ω
 4.  Assemble nodal forces:  f_int, M_int
@@ -634,7 +638,7 @@ d_data->rot_x_cur()(tid) += dt * d_solver->v_rot()(tid * 3 + 0);
 
 ### Theory
 
-After each time step the per-edge damage variable ω ∈ [0, 1] and the maximum
+After each time step the per-interaction damage variable ω ∈ [0, 1] and the maximum
 effective-strain history κ together define a physical **crack opening distance**
 for each interaction strut:
 
@@ -697,7 +701,7 @@ ReadLDPMTet4MeshFromFiles()
     ↓
 GPU_LDPMTet4_Data::SetupFromMesh()
     ├─ Setup():
-    │    ├─ Extract n_edge unique particle struts from TET4 connectivity
+    │    ├─ Extract unique-edge fallback interactions from TET4 connectivity
     │    │    (std::map<pair<int,int>, vector<int>>  keyed on sorted node pair)
     │    ├─ Compute l₀, n̂, m̂, l̂ (local facet frame) per edge
     │    ├─ Compute facet area A per edge (Voronoi sub-triangle sum)
@@ -706,8 +710,8 @@ GPU_LDPMTet4_Data::SetupFromMesh()
     │         forces (f_int, f_ext), moments (f_int_r, f_ext_r),
     │         traction cache (facet_t, LDPM_FACET_N_COMPONENTS × n_edge),
     │         damage history: d_kappa[], d_omega[]  ← initialised to 0
-    └─ Override A, m̂, l̂ from facets.dat sub-facet data (richer geometry)
-         Build subfacet→edge index table d_subfacet_edge_idx[]
+    └─ Replace fallback interactions with one interaction per facets.dat row
+         Preserve each sub-facet's center, A, p̂, q̂, ŝ, state, and owning TET
     ↓
 SetLDPMParams(params)                      ← full LDPM model
 SetExternalForce(f_ext)

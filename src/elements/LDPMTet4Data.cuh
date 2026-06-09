@@ -18,9 +18,9 @@
 //
 // Interaction model summary
 // ─────────────────────────
-//  • Every unique edge (i, j) of the TET4 mesh is one interaction "strut".
-//  • The Voronoi facet area A_ij is precomputed from the local tetrahedral
-//    sub-facets in Setup().
+//  • Setup() uses one fallback interaction per unique edge.
+//  • SetupFromMesh() uses one interaction per Workbench sub-facet, matching
+//    ChElementLDPM's 12 facet sections per TET.
 //  • Each step, the relative displacement of the two endpoint particles at
 //    the interaction facet center is projected onto the reference facet frame
 //    (n, m, l) to obtain strains e_N, e_M, e_L.  Nodal rotations contribute
@@ -301,7 +301,8 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     // Runs only the volumetric strain pre-computation steps (Steps A+B of CalcP):
     //   A. Per-tet volumetric strain from current node positions.
-    //   B. Average per-tet strains onto per-edge values via CSR mapping.
+    //   B. Map per-tet strains onto interactions via CSR mapping.  Workbench
+    //      sub-facet interactions each map to their single owning TET.
     // Called by the LeapfrogSolver before each facet constitutive update so
     // that eps_V is up-to-date when compute_ldpm_facet_strain_and_stress runs.
     void ComputeVolumetricStrain();
@@ -402,27 +403,27 @@ struct GPU_LDPMTet4_Data : public ElementBase {
         }
     }
 
-    // Retrieve per-edge damage state from GPU to host.
+    // Retrieve per-interaction damage state from GPU to host.
     // omega_out : size n_edge, omega ∈ [0, 1] (0 = undamaged, 1 = fully failed)
     void RetrieveFacetDamageToCPU(VectorXR& omega_out);
 
-    // Retrieve per-edge facet traction/moment components from GPU to host.
+    // Retrieve per-interaction facet traction/moment components from GPU to host.
     // out size: LDPM_FACET_N_COMPONENTS * n_edge, layout per edge:
     // [t_N, t_M, t_L, m_T, m_M, m_L].
     void RetrieveFacetTractionToCPU(VectorXR& out);
 
-    // Retrieve per-edge max effective strain history (κ) from GPU to host.
+    // Retrieve per-interaction max effective strain history (κ) from GPU to host.
     // kappa_out : size n_edge, κ ≥ 0 (max damage-driving strain ever reached)
     void RetrieveFacetKappaToCPU(VectorXR& kappa_out);
 
     // Expose edge connectivity for visualization (e.g. VTK line-segment mesh).
-    // Returns a reference to the host-side edge node array (size 2 * n_edge):
+    // Returns a reference to the host-side interaction endpoint array (size 2 * n_edge):
     //   h_edge_nodes_vec[2*e+0] = node i,  h_edge_nodes_vec[2*e+1] = node j.
     const std::vector<int>& GetEdgeNodes() const {
         return h_edge_nodes_vec;
     }
 
-    // Project per-edge damage ω onto the sub-facet mesh.
+    // Project per-interaction damage ω onto the sub-facet mesh.
     //
     // Each sub-facet belongs to a unique LDPM edge (built during SetupFromMesh).
     // This GPU kernel looks up omega[edge_idx] for each sub-facet and writes the
@@ -435,7 +436,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // Must be called after SetupFromMesh() and at least one CalcP() step.
     void ProjectEdgeDamageToSubfacets(VectorXR& out);
 
-    // Project per-edge crack opening displacement onto the sub-facet mesh.
+    // Project per-interaction crack opening displacement onto the sub-facet mesh.
     //
     // The crack opening for each edge is computed as ω × κ × l₀ [mm], where:
     //   ω  — damage variable (0 = elastic, 1 = fully fractured)
@@ -503,7 +504,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
 
     int n_nodes;       // Number of nodes (particles)
     int n_elem;        // Number of TET4 elements
-    int n_edge;        // Number of unique edges (set by Setup)
+    int n_edge;        // Number of interactions: unique edges or loaded sub-facets
     int n_constraint;  // 6 * number of fixed nodes (LDPMTet4 has 6 DOFs per node)
 
     // ── File-loaded mesh data (host-side; filled by SetupFromMesh) ────────────
@@ -586,17 +587,17 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_facet_t;  // [n_edge * LDPM_FACET_N_COMPONENTS]
     Real* d_facet_t;
 
-    // ── Per-edge damage state (legacy) ───────────────────────────────────────────
+    // ── Per-interaction damage state (legacy) ────────────────────────────────
     mophi::DualArray<Real> da_kappa;  // history max effective strain [n_edge]
     mophi::DualArray<Real> da_omega;  // damage variable              [n_edge]
     Real* d_kappa;
     Real* d_omega;
 
-    // ── Per-edge full LDPM state vector [n_edge * LDPM_N_STATEV] ─────────────
+    // ── Per-interaction full LDPM state vector [n_edge * LDPM_N_STATEV] ──────
     mophi::DualArray<Real> da_statev;
     Real* d_statev = nullptr;
 
-    // ── Volumetric strain averaging data ─────────────────────────────────────
+    // ── Volumetric strain mapping data ───────────────────────────────────────
     // Tet connectivity on device [n_elem * 4]
     mophi::DualArray<int> da_tet_conn;
     int* d_tet_conn = nullptr;
@@ -609,14 +610,15 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     mophi::DualArray<Real> da_tet_vol_strain;
     Real* d_tet_vol_strain = nullptr;
 
-    // CSR edge-to-tet mapping: for each edge, which tets share it.
+    // CSR interaction-to-tet mapping. Loaded sub-facets map to their owning TET;
+    // generic Setup() interactions map to all TETs sharing the unique edge.
     // d_edge_tet_offsets[n_edge+1], d_edge_tet_indices[nnz]
     mophi::DualArray<int> da_edge_tet_offsets;
     mophi::DualArray<int> da_edge_tet_indices;
     int* d_edge_tet_offsets = nullptr;
     int* d_edge_tet_indices = nullptr;
 
-    // Per-edge averaged volumetric strain [n_edge]
+    // Per-interaction volumetric strain [n_edge]
     mophi::DualArray<Real> da_edge_vol_strain;
     Real* d_edge_vol_strain = nullptr;
 

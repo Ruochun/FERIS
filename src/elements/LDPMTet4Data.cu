@@ -581,8 +581,8 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 //
 // Calls Setup() with particle positions and TET connectivity from the mesh,
 // stores all additional file-loaded data fields, and — when facets.dat data
-// is present — overrides the tet4-derived edge geometry (facet areas and
-// tangent frame vectors m / l) with the richer file-based values.
+// is present — replaces the unique-edge fallback interactions with one
+// interaction per sub-facet, matching ChElementLDPM's 12 sections per TET.
 //
 // Facets.dat override
 // ───────────────────
@@ -591,15 +591,8 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 // where p is the unit normal (= edge direction), q the first tangent, and
 // s = p × q the second tangent.  12 sub-facets appear per TET (6 edges × 2).
 //
-// For each global unique edge the override:
-//   facet_area  ← sum of pArea over all its sub-facets
-//   edge_m      ← q from the first sub-facet (sign-adjusted for canonical dir)
-//   edge_lv     ← s from the first sub-facet  (sign is unchanged; see below)
-//
-// Sign adjustment: the canonical edge direction stored in edge_n[] points from
-// the lower-index node to the higher-index one.  If a sub-facet's p points in
-// the opposite direction the tangent q must be negated so that l = n × m = s
-// still holds for the canonical frame.
+// Each sub-facet keeps its own pArea, center, and p/q/s frame. Its endpoint
+// order follows ChElementLDPM::facetNodeNums (two sub-facets per local edge).
 
 void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     if (mesh.n_particles <= 0) {
@@ -654,181 +647,106 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     MOPHI_INFO("SetupFromMesh: stored %d sub-facets, %d face-facets, %d facet vertices", n_subfacet, n_face_facet,
                n_facet_vertex);
 
-    // ── Override edge geometry from sub-facet file data ──────────────────────
+    // ── Replace unique-edge fallback with sub-facet interactions ─────────────
     // Only performed when sub-facet data was actually loaded.
     if (n_subfacet <= 0) {
         return;
     }
 
-    // Build a fast lookup: sorted node pair → global edge index.
-    std::map<std::pair<int, int>, int> edge_index_map;
-    for (int e = 0; e < n_edge; e++) {
-        const int ni = h_edge_nodes_vec[e * 2 + 0];
-        const int nj = h_edge_nodes_vec[e * 2 + 1];
-        edge_index_map[{std::min(ni, nj), std::max(ni, nj)}] = e;
-    }
+    n_edge = n_subfacet;
+    h_edge_nodes_vec.resize(static_cast<size_t>(n_edge) * 2);
+    h_l0_vec.resize(n_edge);
 
-    // Per-edge accumulators.
-    std::vector<Real> new_area(n_edge);
-    std::vector<Real> new_m(n_edge * 3);
-    std::vector<Real> new_l(n_edge * 3);
-    std::vector<Real> new_center(n_edge * 3);
-    std::copy(da_facet_area.host(), da_facet_area.host() + n_edge, new_area.begin());
-    std::copy(da_edge_m.host(), da_edge_m.host() + n_edge * 3, new_m.begin());
-    std::copy(da_edge_lv.host(), da_edge_lv.host() + n_edge * 3, new_l.begin());
-    std::copy(da_edge_center.host(), da_edge_center.host() + n_edge * 3, new_center.begin());
-    std::vector<Real> area_accum(n_edge, Real(0));
-    std::vector<Real> center_accum(n_edge * 3, Real(0));
-    std::vector<bool> frame_set(n_edge, false);
+    da_edge_nodes.resize(static_cast<size_t>(n_edge) * 2);
+    da_l0.resize(n_edge);
+    da_facet_area.resize(n_edge);
+    da_edge_n.resize(static_cast<size_t>(n_edge) * 3);
+    da_edge_m.resize(static_cast<size_t>(n_edge) * 3);
+    da_edge_lv.resize(static_cast<size_t>(n_edge) * 3);
+    da_edge_center.resize(static_cast<size_t>(n_edge) * 3);
+    da_facet_t.resize(static_cast<size_t>(n_edge) * LDPM_FACET_N_COMPONENTS);
+    da_kappa.resize(n_edge);
+    da_omega.resize(n_edge);
+    da_edge_tet_offsets.resize(static_cast<size_t>(n_edge) + 1);
+    da_edge_tet_indices.resize(n_edge);
+    da_edge_vol_strain.resize(n_edge);
 
-    // Allocate and initialise the subfacet→edge mapping array.
-    // Entries are set to -1 (unmatched) and filled during the loop below.
     da_subfacet_edge_idx.resize(n_subfacet);
     da_subfacet_edge_idx.BindDevicePointer(&d_subfacet_edge_idx);
-    std::fill(da_subfacet_edge_idx.host(), da_subfacet_edge_idx.host() + n_subfacet, -1);
 
-    const Real* hx = da_x_cur.host();
-    const Real* hy = da_y_cur.host();
-    const Real* hz = da_z_cur.host();
-
-    int n_unmatched = 0;
-
+    std::vector<int> tet_facet_count(static_cast<size_t>(n_elem), 0);
     for (int sf = 0; sf < n_subfacet; sf++) {
         const int t = h_subfacet_tet(sf);
+        if (t < 0 || t >= n_elem) {
+            MOPHI_ERROR("SetupFromMesh: sub-facet %d has invalid owning TET %d.", sf, t);
+            return;
+        }
+        const int local_facet = tet_facet_count[static_cast<size_t>(t)]++;
+        if (local_facet >= 12) {
+            MOPHI_ERROR("SetupFromMesh: TET %d has more than 12 sub-facets.", t);
+            return;
+        }
+        const int local_edge = local_facet / 2;
+        const int ni = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[local_edge][0]];
+        const int nj = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[local_edge][1]];
 
-        const Real px = h_subfacet_normal(sf * 3 + 0);
-        const Real py = h_subfacet_normal(sf * 3 + 1);
-        const Real pz = h_subfacet_normal(sf * 3 + 2);
-        const Real parea = h_subfacet_parea(sf);
+        h_edge_nodes_vec[sf * 2 + 0] = ni;
+        h_edge_nodes_vec[sf * 2 + 1] = nj;
+        da_edge_nodes.host()[sf * 2 + 0] = ni;
+        da_edge_nodes.host()[sf * 2 + 1] = nj;
 
-        // Find the local edge of TET t whose unit direction best matches p.
-        int best_le = -1;
-        Real best_abs_dot = Real(0);
-        Real best_sign = Real(1);
+        const Real dx = mesh.particle_x(nj) - mesh.particle_x(ni);
+        const Real dy = mesh.particle_y(nj) - mesh.particle_y(ni);
+        const Real dz = mesh.particle_z(nj) - mesh.particle_z(ni);
+        const Real length = std::sqrt(dx * dx + dy * dy + dz * dz);
+        h_l0_vec[sf] = length;
+        da_l0.host()[sf] = length;
+        da_facet_area.host()[sf] = h_subfacet_parea(sf);
 
-        for (int le = 0; le < 6; le++) {
-            const int na = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[le][0]];
-            const int nb = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[le][1]];
-
-            const Real dx = hx[nb] - hx[na];
-            const Real dy = hy[nb] - hy[na];
-            const Real dz = hz[nb] - hz[na];
-            const Real len = std::sqrt(dx * dx + dy * dy + dz * dz);
-            if (len <= Real(0))
-                continue;
-            const Real inv_len = Real(1) / len;
-
-            const Real d = (px * dx + py * dy + pz * dz) * inv_len;
-            const Real abs_d = std::abs(d);
-            if (abs_d > best_abs_dot) {
-                best_abs_dot = abs_d;
-                best_le = le;
-                // sign = dot(p, canonical direction na→nb)
-                // canonical direction is ni→nj where ni = min(na,nb)
-                // so sign relative to canonical = d if na < nb, else -d
-                best_sign = (na < nb) ? d : -d;
-            }
+        for (int k = 0; k < 3; ++k) {
+            da_edge_center.host()[sf * 3 + k] = h_subfacet_centroid(sf * 3 + k);
+            da_edge_n.host()[sf * 3 + k] = h_subfacet_normal(sf * 3 + k);
+            da_edge_m.host()[sf * 3 + k] = h_subfacet_tangent_q(sf * 3 + k);
+            da_edge_lv.host()[sf * 3 + k] = h_subfacet_tangent_s(sf * 3 + k);
         }
 
-        if (best_le < 0 || best_abs_dot < Real(0.99)) {
-            ++n_unmatched;
-            continue;
-        }
-
-        // Resolve global edge index.
-        const int na = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[best_le][0]];
-        const int nb = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[best_le][1]];
-        const int ni = std::min(na, nb);
-        const int nj = std::max(na, nb);
-
-        auto it = edge_index_map.find({ni, nj});
-        if (it == edge_index_map.end()) {
-            ++n_unmatched;
-            continue;
-        }
-        const int eidx = it->second;
-
-        // Record which global edge this sub-facet belongs to.
-        da_subfacet_edge_idx.host()[sf] = eidx;
-
-        // Accumulate projected area and area-weighted facet center.
-        area_accum[eidx] += parea;
-        center_accum[eidx * 3 + 0] += parea * h_subfacet_centroid(sf * 3 + 0);
-        center_accum[eidx * 3 + 1] += parea * h_subfacet_centroid(sf * 3 + 1);
-        center_accum[eidx * 3 + 2] += parea * h_subfacet_centroid(sf * 3 + 2);
-
-        // Store the tangent frame from the first matching sub-facet.
-        // Sign adjustment for m (q): if p is anti-parallel to the canonical
-        // edge direction, negate q so that l = n_canonical × m = s still holds.
-        //
-        // Why l (= s from file) needs no sign adjustment:
-        //   File convention: s = p × q
-        //   sign > 0  (p ≈ +n_canonical):
-        //     m = q,   l = n_canonical × q = p × q = s ✓
-        //   sign < 0  (p ≈ −n_canonical):
-        //     m = −q,  l = n_canonical × (−q) = −(n_canonical × q)
-        //              = −((−p) × q) = p × q = s ✓
-        //   In both cases l = s, so s is copied without negation.
-        if (!frame_set[eidx]) {
-            const Real q0 = h_subfacet_tangent_q(sf * 3 + 0);
-            const Real q1 = h_subfacet_tangent_q(sf * 3 + 1);
-            const Real q2 = h_subfacet_tangent_q(sf * 3 + 2);
-            const Real s0 = h_subfacet_tangent_s(sf * 3 + 0);
-            const Real s1 = h_subfacet_tangent_s(sf * 3 + 1);
-            const Real s2 = h_subfacet_tangent_s(sf * 3 + 2);
-
-            const Real sign_m = (best_sign > Real(0)) ? Real(1) : Real(-1);
-            new_m[eidx * 3 + 0] = sign_m * q0;
-            new_m[eidx * 3 + 1] = sign_m * q1;
-            new_m[eidx * 3 + 2] = sign_m * q2;
-            new_l[eidx * 3 + 0] = s0;
-            new_l[eidx * 3 + 1] = s1;
-            new_l[eidx * 3 + 2] = s2;
-            frame_set[eidx] = true;
+        da_edge_tet_offsets.host()[sf] = sf;
+        da_edge_tet_indices.host()[sf] = t;
+        da_subfacet_edge_idx.host()[sf] = sf;
+    }
+    for (int t = 0; t < n_elem; ++t) {
+        if (tet_facet_count[static_cast<size_t>(t)] != 12) {
+            MOPHI_ERROR("SetupFromMesh: TET %d has %d sub-facets; Chrono-compatible LDPM requires 12.", t,
+                        tet_facet_count[static_cast<size_t>(t)]);
+            return;
         }
     }
+    da_edge_tet_offsets.host()[n_edge] = n_edge;
 
-    if (n_unmatched > 0) {
-        MOPHI_WARNING("SetupFromMesh: %d sub-facet(s) could not be matched to a global edge.", n_unmatched);
-    }
-
-    // Count edges whose frame was set; edges with no sub-facet match keep the
-    // tet4-derived geometry (unlikely but handled gracefully).
-    int n_frame_set = 0;
-    for (int e = 0; e < n_edge; e++) {
-        if (frame_set[e]) {
-            ++n_frame_set;
-            new_area[e] = area_accum[e];
-            if (area_accum[e] > Real(0)) {
-                const Real inv_area = Real(1) / area_accum[e];
-                new_center[e * 3 + 0] = center_accum[e * 3 + 0] * inv_area;
-                new_center[e * 3 + 1] = center_accum[e * 3 + 1] * inv_area;
-                new_center[e * 3 + 2] = center_accum[e * 3 + 2] * inv_area;
-            }
-        }
-    }
-
-    // Write updated arrays back to device.
-    std::copy(new_area.begin(), new_area.end(), da_facet_area.host());
+    da_edge_nodes.ToDevice();
+    da_l0.ToDevice();
     da_facet_area.ToDevice();
-
-    std::copy(new_m.begin(), new_m.end(), da_edge_m.host());
+    da_edge_n.ToDevice();
     da_edge_m.ToDevice();
-
-    std::copy(new_l.begin(), new_l.end(), da_edge_lv.host());
     da_edge_lv.ToDevice();
-
-    std::copy(new_center.begin(), new_center.end(), da_edge_center.host());
     da_edge_center.ToDevice();
-
-    // Upload subfacet→edge mapping to device.
+    da_edge_tet_offsets.ToDevice();
+    da_edge_tet_indices.ToDevice();
     da_subfacet_edge_idx.ToDevice();
 
-    // Sync device struct mirror so kernels see updated pointers.
+    da_facet_t.SetVal(Real(0));
+    da_facet_t.ToDevice();
+    da_kappa.SetVal(Real(0));
+    da_kappa.ToDevice();
+    da_omega.SetVal(Real(0));
+    da_omega.ToDevice();
+    da_edge_vol_strain.SetVal(Real(0));
+    da_edge_vol_strain.ToDevice();
+
+    // Sync device struct mirror so kernels see resized arrays and interaction count.
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
 
-    MOPHI_INFO("SetupFromMesh: overrode facet area and tangent frame for %d/%d edges from sub-facet file data.",
-               n_frame_set, n_edge);
+    MOPHI_INFO("SetupFromMesh: configured %d LDPM sub-facet interactions.", n_edge);
 }
 
 // ─── Material / parameter setters ────────────────────────────────────────────
@@ -862,7 +780,7 @@ void GPU_LDPMTet4_Data::SetLDPMParams(const LDPMParams& params) {
         return;
     }
 
-    // Allocate per-edge state vector if not already done
+    // Allocate per-interaction state vector if not already done
     if (d_statev == nullptr) {
         da_statev.resize(static_cast<size_t>(n_edge) * LDPM_N_STATEV);
         da_statev.BindDevicePointer(&d_statev);

@@ -23,7 +23,6 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
-#include <map>
 #include <stdexcept>
 #include <sstream>
 #include <string>
@@ -201,8 +200,6 @@ std::string SubfacetVtkName(int case_id, int frame) {
     s << "ldpm_singletet_case" << case_id << "_subfacets_" << std::setfill('0') << std::setw(5) << frame << ".vtk";
     return s.str();
 }
-
-const int kLocalEdges[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 
 std::string JoinPath(const std::string& dir, const std::string& file) {
     return (std::filesystem::path(dir) / file).string();
@@ -496,31 +493,14 @@ int main(int argc, char* argv[]) {
     }
     subfacet_csv << "\n";
 
-    const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
-    std::map<std::pair<int, int>, int> edge_index_map;
-    for (int e = 0; e < element_data.n_edge; ++e) {
-        const int ni = edge_nodes[2 * e + 0];
-        const int nj = edge_nodes[2 * e + 1];
-        edge_index_map[{std::min(ni, nj), std::max(ni, nj)}] = e;
-    }
-
     std::vector<int> subfacet_edge_idx(static_cast<size_t>(mesh.n_subfacets), -1);
     std::vector<int> subfacet_node_i(static_cast<size_t>(mesh.n_subfacets), -1);
     std::vector<int> subfacet_node_j(static_cast<size_t>(mesh.n_subfacets), -1);
+    const std::vector<int>& interaction_nodes = element_data.GetEdgeNodes();
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
-        const int t = mesh.subfacet_tet(sf);
-        const int local_sf = sf % 12;
-        const int edge_slot = local_sf / 2;
-        const int a = kLocalEdges[edge_slot][0];
-        const int b = kLocalEdges[edge_slot][1];
-        const int ni = mesh.tet_connectivity(t, a);
-        const int nj = mesh.tet_connectivity(t, b);
-        const std::pair<int, int> key = {std::min(ni, nj), std::max(ni, nj)};
-        auto it = edge_index_map.find(key);
-        if (it != edge_index_map.end())
-            subfacet_edge_idx[static_cast<size_t>(sf)] = it->second;
-        subfacet_node_i[static_cast<size_t>(sf)] = ni;
-        subfacet_node_j[static_cast<size_t>(sf)] = nj;
+        subfacet_edge_idx[static_cast<size_t>(sf)] = sf;
+        subfacet_node_i[static_cast<size_t>(sf)] = interaction_nodes[static_cast<size_t>(2 * sf)];
+        subfacet_node_j[static_cast<size_t>(sf)] = interaction_nodes[static_cast<size_t>(2 * sf + 1)];
     }
 
     auto write_csv = [&](Real time_s) {
@@ -738,25 +718,33 @@ void write_csv_metrics(Real time_s,
         const int nj = subfacet_node_j[static_cast<size_t>(sf)];
         if (ni < 0 || nj < 0)
             continue;
+        const Real ui0 = x_cur(ni) - mesh.particle_x(ni);
+        const Real ui1 = y_cur(ni) - mesh.particle_y(ni);
+        const Real ui2 = z_cur(ni) - mesh.particle_z(ni);
+        const Real uj0 = x_cur(nj) - mesh.particle_x(nj);
+        const Real uj1 = y_cur(nj) - mesh.particle_y(nj);
+        const Real uj2 = z_cur(nj) - mesh.particle_z(nj);
+
+        const Real ci0 = mesh.subfacet_centroid(sf * 3 + 0) - mesh.particle_x(ni);
+        const Real ci1 = mesh.subfacet_centroid(sf * 3 + 1) - mesh.particle_y(ni);
+        const Real ci2 = mesh.subfacet_centroid(sf * 3 + 2) - mesh.particle_z(ni);
+        const Real cj0 = mesh.subfacet_centroid(sf * 3 + 0) - mesh.particle_x(nj);
+        const Real cj1 = mesh.subfacet_centroid(sf * 3 + 1) - mesh.particle_y(nj);
+        const Real cj2 = mesh.subfacet_centroid(sf * 3 + 2) - mesh.particle_z(nj);
+
+        const Real ui_c0 = ui0 + ry_cur(ni) * ci2 - rz_cur(ni) * ci1;
+        const Real ui_c1 = ui1 + rz_cur(ni) * ci0 - rx_cur(ni) * ci2;
+        const Real ui_c2 = ui2 + rx_cur(ni) * ci1 - ry_cur(ni) * ci0;
+        const Real uj_c0 = uj0 + ry_cur(nj) * cj2 - rz_cur(nj) * cj1;
+        const Real uj_c1 = uj1 + rz_cur(nj) * cj0 - rx_cur(nj) * cj2;
+        const Real uj_c2 = uj2 + rx_cur(nj) * cj1 - ry_cur(nj) * cj0;
+
+        const Real dux = uj_c0 - ui_c0;
+        const Real duy = uj_c1 - ui_c1;
+        const Real duz = uj_c2 - ui_c2;
         const Real dx0 = mesh.particle_x(nj) - mesh.particle_x(ni);
         const Real dy0 = mesh.particle_y(nj) - mesh.particle_y(ni);
         const Real dz0 = mesh.particle_z(nj) - mesh.particle_z(ni);
-        const Real dx = x_cur(nj) - x_cur(ni);
-        const Real dy = y_cur(nj) - y_cur(ni);
-        const Real dz = z_cur(nj) - z_cur(ni);
-
-        const Real rix = rx_cur(ni), riy = ry_cur(ni), riz = rz_cur(ni);
-        const Real rjx = rx_cur(nj), rjy = ry_cur(nj), rjz = rz_cur(nj);
-        const Real rax = Real(0.5) * (rix + rjx);
-        const Real ray = Real(0.5) * (riy + rjy);
-        const Real raz = Real(0.5) * (riz + rjz);
-        const Real rotx = ray * dz0 - raz * dy0;
-        const Real roty = raz * dx0 - rax * dz0;
-        const Real rotz = rax * dy0 - ray * dx0;
-
-        const Real dux = dx - dx0 - rotx;
-        const Real duy = dy - dy0 - roty;
-        const Real duz = dz - dz0 - rotz;
         const Real l0 = std::sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
         if (l0 <= Real(0))
             continue;

@@ -119,7 +119,7 @@ __device__ __forceinline__ LDPMFacetKinematics compute_ldpm_facet_kinematics(int
 // ---------------------------------------------------------------------------
 // compute_ldpm_facet_strain_and_stress
 //
-// Core LDPM constitutive computation for a single edge (facet strut).
+// Core LDPM constitutive computation for a single interaction.
 // Resolves the relative displacement at the interaction facet center and the
 // rotation difference onto the reference facet frame (n, m, l), computes 6 strains
 // (e_N, e_M, e_L, kappa_T, kappa_M, kappa_L), and evaluates the full LDPM
@@ -137,7 +137,7 @@ __device__ __forceinline__ void compute_ldpm_facet_strain_and_stress(int edge_id
 
     Real t_N, t_M, t_L, m_T, m_M, m_L;
 
-    // Full LDPM model: incremental update with per-edge state vector.
+    // Full LDPM model: incremental update with per-interaction state vector.
     // Compute strain increments relative to stored accumulated strain.
     const Real prev_eps_N = d_data->edge_statev(edge_idx, 0);
     const Real prev_eps_M = d_data->edge_statev(edge_idx, 1);
@@ -146,9 +146,8 @@ __device__ __forceinline__ void compute_ldpm_facet_strain_and_stress(int edge_id
     const Real d_eps_M = kin.e_M - prev_eps_M;
     const Real d_eps_L = kin.e_L - prev_eps_L;
 
-    // Volumetric strain: precomputed as the average of the volumetric
-    // strains of the tets sharing this edge (matches CPU reference where
-    // eps_V = (V_cur - V_ref) / (3 * V_ref) per tet element).
+    // Volumetric strain: a loaded sub-facet uses its owning TET's value, matching
+    // the CPU reference. Generic Setup() interactions average sharing TETs.
     const Real eps_V = d_data->edge_vol_strain(edge_idx);
 
     // Local copy of state vector for the constitutive update
@@ -200,7 +199,7 @@ __device__ __forceinline__ void compute_p(int edge_idx,
 // compute_internal_force for LDPMTet4
 //
 // Called by leapfrog_compute_f_int_kernel<GPU_LDPMTet4_Data> with
-//   edge_idx   = "element" index (one edge)
+//   edge_idx   = "element" index (one interaction)
 //   node_local = 0 → endpoint node i, 1 → endpoint node j
 //
 // Translational force assembly:
