@@ -59,10 +59,11 @@ This implementation runs the full LDPM workflow on the GPU. The main types invol
 ### Theory
 
 LDPM places aggregate particles at random positions and connects them by a 3-D
-Delaunay triangulation (TET4 mesh). Each TET contributes 12 sub-facet
-interactions: two for each of its six local particle-particle edges. Every
-sub-facet keeps its own center, area, local frame, material state, and owning-TET
-volumetric strain, matching Chrono's `ChElementLDPM` sections.
+Delaunay triangulation (TET4 mesh). In the loaded-mesh path, each TET contributes
+12 sub-facet records: two for each of its six local particle-particle edges.
+The default interaction mode keeps every sub-facet as an independent
+interaction with its own center, area, local frame, material state, and
+owning-TET volumetric strain.
 
 ### Implementation
 
@@ -92,6 +93,27 @@ the generic geometry fallback. When `SetupFromMesh()` has `facets.dat` data, it
 replaces those fallback interactions with one interaction per sub-facet row.
 The legacy member `n_edge` and `get_n_beam()` therefore represent the active
 interaction count, which is `n_subfacet` for a loaded Workbench mesh.
+
+Two loaded-mesh interaction modes share the same runtime arrays:
+
+- `LeapfrogSolver::SetLDPMSubfacetInteractions(true)` is the default and keeps
+  every sub-facet independent. This is the higher-detail mode and preserves all
+  loaded sub-facet geometry and per-sub-facet state.
+- `LeapfrogSolver::SetLDPMSubfacetInteractions(false)` collapses sub-facets
+  sharing a particle edge into one interaction. It sums their areas, uses an
+  area-weighted center, retains a consistent representative frame, and averages
+  volumetric strain over the TETs sharing that edge. This is faster because it
+  runs fewer interaction threads and stores fewer interaction state vectors.
+
+The toggle must be called after constructing the solver and before
+`LeapfrogSolver::Setup()`. Rebuilding interactions resets facet history.
+
+```cpp
+LeapfrogSolver solver(&element_data);
+solver.SetLDPMSubfacetInteractions(false);  // optional faster approximation
+solver.SetParameters(&params);
+solver.Setup();
+```
 
 ---
 
@@ -268,7 +290,9 @@ For each strut (i, j), the engineering strains are projections of the
 where Δ**u**_c = (**u**ⱼ + **θ**ⱼ × **r**ⱼ) − (**u**ᵢ + **θ**ᵢ × **r**ᵢ)
 is the relative displacement of the two particles at the facet center.  The
 vectors **r**ᵢ and **r**ⱼ point from each endpoint's reference position to the
-interaction facet center, matching Chrono's LDPM `A`-matrix kinematics.
+interaction facet center. Because the center is generally offset from the
+particle center, pure nodal rotations can generate normal and shear facet
+strains.
 
 ### Implementation
 

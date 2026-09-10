@@ -379,6 +379,7 @@ void LeapfrogSolver::Setup() {
     }
 
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
+    is_setup_ = true;
 }
 
 // ---------------------------------------------------------------------------

@@ -19,15 +19,16 @@
 // Interaction model summary
 // ─────────────────────────
 //  • Setup() uses one fallback interaction per unique edge.
-//  • SetupFromMesh() uses one interaction per Workbench sub-facet, matching
-//    ChElementLDPM's 12 facet sections per TET.
+//  • SetupFromMesh() defaults to one interaction per Workbench sub-facet.
+//    A solver-side switch can collapse those sub-facets into one interaction
+//    per particle edge for faster, lower-resolution runs.
 //  • Each step, the relative displacement of the two endpoint particles at
 //    the interaction facet center is projected onto the reference facet frame
 //    (n, m, l) to obtain strains e_N, e_M, e_L.  Nodal rotations contribute
-//    through theta × r_center, matching Chrono's LDPM A-matrix kinematics.
+//    through theta × r_center.
 //  • The LDPM constitutive law maps the three translational facet strains to
 //    tractions.  Rotational nodal residuals are assembled from those tractions
-//    acting through reference facet-center lever arms, matching Chrono LDPM.
+//    acting through reference facet-center lever arms.
 //
 // DOF layout
 // ──────────
@@ -367,12 +368,24 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     // individual file readers.
     void SetupFromMesh(const LDPMTet4Mesh& mesh);
 
+    // Select the interaction discretization for a loaded Workbench mesh.
+    // true  (default): one interaction per sub-facet, preserving all loaded
+    //        facet centers, areas, frames, state variables, and owning-TET
+    //        volumetric strains.
+    // false: collapse sub-facets sharing a particle edge into one area-averaged
+    //        interaction for lower computational cost.
+    // Rebuilds the existing interaction arrays and resets facet history.
+    void SetUseSubfacetInteractions(bool enabled);
+    bool UsesSubfacetInteractions() const {
+        return use_subfacet_interactions;
+    }
+
     // Set LDPM-TET4 material moduli.  Must be called after Setup().
     // E_N  – normal translational modulus (Pa)
     // E_T  – shear translational modulus (Pa)
     // E_kT/E_kM/E_kL are retained for API compatibility with older FERIS
-    // examples.  The Chrono-compatible LDPM path does not use a separate
-    // rotational couple-stress law.
+    // examples.  The current LDPM path does not use a separate rotational
+    // couple-stress law.
     void SetMaterial(Real E_N_val, Real E_T_val, Real E_kT_val, Real E_kM_val, Real E_kL_val);
 
     // Set the full LDPM parameter set.  Must be called after Setup().
@@ -422,6 +435,9 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     const std::vector<int>& GetEdgeNodes() const {
         return h_edge_nodes_vec;
     }
+
+    // Retrieve the host-side sub-facet → active interaction mapping.
+    void RetrieveSubfacetInteractionIndices(std::vector<int>& out);
 
     // Project per-interaction damage ω onto the sub-facet mesh.
     //
@@ -657,6 +673,7 @@ struct GPU_LDPMTet4_Data : public ElementBase {
     bool is_setup = false;
     bool is_csr_setup = false;
     bool is_constraints_setup = false;
+    bool use_subfacet_interactions = true;
 };
 
 }  // namespace feris

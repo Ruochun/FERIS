@@ -130,6 +130,29 @@ class LeapfrogSolver : public SolverBase {
     // SetParameters().
     void Setup();
 
+    // Select the LDPM interaction discretization before Setup().
+    // enabled=true (default): resolve every loaded Workbench sub-facet as its
+    // own interaction. This keeps all sub-facet centers, areas, frames, state
+    // variables, and owning-TET volumetric strains.
+    // enabled=false: collapse sub-facets sharing a particle edge into one
+    // area-averaged interaction. This reduces the number of interaction
+    // threads and state entries, so it is faster but lower-resolution.
+    // Changing mode rebuilds the element's interaction arrays and resets facet
+    // history. Call it only before Setup(), before any time integration.
+    void SetLDPMSubfacetInteractions(bool enabled) {
+        if (type_ != TYPE_LDPM_TET4) {
+            MOPHI_ERROR("LeapfrogSolver::SetLDPMSubfacetInteractions is only valid for TYPE_LDPM_TET4.");
+            return;
+        }
+        if (is_setup_) {
+            MOPHI_ERROR("LeapfrogSolver::SetLDPMSubfacetInteractions must be called before Setup().");
+            return;
+        }
+        ldpm_host_data_->SetUseSubfacetInteractions(enabled);
+        n_beam_ = ldpm_host_data_->get_n_beam();
+        d_data_ = ldpm_host_data_->GetDevicePtr();
+    }
+
 #if defined(__CUDACC__)
     // Half-step nodal velocity vector (length 3*n_coef_).
     __device__ Map<VectorXR> v() {
@@ -413,6 +436,7 @@ class LeapfrogSolver : public SolverBase {
     LeapfrogSolver* d_leapfrog_solver_;
     int n_total_qp_, n_shape_;
     int n_coef_, n_beam_;
+    bool is_setup_ = false;
 
     // DualArrays for long arrays (manage both pinned host and device memory).
     // d_v_: half-step nodal velocities, length 3*n_coef_

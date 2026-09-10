@@ -253,7 +253,7 @@ int main() {
     GPU_LDPMTet4_Data element_data;
     element_data.SetupFromMesh(mesh);
 
-    std::cout << "  Unique edges: " << element_data.n_edge << "\n";
+    std::cout << "  LDPM interactions: " << element_data.n_edge << "\n";
 
     // Full LDPM parameter set.
     LDPMParams ldpm_params{};

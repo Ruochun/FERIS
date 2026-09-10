@@ -201,6 +201,8 @@ std::string SubfacetVtkName(int case_id, int frame) {
     return s.str();
 }
 
+const int kLocalEdges[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+
 std::string JoinPath(const std::string& dir, const std::string& file) {
     return (std::filesystem::path(dir) / file).string();
 }
@@ -493,14 +495,16 @@ int main(int argc, char* argv[]) {
     }
     subfacet_csv << "\n";
 
-    std::vector<int> subfacet_edge_idx(static_cast<size_t>(mesh.n_subfacets), -1);
+    std::vector<int> subfacet_edge_idx;
+    element_data.RetrieveSubfacetInteractionIndices(subfacet_edge_idx);
     std::vector<int> subfacet_node_i(static_cast<size_t>(mesh.n_subfacets), -1);
     std::vector<int> subfacet_node_j(static_cast<size_t>(mesh.n_subfacets), -1);
-    const std::vector<int>& interaction_nodes = element_data.GetEdgeNodes();
+    std::vector<int> tet_facet_count(static_cast<size_t>(mesh.n_tets), 0);
     for (int sf = 0; sf < mesh.n_subfacets; ++sf) {
-        subfacet_edge_idx[static_cast<size_t>(sf)] = sf;
-        subfacet_node_i[static_cast<size_t>(sf)] = interaction_nodes[static_cast<size_t>(2 * sf)];
-        subfacet_node_j[static_cast<size_t>(sf)] = interaction_nodes[static_cast<size_t>(2 * sf + 1)];
+        const int t = mesh.subfacet_tet(sf);
+        const int local_edge = tet_facet_count[static_cast<size_t>(t)]++ / 2;
+        subfacet_node_i[static_cast<size_t>(sf)] = mesh.tet_connectivity(t, kLocalEdges[local_edge][0]);
+        subfacet_node_j[static_cast<size_t>(sf)] = mesh.tet_connectivity(t, kLocalEdges[local_edge][1]);
     }
 
     auto write_csv = [&](Real time_s) {

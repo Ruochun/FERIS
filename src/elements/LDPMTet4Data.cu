@@ -581,8 +581,9 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 //
 // Calls Setup() with particle positions and TET connectivity from the mesh,
 // stores all additional file-loaded data fields, and — when facets.dat data
-// is present — replaces the unique-edge fallback interactions with one
-// interaction per sub-facet, matching ChElementLDPM's 12 sections per TET.
+// is present — rebuilds the active interaction arrays from the loaded
+// sub-facet data. The default mode uses one interaction per sub-facet; the
+// solver may later request an area-averaged unique-edge mode for performance.
 //
 // Facets.dat override
 // ───────────────────
@@ -591,8 +592,8 @@ void GPU_LDPMTet4_Data::Setup(const VectorXR& h_x,
 // where p is the unit normal (= edge direction), q the first tangent, and
 // s = p × q the second tangent.  12 sub-facets appear per TET (6 edges × 2).
 //
-// Each sub-facet keeps its own pArea, center, and p/q/s frame. Its endpoint
-// order follows ChElementLDPM::facetNodeNums (two sub-facets per local edge).
+// Each TET is expected to contribute 12 sub-facets, ordered as two sub-facets
+// for each local edge in LDPM_TET4_LOCAL_EDGES.
 
 void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     if (mesh.n_particles <= 0) {
@@ -647,81 +648,222 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     MOPHI_INFO("SetupFromMesh: stored %d sub-facets, %d face-facets, %d facet vertices", n_subfacet, n_face_facet,
                n_facet_vertex);
 
-    // ── Replace unique-edge fallback with sub-facet interactions ─────────────
-    // Only performed when sub-facet data was actually loaded.
-    if (n_subfacet <= 0) {
+    SetUseSubfacetInteractions(true);
+}
+
+void GPU_LDPMTet4_Data::SetUseSubfacetInteractions(bool enabled) {
+    if (!is_setup || n_subfacet <= 0) {
+        if (!enabled) {
+            MOPHI_WARNING(
+                "SetUseSubfacetInteractions(false): no Workbench sub-facets are loaded; keeping Setup() "
+                "unique-edge interactions.");
+        }
+        use_subfacet_interactions = enabled;
         return;
     }
 
-    n_edge = n_subfacet;
-    h_edge_nodes_vec.resize(static_cast<size_t>(n_edge) * 2);
-    h_l0_vec.resize(n_edge);
-
-    da_edge_nodes.resize(static_cast<size_t>(n_edge) * 2);
-    da_l0.resize(n_edge);
-    da_facet_area.resize(n_edge);
-    da_edge_n.resize(static_cast<size_t>(n_edge) * 3);
-    da_edge_m.resize(static_cast<size_t>(n_edge) * 3);
-    da_edge_lv.resize(static_cast<size_t>(n_edge) * 3);
-    da_edge_center.resize(static_cast<size_t>(n_edge) * 3);
-    da_facet_t.resize(static_cast<size_t>(n_edge) * LDPM_FACET_N_COMPONENTS);
-    da_kappa.resize(n_edge);
-    da_omega.resize(n_edge);
-    da_edge_tet_offsets.resize(static_cast<size_t>(n_edge) + 1);
-    da_edge_tet_indices.resize(n_edge);
-    da_edge_vol_strain.resize(n_edge);
-
-    da_subfacet_edge_idx.resize(n_subfacet);
-    da_subfacet_edge_idx.BindDevicePointer(&d_subfacet_edge_idx);
-
+    // First recover the endpoint particles for every loaded sub-facet.  The
+    // mesh stores sub-facets as rows grouped by owning TET; within a TET, rows
+    // are two-per-local-edge in LDPM_TET4_LOCAL_EDGES order.  Both interaction
+    // modes below use this same sub-facet endpoint table.
+    std::vector<int> sf_node_i(static_cast<size_t>(n_subfacet));
+    std::vector<int> sf_node_j(static_cast<size_t>(n_subfacet));
     std::vector<int> tet_facet_count(static_cast<size_t>(n_elem), 0);
-    for (int sf = 0; sf < n_subfacet; sf++) {
+    for (int sf = 0; sf < n_subfacet; ++sf) {
         const int t = h_subfacet_tet(sf);
         if (t < 0 || t >= n_elem) {
-            MOPHI_ERROR("SetupFromMesh: sub-facet %d has invalid owning TET %d.", sf, t);
+            MOPHI_ERROR("SetUseSubfacetInteractions: sub-facet %d has invalid owning TET %d.", sf, t);
             return;
         }
         const int local_facet = tet_facet_count[static_cast<size_t>(t)]++;
         if (local_facet >= 12) {
-            MOPHI_ERROR("SetupFromMesh: TET %d has more than 12 sub-facets.", t);
+            MOPHI_ERROR("SetUseSubfacetInteractions: TET %d has more than 12 sub-facets.", t);
             return;
         }
         const int local_edge = local_facet / 2;
-        const int ni = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[local_edge][0]];
-        const int nj = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[local_edge][1]];
-
-        h_edge_nodes_vec[sf * 2 + 0] = ni;
-        h_edge_nodes_vec[sf * 2 + 1] = nj;
-        da_edge_nodes.host()[sf * 2 + 0] = ni;
-        da_edge_nodes.host()[sf * 2 + 1] = nj;
-
-        const Real dx = mesh.particle_x(nj) - mesh.particle_x(ni);
-        const Real dy = mesh.particle_y(nj) - mesh.particle_y(ni);
-        const Real dz = mesh.particle_z(nj) - mesh.particle_z(ni);
-        const Real length = std::sqrt(dx * dx + dy * dy + dz * dz);
-        h_l0_vec[sf] = length;
-        da_l0.host()[sf] = length;
-        da_facet_area.host()[sf] = h_subfacet_parea(sf);
-
-        for (int k = 0; k < 3; ++k) {
-            da_edge_center.host()[sf * 3 + k] = h_subfacet_centroid(sf * 3 + k);
-            da_edge_n.host()[sf * 3 + k] = h_subfacet_normal(sf * 3 + k);
-            da_edge_m.host()[sf * 3 + k] = h_subfacet_tangent_q(sf * 3 + k);
-            da_edge_lv.host()[sf * 3 + k] = h_subfacet_tangent_s(sf * 3 + k);
-        }
-
-        da_edge_tet_offsets.host()[sf] = sf;
-        da_edge_tet_indices.host()[sf] = t;
-        da_subfacet_edge_idx.host()[sf] = sf;
+        sf_node_i[static_cast<size_t>(sf)] = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[local_edge][0]];
+        sf_node_j[static_cast<size_t>(sf)] = h_tet_conn_vec[t * 4 + LDPM_TET4_LOCAL_EDGES[local_edge][1]];
     }
     for (int t = 0; t < n_elem; ++t) {
         if (tet_facet_count[static_cast<size_t>(t)] != 12) {
-            MOPHI_ERROR("SetupFromMesh: TET %d has %d sub-facets; Chrono-compatible LDPM requires 12.", t,
+            MOPHI_ERROR("SetUseSubfacetInteractions: TET %d has %d sub-facets; LDPM TET4 setup requires 12.", t,
                         tet_facet_count[static_cast<size_t>(t)]);
             return;
         }
     }
-    da_edge_tet_offsets.host()[n_edge] = n_edge;
+
+    std::vector<int> interaction_nodes;
+    std::vector<Real> interaction_l0;
+    std::vector<Real> interaction_area;
+    std::vector<Real> interaction_n;
+    std::vector<Real> interaction_m;
+    std::vector<Real> interaction_l;
+    std::vector<Real> interaction_center;
+    std::vector<int> interaction_tet_offsets;
+    std::vector<int> interaction_tet_indices;
+    std::vector<int> subfacet_interaction(static_cast<size_t>(n_subfacet), -1);
+
+    if (enabled) {
+        // High-resolution mode: preserve the Workbench sub-facet mesh as the
+        // solver's interaction mesh.  Every sub-facet owns one state vector,
+        // one traction cache entry, and one volumetric-strain entry sourced
+        // from its owning TET.
+        n_edge = n_subfacet;
+        interaction_nodes.resize(static_cast<size_t>(n_edge) * 2);
+        interaction_l0.resize(n_edge);
+        interaction_area.resize(n_edge);
+        interaction_n.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_m.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_l.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_center.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_tet_offsets.resize(static_cast<size_t>(n_edge) + 1);
+        interaction_tet_indices.resize(n_edge);
+
+        for (int sf = 0; sf < n_subfacet; ++sf) {
+            const int ni = sf_node_i[static_cast<size_t>(sf)];
+            const int nj = sf_node_j[static_cast<size_t>(sf)];
+            const Real dx = da_x_ref.host()[nj] - da_x_ref.host()[ni];
+            const Real dy = da_y_ref.host()[nj] - da_y_ref.host()[ni];
+            const Real dz = da_z_ref.host()[nj] - da_z_ref.host()[ni];
+
+            interaction_nodes[static_cast<size_t>(sf) * 2 + 0] = ni;
+            interaction_nodes[static_cast<size_t>(sf) * 2 + 1] = nj;
+            interaction_l0[static_cast<size_t>(sf)] = std::sqrt(dx * dx + dy * dy + dz * dz);
+            interaction_area[static_cast<size_t>(sf)] = h_subfacet_parea(sf);
+            for (int k = 0; k < 3; ++k) {
+                interaction_center[static_cast<size_t>(sf) * 3 + k] = h_subfacet_centroid(sf * 3 + k);
+                interaction_n[static_cast<size_t>(sf) * 3 + k] = h_subfacet_normal(sf * 3 + k);
+                interaction_m[static_cast<size_t>(sf) * 3 + k] = h_subfacet_tangent_q(sf * 3 + k);
+                interaction_l[static_cast<size_t>(sf) * 3 + k] = h_subfacet_tangent_s(sf * 3 + k);
+            }
+            interaction_tet_offsets[static_cast<size_t>(sf)] = sf;
+            interaction_tet_indices[static_cast<size_t>(sf)] = h_subfacet_tet(sf);
+            subfacet_interaction[static_cast<size_t>(sf)] = sf;
+        }
+        interaction_tet_offsets[static_cast<size_t>(n_edge)] = n_edge;
+    } else {
+        // Performance mode: collapse all sub-facets on the same particle pair
+        // into a single interaction.  This greatly reduces n_edge and the
+        // number of per-step interaction threads, at the cost of replacing the
+        // individual sub-facet centers/frames/states with one area-averaged
+        // interaction per particle edge.
+        std::map<std::pair<int, int>, std::vector<int>> edge_subfacets;
+        for (int sf = 0; sf < n_subfacet; ++sf) {
+            const int ni = sf_node_i[static_cast<size_t>(sf)];
+            const int nj = sf_node_j[static_cast<size_t>(sf)];
+            edge_subfacets[{std::min(ni, nj), std::max(ni, nj)}].push_back(sf);
+        }
+
+        n_edge = static_cast<int>(edge_subfacets.size());
+        interaction_nodes.resize(static_cast<size_t>(n_edge) * 2);
+        interaction_l0.resize(n_edge);
+        interaction_area.resize(n_edge);
+        interaction_n.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_m.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_l.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_center.resize(static_cast<size_t>(n_edge) * 3);
+        interaction_tet_offsets.resize(static_cast<size_t>(n_edge) + 1, 0);
+
+        int edge_idx = 0;
+        for (const auto& edge : edge_subfacets) {
+            const int ni = edge.first.first;
+            const int nj = edge.first.second;
+            const Real dx = da_x_ref.host()[nj] - da_x_ref.host()[ni];
+            const Real dy = da_y_ref.host()[nj] - da_y_ref.host()[ni];
+            const Real dz = da_z_ref.host()[nj] - da_z_ref.host()[ni];
+            const Real length = std::sqrt(dx * dx + dy * dy + dz * dz);
+            const Real inv_length = length > Real(0) ? Real(1) / length : Real(0);
+
+            interaction_nodes[static_cast<size_t>(edge_idx) * 2 + 0] = ni;
+            interaction_nodes[static_cast<size_t>(edge_idx) * 2 + 1] = nj;
+            interaction_l0[static_cast<size_t>(edge_idx)] = length;
+            interaction_n[static_cast<size_t>(edge_idx) * 3 + 0] = dx * inv_length;
+            interaction_n[static_cast<size_t>(edge_idx) * 3 + 1] = dy * inv_length;
+            interaction_n[static_cast<size_t>(edge_idx) * 3 + 2] = dz * inv_length;
+
+            Real area_sum = Real(0);
+            Real center_sum[3] = {Real(0), Real(0), Real(0)};
+            std::vector<int> sharing_tets;
+            for (int sf : edge.second) {
+                // Sum the projected areas and build an area-weighted center.
+                // The output/VTK projection table records that each original
+                // sub-facet now receives this collapsed interaction's state.
+                const Real area = h_subfacet_parea(sf);
+                area_sum += area;
+                for (int k = 0; k < 3; ++k)
+                    center_sum[k] += area * h_subfacet_centroid(sf * 3 + k);
+                const int t = h_subfacet_tet(sf);
+                if (std::find(sharing_tets.begin(), sharing_tets.end(), t) == sharing_tets.end())
+                    sharing_tets.push_back(t);
+                subfacet_interaction[static_cast<size_t>(sf)] = edge_idx;
+            }
+            interaction_area[static_cast<size_t>(edge_idx)] = area_sum;
+            interaction_center[static_cast<size_t>(edge_idx) * 3 + 0] =
+                area_sum > Real(0) ? center_sum[0] / area_sum : Real(0.5) * (da_x_ref.host()[ni] + da_x_ref.host()[nj]);
+            interaction_center[static_cast<size_t>(edge_idx) * 3 + 1] =
+                area_sum > Real(0) ? center_sum[1] / area_sum : Real(0.5) * (da_y_ref.host()[ni] + da_y_ref.host()[nj]);
+            interaction_center[static_cast<size_t>(edge_idx) * 3 + 2] =
+                area_sum > Real(0) ? center_sum[2] / area_sum : Real(0.5) * (da_z_ref.host()[ni] + da_z_ref.host()[nj]);
+
+            const int first_sf = edge.second.front();
+            // Use the first sub-facet's tangential frame as the representative
+            // collapsed frame.  If its normal is opposite to the canonical
+            // particle-pair direction, flip q so that the stored n/m/l frame
+            // remains right-handed with the canonical interaction normal.
+            const Real p_dot_n = h_subfacet_normal(first_sf * 3 + 0) * interaction_n[edge_idx * 3 + 0] +
+                                 h_subfacet_normal(first_sf * 3 + 1) * interaction_n[edge_idx * 3 + 1] +
+                                 h_subfacet_normal(first_sf * 3 + 2) * interaction_n[edge_idx * 3 + 2];
+            const Real frame_sign = p_dot_n >= Real(0) ? Real(1) : Real(-1);
+            for (int k = 0; k < 3; ++k) {
+                interaction_m[static_cast<size_t>(edge_idx) * 3 + k] =
+                    frame_sign * h_subfacet_tangent_q(first_sf * 3 + k);
+                interaction_l[static_cast<size_t>(edge_idx) * 3 + k] = h_subfacet_tangent_s(first_sf * 3 + k);
+            }
+
+            std::sort(sharing_tets.begin(), sharing_tets.end());
+            // A collapsed particle-edge interaction can be touched by multiple
+            // TETs.  Store that small set in the existing CSR map so the
+            // per-step volumetric strain pass averages those TET values.
+            interaction_tet_indices.insert(interaction_tet_indices.end(), sharing_tets.begin(), sharing_tets.end());
+            interaction_tet_offsets[static_cast<size_t>(edge_idx + 1)] =
+                static_cast<int>(interaction_tet_indices.size());
+            ++edge_idx;
+        }
+    }
+
+    // Copy the selected interaction mesh into the existing DualArrays.  Kernels
+    // do not know which setup mode was chosen; they just loop over n_edge and
+    // read this active interaction table.
+    h_edge_nodes_vec = interaction_nodes;
+    h_l0_vec = interaction_l0;
+    da_edge_nodes.resize(interaction_nodes.size());
+    da_l0.resize(interaction_l0.size());
+    da_facet_area.resize(interaction_area.size());
+    da_edge_n.resize(interaction_n.size());
+    da_edge_m.resize(interaction_m.size());
+    da_edge_lv.resize(interaction_l.size());
+    da_edge_center.resize(interaction_center.size());
+    da_edge_tet_offsets.resize(interaction_tet_offsets.size());
+    da_edge_tet_indices.resize(interaction_tet_indices.size());
+    da_subfacet_edge_idx.resize(subfacet_interaction.size());
+    da_subfacet_edge_idx.BindDevicePointer(&d_subfacet_edge_idx);
+    std::copy(interaction_nodes.begin(), interaction_nodes.end(), da_edge_nodes.host());
+    std::copy(interaction_l0.begin(), interaction_l0.end(), da_l0.host());
+    std::copy(interaction_area.begin(), interaction_area.end(), da_facet_area.host());
+    std::copy(interaction_n.begin(), interaction_n.end(), da_edge_n.host());
+    std::copy(interaction_m.begin(), interaction_m.end(), da_edge_m.host());
+    std::copy(interaction_l.begin(), interaction_l.end(), da_edge_lv.host());
+    std::copy(interaction_center.begin(), interaction_center.end(), da_edge_center.host());
+    std::copy(interaction_tet_offsets.begin(), interaction_tet_offsets.end(), da_edge_tet_offsets.host());
+    std::copy(interaction_tet_indices.begin(), interaction_tet_indices.end(), da_edge_tet_indices.host());
+    std::copy(subfacet_interaction.begin(), subfacet_interaction.end(), da_subfacet_edge_idx.host());
+
+    da_facet_t.resize(static_cast<size_t>(n_edge) * LDPM_FACET_N_COMPONENTS);
+    da_kappa.resize(n_edge);
+    da_omega.resize(n_edge);
+    da_edge_vol_strain.resize(n_edge);
+    if (d_statev != nullptr)
+        da_statev.resize(static_cast<size_t>(n_edge) * LDPM_N_STATEV);
 
     da_edge_nodes.ToDevice();
     da_l0.ToDevice();
@@ -733,7 +875,6 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     da_edge_tet_offsets.ToDevice();
     da_edge_tet_indices.ToDevice();
     da_subfacet_edge_idx.ToDevice();
-
     da_facet_t.SetVal(Real(0));
     da_facet_t.ToDevice();
     da_kappa.SetVal(Real(0));
@@ -742,11 +883,15 @@ void GPU_LDPMTet4_Data::SetupFromMesh(const LDPMTet4Mesh& mesh) {
     da_omega.ToDevice();
     da_edge_vol_strain.SetVal(Real(0));
     da_edge_vol_strain.ToDevice();
+    if (d_statev != nullptr) {
+        da_statev.SetVal(Real(0));
+        da_statev.ToDevice();
+    }
 
-    // Sync device struct mirror so kernels see resized arrays and interaction count.
+    use_subfacet_interactions = enabled;
     MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(GPU_LDPMTet4_Data), cudaMemcpyHostToDevice));
-
-    MOPHI_INFO("SetupFromMesh: configured %d LDPM sub-facet interactions.", n_edge);
+    MOPHI_INFO("LDPM interaction mode: %s (%d interactions).",
+               enabled ? "independent Workbench sub-facets" : "area-averaged unique edges", n_edge);
 }
 
 // ─── Material / parameter setters ────────────────────────────────────────────
@@ -1049,6 +1194,11 @@ void GPU_LDPMTet4_Data::RetrieveFacetKappaToCPU(VectorXR& kappa_out) {
     kappa_out.resize(n_edge);
     da_kappa.ToHost();
     std::copy(da_kappa.host(), da_kappa.host() + n_edge, kappa_out.data());
+}
+
+void GPU_LDPMTet4_Data::RetrieveSubfacetInteractionIndices(std::vector<int>& out) {
+    da_subfacet_edge_idx.ToHost();
+    out.assign(da_subfacet_edge_idx.host(), da_subfacet_edge_idx.host() + n_subfacet);
 }
 
 // ─── ProjectEdgeDamageToSubfacets ────────────────────────────────────────────

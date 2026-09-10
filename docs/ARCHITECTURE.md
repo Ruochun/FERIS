@@ -101,7 +101,7 @@ the particle neighbourhood topology.
 - Translational: `x, y, z`
 - Rotational (linearised): `rx (θ_x), ry (θ_y), rz (θ_z)`
 
-**Constitutive law** (`src/materials/LDPM.cuh`) — Chrono-compatible facet law:
+**Constitutive law** (`src/materials/LDPM.cuh`) — LDPM facet law:
 
 | Strain | Formula | Traction / moment | Modulus |
 |--------|---------|-------------------|---------|
@@ -113,13 +113,18 @@ where `Δu_c = (u_j + θ_j × r_j) − (u_i + θ_i × r_i)` is the relative
 displacement at the interaction facet center, `r_i/r_j` are reference vectors
 from each endpoint to that center. Rotational nodal residuals come from these
 same facet tractions acting through the reference lever arms; there is no
-separate rotational couple-stress law in the Chrono-matching path.
+separate rotational couple-stress law in the current path.
 
 For Workbench meshes loaded with `SetupFromMesh()`, every row of `facets.dat`
 is a separate interaction with its own center, area, local frame, material
-state, and owning-TET volumetric strain. This matches Chrono's 12 facet
-sections per TET. The generic `Setup()` path retains one interaction per unique
-TET edge as a geometry fallback.
+state, and owning-TET volumetric strain. This subfacet-resolved mode is the
+default and is the higher-detail discretization. The generic `Setup()` path
+retains one interaction per unique TET edge as a geometry fallback.
+
+`LeapfrogSolver::SetLDPMSubfacetInteractions(false)` may be called before
+`LeapfrogSolver::Setup()` to select a faster approximate mode that collapses
+loaded sub-facets onto area-averaged unique-edge interactions. The default
+`true` mode is the per-sub-facet formulation.
 
 **Rotational inertia**: `I_lump = α · m_lump · l_min²` with `α = 0.25` by default
 (configurable via `LDPM_TET4_ALPHA_ROT`).
