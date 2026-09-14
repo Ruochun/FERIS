@@ -11,6 +11,7 @@
  *          ANCF3243, ANCF3443, FEAT10, FEAT4, and LDPM_TET4 element
  *          types, with primary focus on LDPM_TET4 for
  *          particle-scale simulations with 6 DOFs per particle.
+ *          Exposes solver-side device buffers for external constraint coupling.
  *
  *          Supported element types: TYPE_3243, TYPE_3443, TYPE_T10,
  *          TYPE_T4, TYPE_LDPM_TET4.
@@ -419,6 +420,18 @@ class LeapfrogSolver : public SolverBase {
     // Call after the final Solve() when a velocity output synchronized
     // with the current position is required (e.g. kinetic-energy reporting).
     void FinalHalfKick();
+
+    // Solver-side coupling buffers, valid after Setup() until destruction.
+    // A constraint projection after Solve() may correct translational v_{n+1/2}
+    // here, provided it also corrects positions by dt * delta_v. LDPM rotational
+    // velocities follow the first 3*n_coef entries; mass/inertia each have n_coef
+    // entries. These pointers are device memory, not host collection APIs.
+    Real* GetHalfStepVelocityDevicePtr() {
+        return d_v_;
+    }
+    const Real* GetLumpedMassDevicePtr() const {
+        return d_mass_lump_;
+    }
 
   private:
     ElementType type_;

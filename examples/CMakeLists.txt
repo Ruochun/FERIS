@@ -6,7 +6,7 @@
 #   solver_tests/      – focused tests of the gradient-based solvers
 #                        (Nesterov, AdamW) on a simple solid block.
 #   ldmp_tests/        – LDPM demos and benchmark cases, including Dogbone
-#                        specimen simulations and single-tet unit tests.
+#                        specimen simulations, single-tet tests, and three-point bending.
 
 add_subdirectory(beam_simulations)
 add_subdirectory(solver_tests)

@@ -90,6 +90,9 @@ This example demonstrates loading a mesh from a VTU file and performing realisti
 
 See [examples/README_BEAM.md](examples/README_BEAM.md) for detailed information about this example.
 
+The [LDPM three-point bending demo](examples/ldmp_tests/README_TPB.md) uses leapfrog
+with a notched particle core, elastic beam arms, and movable support plates.
+
 ## Project Structure
 
 ```

@@ -1,7 +1,7 @@
 # examples/ldmp_tests/CMakeLists.txt
 #
 # LDPM demos and benchmark cases: Dogbone tensile simulations and
-# single-tet unit tests.
+# single-tet unit tests, and notched three-point bending.
 
 set(LDMP_TESTS_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/src
@@ -34,3 +34,16 @@ add_executable(ldpm_singletet ldpm_singletet.cc)
 target_link_libraries(ldpm_singletet feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
 target_include_directories(ldpm_singletet PRIVATE ${LDMP_TESTS_INCLUDE_DIRS})
 set_target_properties(ldpm_singletet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Reference notched three-point bending: LDPM core plus elastic arms.
+add_executable(ldpm_tpb ldpm_tpb.cu tpb_model.cc)
+target_link_libraries(ldpm_tpb PRIVATE feris_lib Eigen3::Eigen CUDA::cudart mophi_essentials)
+target_include_directories(ldpm_tpb PRIVATE ${LDMP_TESTS_INCLUDE_DIRS})
+target_compile_definitions(ldpm_tpb PRIVATE TPB_DEFAULT_MESH_DIR="${CMAKE_SOURCE_DIR}/data/meshes/LDPMTet4/TPB")
+set_target_properties(ldpm_tpb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Host-side physics checks; no CUDA device is needed to execute this target.
+add_executable(tpb_model_test tpb_model_test.cc tpb_model.cc)
+target_link_libraries(tpb_model_test PRIVATE feris_lib Eigen3::Eigen mophi_essentials)
+target_compile_definitions(tpb_model_test PRIVATE TPB_DEFAULT_MESH_DIR="${CMAKE_SOURCE_DIR}/data/meshes/LDPMTet4/TPB")
+set_target_properties(tpb_model_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

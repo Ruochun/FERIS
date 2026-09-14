@@ -838,3 +838,52 @@ LeapfrogSolver::Setup()
 | crack_distance | Physical crack opening width [mm]: ω·κ·l₀ | computed in `ProjectEdgeCrackDistanceToSubfacets` | `LDPMTet4Data.cu` |
 | T_VTK | VTK output interval | `static constexpr Real T_VTK` (default 0.005 s) | dogbone demos |
 | T_CSV | CSV output interval | `static constexpr Real T_CSV` (default 0.0005 s) | dogbone demos |
+
+## Three-point bending demo coupling
+
+`examples/ldmp_tests/ldpm_tpb.cu` couples the existing LDPM `LeapfrogSolver`
+to demo-local linear C3D4 elastic arms. This does not introduce another
+library solver–element pairing. The elastic arm stiffness is assembled from
+`V Bᵀ D B`, with row-lumped tetrahedral masses. Bottom support plates have
+six dynamic coordinates each and box mass/inertia. Their center z coordinates
+are constrained; all other plate coordinates remain dynamic.
+
+Let `u` collect core translations, arm translations, and support-plate
+translations/rotations. LDPM particle rotations remain in the LDPM solver.
+Constant linear constraints are `C u = g(t)`:
+
+- Interface rows are `u_core - sum_a(N_a u_arm,a) = 0`, using the containing
+  surface triangle's barycentric coordinates at x=0 or x=100.
+- Support attachment rows are `u_arm - u_plate + [r]x theta_plate = 0`.
+- Each support-center z row is zero.
+- Loading rows set top-particle x to zero and z to the reference displacement.
+
+For the free leapfrog half-step velocity `v*`, the correction is
+
+```
+b = (g(t+dt) - g(t))/dt
+lambda = (C M^-1 C^T)^-1 (b - C v*)
+delta_v = M^-1 C^T lambda
+v_half = v* + delta_v
+```
+
+The demo computes the free drift first and corrects it by `dt * delta_v`.
+For constant `C` this is algebraically the same as projection before drift.
+The corrected core velocities are written back through
+`GetHalfStepVelocityDevicePtr()` so the next LDPM kick starts from the
+coupled state. Core rotational velocities are untouched. Coupling buffers
+are internal flat solver data; this is not a user-facing 3D collection API.
+
+Independent constraint blocks touch disjoint DOFs (interface components,
+left/right supports, and loading directions). Each Gram block is diagonally
+scaled and factored once on the host. The inverse residual is checked; CUDA
+kernels apply the block inverses and transpose-scatter impulses each step.
+There is no penalty parameter, iterative coupling tolerance, or artificial
+constraint stiffness. The constraint force is `lambda/dt`; CSV loading force
+negates the sum of driven-z constraint forces, and support reactions use the
+support-center z rows directly.
+
+The small-displacement arm stiffness and linearized rigid-body ties preserve
+small-deflection bending compliance but do not implement Chrono's finite
+corotational arm kinematics. See the demo README for mass, gravity, reaction
+sampling, and time-step differences from the CPU model.

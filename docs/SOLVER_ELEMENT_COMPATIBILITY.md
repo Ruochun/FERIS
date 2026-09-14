@@ -114,6 +114,11 @@ the velocity buffer is `6·n_nodes` and the mass buffer is `2·n_nodes`.
 | `TYPE_T4`   | ✅ | |
 | `TYPE_LDPM_TET4` | ✅ | **Primary use case.** 6-DOF leapfrog with rotational inertia |
 
+The [three-point bending demo](../examples/ldmp_tests/README_TPB.md) uses this
+LDPM pairing with demo-local linear elastic arms and bilateral constraint
+projection. The arm implementation is not an additional library element type
+or a new solver–element pairing.
+
 ---
 
 ## Material Models
