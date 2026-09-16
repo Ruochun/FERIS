@@ -130,9 +130,10 @@ arms. From the repository root:
 
 ```bash
 cmake -S . -B build
-cmake --build build --target ldpm_tpb tpb_model_test -j4
+cmake --build build --target ldpm_tpb tpb_model_test coupled_dynamics_test -j4
 cd build
-./bin/tpb_model_test                 # CPU physics checks
+./bin/tpb_model_test                 # CPU constraint/mesh checks
+./bin/coupled_dynamics_test          # GPU T4/T10 and coupled integration checks
 ./bin/ldpm_tpb --steps 100 --no-vtk  # short GPU setup/integration check
 ./bin/ldpm_tpb                       # reference loading history, 0.1 s
 ```
@@ -142,5 +143,5 @@ Use `--end-time 0.003` to exercise the 2 ms loading-ramp transition, or
 `--dt-scale 0.5` for a time-step refinement run. `--help` lists all options.
 Every run replaces `ldpm_tpb/` in the current working directory. Input meshes
 are bundled; `--mesh-dir /path/to/TPB` overrides the compiled source-tree path.
-See [README_TPB.md](../examples/ldmp_tests/README_TPB.md) for physics,
+See [TPB README](../examples/ldmp_tests/tpb/README.md) for physics,
 numerical differences, and output conventions.

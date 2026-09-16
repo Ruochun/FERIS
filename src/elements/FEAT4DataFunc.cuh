@@ -152,6 +152,9 @@ __device__ __forceinline__ void compute_p(int elem_idx,
 #pragma unroll
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
+                if (d_data->UsesLinearizedSVK())
+                    P_vis[i][j] =
+                        eta * (Fdot[i][j] + Fdot[j][i]) + lambda_d * (Fdot[0][0] + Fdot[1][1] + Fdot[2][2]) * (i == j);
                 d_data->Fdot(elem_idx, qp_idx)(i, j) = Fdot[i][j];
                 d_data->P_vis(elem_idx, qp_idx)(i, j) = P_vis[i][j];
             }
@@ -204,7 +207,12 @@ __device__ __forceinline__ void compute_p(int elem_idx,
     }
 
     Real P_el[3][3];
-    if (d_data->material_model() == MATERIAL_MODEL_MOONEY_RIVLIN) {
+    if (d_data->UsesLinearizedSVK()) {
+        const Real trace = F[0][0] + F[1][1] + F[2][2] - 3;
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                P_el[i][j] = d_data->mu() * (F[i][j] + F[j][i] - 2 * (i == j)) + d_data->lambda() * trace * (i == j);
+    } else if (d_data->material_model() == MATERIAL_MODEL_MOONEY_RIVLIN) {
         mr_compute_P(F, d_data->mu10(), d_data->mu01(), d_data->kappa(), P_el);
     } else {
         Real lambda = d_data->lambda();
@@ -374,6 +382,11 @@ __device__ __forceinline__ void compute_hessian_assemble_csr<GPU_FEAT4_Data>(GPU
     }
 
     // Compute C = F^T * F
+    if (d_data->UsesLinearizedSVK()) {
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                F[i][j] = (i == j) ? Real(1) : Real(0);
+    }
     Real C[3][3] = {{0.0}};
 #pragma unroll
     for (int i = 0; i < 3; i++) {

@@ -224,3 +224,46 @@ All element and solver kernels run on the GPU via CUDA:
 - St. Venant-Kirchhoff: standard nonlinear elasticity reference
 - Nesterov acceleration: Nesterov, Y. (1983). "A method for solving the convex
   programming problem with convergence rate O(1/k²)"
+
+## Coupled explicit dynamics
+
+`DynamicsSystem` (`src/dynamics/`) registers borrowed element groups and owns
+linearized rigid-body state descriptions. `CoupledLeapfrogSolver` owns the
+common time step and projection workspace; it uses the same kick and drift
+kernels as standalone `LeapfrogSolver`. Element storage must outlive both.
+A registered group cannot be registered twice, and topology/mass must remain
+unchanged after registration. The system is frozen when its solver is created.
+
+Element physics remains in `src/elements/`: T4/T10 offer `SetLinearizedSVK`,
+mesh setup, tangent CSR assembly, and explicit mass policies. Shared tetrahedral
+assembly is used by `LinearStaticSolver` without a host matrix round trip; a
+host CSR overload supports diagnostics, energy evaluation, and time-step bounds.
+The assembled operator retains the existing static solver's unit-step viscous
+tangent when damping is enabled. Quadratic strain energy and the elastic
+time-step bound therefore use an undamped, linearized stiffness (as in TPB).
+The existing finite-strain SVK and Mooney–Rivlin paths remain available.
+T10 uses diagonal-scaled positive lumping rather than negative vertex row sums.
+
+`src/constraints/LinearConstraints` describes displacement-level rows independently
+of element constitutive laws. It supports prescribed components, node ties,
+T4/T10 face interpolation ties, and node-to-rigid-body attachments. Rows touching
+shared DOFs are grouped automatically, so overlapping connections are solved
+together. Dependent/conflicting rows fail during preparation. Small blocks
+cache inverses for GPU application; blocks over 512 rows use cached sparse
+LDLT factors on the CPU, transferring residuals/impulses at each step. This
+fallback avoids quadratic inverse storage; a GPU sparse solver can replace it
+without changing the public constraint declarations.
+
+The first implementation uses constant constraint Jacobians and small rigid
+rotations. Particle rotations are integrated by LDPM but are not exposed as
+coupling coordinates yet. Finite-rotation constraints, evolving contact, and
+ANCF coupling require additional kinematic adapters; they are not silently
+approximated by this API. Independent prescribed histories are supported through
+`SetConstraintMotionIncrements`; a scalar-history convenience method uses each
+row's configured scale.
+
+`src/utils/tetrahedral_mesh` owns single-part C3D4/C3D10 Abaqus import, boundary
+face extraction, and reference interpolation. T10 faces use six shape functions
+and an isoparametric inverse map, including curved faces. TPB's `tpb_model.*`
+now contains only specimen-specific placement, geometric selections, and output.
+The demo itself is ordinary C++ and launches no CUDA kernels.

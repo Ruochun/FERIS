@@ -114,10 +114,30 @@ the velocity buffer is `6·n_nodes` and the mass buffer is `2·n_nodes`.
 | `TYPE_T4`   | ✅ | |
 | `TYPE_LDPM_TET4` | ✅ | **Primary use case.** 6-DOF leapfrog with rotational inertia |
 
-The [three-point bending demo](../examples/ldmp_tests/README_TPB.md) uses this
-LDPM pairing with demo-local linear elastic arms and bilateral constraint
-projection. The arm implementation is not an additional library element type
-or a new solver–element pairing.
+T4 uses row-summed lumped mass. T10 uses positive diagonal scaling of its
+consistent mass, preserving total mass while avoiding negative vertex row sums.
+`SetLinearizedSVK(E, nu)` selects small-strain response on T4/T10; `SetSVK`
+restores the existing finite-strain formulation.
+
+### `CoupledLeapfrogSolver`
+
+Common-step explicit integration of element groups and linearized rigid bodies
+registered in `DynamicsSystem`. Element storage must outlive the system/solver.
+Bilateral constraints project velocities between kick and drift. Register
+prescribed/fixed DOFs in the system constraint set, not on individual elements.
+
+| Element type | Supported? | Notes |
+|---|---|---|
+| `TYPE_3243` | ❌ | Use standalone `LeapfrogSolver` for ANCF |
+| `TYPE_3443` | ❌ | Use standalone `LeapfrogSolver` for ANCF |
+| `TYPE_T4` | ✅ | Existing continuum forces and lumped masses |
+| `TYPE_T10` | ✅ | Positive diagonal-scaled mass; quadratic face ties |
+| `TYPE_LDPM_TET4` | ✅ | Translation coupling; particle rotations remain dynamic |
+
+Rigid bodies are system components, not a new `ElementType`. Current body ties
+use linearized rotation and constant reference offsets. This solver does not
+implement finite-rotation constraints or contact. The
+[TPB demo](../examples/ldmp_tests/tpb/README.md) exercises LDPM + T4 + rigid bodies.
 
 ---
 
@@ -127,7 +147,7 @@ The material model is set on the element (not the solver) before calling `Solve(
 
 | Enum | Class | Applicable elements | Description |
 |---|---|---|---|
-| `MATERIAL_MODEL_SVK` | `SVK.cuh` | `TYPE_T4`, `TYPE_T10` | St. Venant–Kirchhoff (SVK) hyperelastic — suitable for moderate strains |
+| `MATERIAL_MODEL_SVK` | `SVK.cuh` | `TYPE_T4`, `TYPE_T10` | Finite-strain SVK by default; `SetLinearizedSVK(E, nu)` selects reference small-strain elasticity |
 | `MATERIAL_MODEL_MOONEY_RIVLIN` | `MooneyRivlin.cuh` | `TYPE_T4`, `TYPE_T10` | Mooney–Rivlin hyperelastic — suitable for large-strain rubber-like materials |
 | LDPM facet law | `LDPM.cuh` | `TYPE_LDPM_TET4` | Cusatis LDPM tensile-shear coupled damage — suitable for concrete-like materials |
 
@@ -135,10 +155,10 @@ The material model is set on the element (not the solver) before calling `Solve(
 
 ## Quick-Reference Table (all combinations)
 
-|  | LinearStatic | SyncedNesterov | SyncedAdamW | SyncedAdamWNocoop | Leapfrog |
-|---|---|---|---|---|---|
-| `TYPE_3243` | ❌ | ✅ | ✅ | ✅ | ✅ |
-| `TYPE_3443` | ❌ | ✅ | ✅ | ✅ | ✅ |
-| `TYPE_T4`   | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `TYPE_T10`  | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `TYPE_LDPM_TET4` | ❌ | ❌ | ❌ | ❌ | ✅ |
+|  | LinearStatic | SyncedNesterov | SyncedAdamW | SyncedAdamWNocoop | Leapfrog | CoupledLeapfrog |
+|---|---|---|---|---|---|---|
+| `TYPE_3243` | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `TYPE_3443` | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `TYPE_T4`   | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `TYPE_T10`  | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `TYPE_LDPM_TET4` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |

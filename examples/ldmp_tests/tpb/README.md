@@ -4,7 +4,7 @@ This demo reproduces the geometry, material inputs, loading history, and
 bilateral support layout of the [Chrono TPB example](https://github.com/Computational-Mechanics-Material-Models/chrono-mechanics/blob/5c2ae9466120c025829a4eb573c7532dd70a6bc4/template_project_ldpm/TPB/LDPM_TPBT.cpp)
 using FERIS LDPM and explicit leapfrog integration. It includes the elastic
 arms: the 100 mm long LDPM region is only the notched middle of the beam.
-Build and run commands are in [BUILDING.md](../../docs/BUILDING.md#ldpm-three-point-bending).
+Build and run commands are in [BUILDING.md](../../../docs/BUILDING.md#ldpm-three-point-bending).
 
 ## Physical setup
 
@@ -46,16 +46,15 @@ lever arms; no additional curvature stiffness is introduced.
 ## Numerical scope
 
 The reference uses implicit HHT and corotational elastic tetrahedra. This
-port uses FERIS `LeapfrogSolver` for LDPM and a demo-local explicit leapfrog
-update of the arms' assembled **linear small-displacement** tetrahedral
-stiffness. Rigid plate kinematics and interface constraints are also linear
+port uses `CoupledLeapfrogSolver` with the shared leapfrog stages for LDPM
+and `GPU_FEAT4_Data` arms using **linear small-displacement** SVK response. Rigid plate kinematics and interface constraints are also linear
 in displacement/rotation. This is appropriate for small beam deflections;
 large-rotation equivalence to Chrono is not claimed.
 
 A mass-weighted bilateral projection couples the free subsystem steps. It
 retains elastic-arm compliance, inertia, support sliding, and support
 rotation. It does not replace the arms with prescribed core-end motion or
-penalty springs. See [implementation notes](../../docs/LDPMTet4_implementation.md#three-point-bending-demo-coupling)
+penalty springs. See [implementation notes](../../../docs/LDPMTet4_implementation.md#three-point-bending-demo-coupling)
 for the projection equations.
 
 Both material meshes have gravity disabled in the reference. This demo also
@@ -111,12 +110,15 @@ checks setup and integration, not the full post-peak response.
 
 ## Validation performed
 
-`tpb_model_test` checks stiffness symmetry, the six zero-force rigid modes of
-each arm, positive elastic strain energy, mass-orthogonal constraint
-projection, non-increasing kinetic energy for homogeneous constraints, and
-the loading-ramp transition. It runs without a GPU device.
+`tpb_model_test` checks overlapping and large sparse constraint components,
+projection momentum/energy behavior, rigid ties, quadratic face interpolation,
+and reference mesh/loading data without a GPU. `coupled_dynamics_test` checks
+T4/T10 stiffness/force consistency, rigid modes, positive mass conservation,
+prescribed motion, standalone/coupled leapfrog equivalence, rigid-body acceleration,
+and a 521-row sparse constraint component on a GPU.
 
-GPU checks on the supplied mesh covered initial/final VTK output and nonlinear
+The original implementation (commit `332ab4f`) was validated as follows and
+provides the refactoring baseline. GPU checks on the supplied mesh covered initial/final VTK output and nonlinear
 runs through 3 ms at dt≈6.9393e-8 s (43,232 steps) and dt≈3.4697e-8 s
 (86,463 steps). At 3 ms:
 
@@ -133,3 +135,17 @@ The load difference is 0.00263%; sampled constraint errors stayed below
 These checks cover the loading-ramp transition and onset of cracking, not
 the entire 0.1 s response or quantitative agreement with a CPU reference run.
 The existing `dogbone_velbc` and `ldpm_singletet` targets also rebuilt successfully.
+
+After migration to the shared library, the default-step 3 ms run gives
+877.374814 N load and 0.012616332954 mm CMOD. Relative to the original baseline,
+the load differs by approximately 1.2e-8 and CMOD by less than 5e-11 mm.
+The maximum sampled constraint drift is 1.04e-10 mm. The shared solver advances
+the element's coordinates directly after projection.
+The half-step run (86,463 steps) gives 877.351746 N and 0.012616332972 mm CMOD;
+its load differs from the saved half-step baseline by 3.85e-8 relative, and
+its sampled constraint drift stays below 3.4e-10 mm.
+
+The existing T4/T10 static beam examples also converge with relative residuals
+below 1e-10, and the T4 leapfrog example completes. A 100-step TPB run writes
+the expected initial/final VTK files. CUDA memcheck could not attach to the
+WSL GPU in this environment; the ordinary GPU tests pass.

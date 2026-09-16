@@ -26,13 +26,13 @@ Based on the [Total-Lagrangian-FEA](https://github.com/uwsbel/Total-Lagrangian-F
 
 See [`docs/SOLVER_ELEMENT_COMPATIBILITY.md`](docs/SOLVER_ELEMENT_COMPATIBILITY.md) for the full matrix.
 
-|  | LinearStatic | SyncedNesterov | SyncedAdamW | SyncedAdamWNocoop | Leapfrog |
-|---|---|---|---|---|---|
-| FEAT4 (TET4) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| FEAT10 (TET10) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ANCF3243 (cable) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| ANCF3443 (shell) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| LDPMTet4 (particle) | ❌ | ❌ | ❌ | ❌ | ✅ |
+|  | LinearStatic | SyncedNesterov | SyncedAdamW | SyncedAdamWNocoop | Leapfrog | CoupledLeapfrog |
+|---|---|---|---|---|---|---|
+| FEAT4 (TET4) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| FEAT10 (TET10) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ANCF3243 (cable) | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| ANCF3443 (shell) | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| LDPMTet4 (particle) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ## Quick Start
 
@@ -90,7 +90,7 @@ This example demonstrates loading a mesh from a VTU file and performing realisti
 
 See [examples/README_BEAM.md](examples/README_BEAM.md) for detailed information about this example.
 
-The [LDPM three-point bending demo](examples/ldmp_tests/README_TPB.md) uses leapfrog
+The [LDPM three-point bending demo](examples/ldmp_tests/tpb/README.md) uses leapfrog
 with a notched particle core, elastic beam arms, and movable support plates.
 
 ## Project Structure

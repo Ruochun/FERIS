@@ -25,3 +25,6 @@
 #include "solvers/SyncedAdamW.cuh"
 #include "solvers/SyncedAdamWNocoop.cuh"
 #include "solvers/SyncedNesterov.cuh"
+
+#include "elements/LDPMTet4Data.cuh"
+#include "solvers/CoupledLeapfrogSolver.h"

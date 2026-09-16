@@ -30,10 +30,10 @@
 
 #include <MoPhiEssentials.h>
 
-#include "../src/elements/LDPMTet4Data.cuh"
-#include "../src/solvers/LeapfrogSolver.cuh"
-#include "../src/types.h"
-#include "../src/utils/ldpm_mesh_utils.h"
+#include "elements/LDPMTet4Data.cuh"
+#include "solvers/LeapfrogSolver.cuh"
+#include "types.h"
+#include "utils/ldpm_mesh_utils.h"
 
 using namespace feris;
 

@@ -1,6 +1,6 @@
 /* Project: FERIS
  * File: tpb_model.h
- * Brief: Demo-local elastic arms and linear constraint data for LDPM TPB.
+ * Brief: TPB-specific geometry, load-strip selection, and output data for LDPM TPB.
  */
 #pragma once
 #include <array>
@@ -9,19 +9,16 @@
 #include <vector>
 #include "types.h"
 #include "utils/ldpm_mesh_utils.h"
+#include "utils/tetrahedral_mesh.h"
+#include "dynamics/DynamicsSystem.h"
 
 namespace feris {
 namespace tpb {
-struct Csr {
-    std::vector<int> offsets{0}, columns;
-    std::vector<Real> values;
-    int Rows() const { return static_cast<int>(offsets.size()) - 1; }
-};
 struct Model {
     VectorReal3 arm_pos_ref;
     std::vector<std::array<int, 4>> arm_tets;
     VectorXR inv_mass;
-    Csr stiffness, constraints, gram_inverse;
+    HostCsrMatrix stiffness;
     std::vector<Real> drive;
     std::vector<int> top_nodes;
     std::array<int, 2> cmod_nodes;
@@ -29,7 +26,12 @@ struct Model {
     int core_dofs = 0, plate_offset = 0;
     Real min_edge = 0, elastic_dt = 0;
 };
-Model BuildModel(const LDPMTet4Mesh& core, const std::string& inp, const VectorXR& core_mass);
+TetrahedralMesh LoadArms(const std::string& inp);
+Model BuildModel(const LDPMTet4Mesh& core,
+                 const TetrahedralMesh& arms,
+                 const HostCsrMatrix& stiffness,
+                 DynamicsSystem& system,
+                 int arm_offset);
 void WriteArms(const std::string& path, const Model& model, const VectorXR& disp);
 // Signed plate displacement, continuous in position and velocity at 2 ms.
 inline Real PlateDisplacement(Real t) {

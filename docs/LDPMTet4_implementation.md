@@ -841,49 +841,34 @@ LeapfrogSolver::Setup()
 
 ## Three-point bending demo coupling
 
-`examples/ldmp_tests/ldpm_tpb.cu` couples the existing LDPM `LeapfrogSolver`
-to demo-local linear C3D4 elastic arms. This does not introduce another
-library solver–element pairing. The elastic arm stiffness is assembled from
-`V Bᵀ D B`, with row-lumped tetrahedral masses. Bottom support plates have
-six dynamic coordinates each and box mass/inertia. Their center z coordinates
-are constrained; all other plate coordinates remain dynamic.
+`examples/ldmp_tests/tpb/ldpm_tpb.cc` configures the library `DynamicsSystem` and
+`CoupledLeapfrogSolver`. The core is LDPM; the arms are `GPU_FEAT4_Data` with
+`SetLinearizedSVK(39000, 0.2)`. Elastic force, tangent, and mass implementation
+is shared with the general T4/T10 support. Rigid plates belong to the dynamics
+system. No CUDA kernels or elasticity assembly remain in the demo.
 
-Let `u` collect core translations, arm translations, and support-plate
-translations/rotations. LDPM particle rotations remain in the LDPM solver.
-Constant linear constraints are `C u = g(t)`:
-
-- Interface rows are `u_core - sum_a(N_a u_arm,a) = 0`, using the containing
-  surface triangle's barycentric coordinates at x=0 or x=100.
-- Support attachment rows are `u_arm - u_plate + [r]x theta_plate = 0`.
-- Each support-center z row is zero.
-- Loading rows set top-particle x to zero and z to the reference displacement.
-
-For the free leapfrog half-step velocity `v*`, the correction is
+For the free half-step velocities `v*`, constant constraints `C u = g(t)` give
 
 ```
 b = (g(t+dt) - g(t))/dt
 lambda = (C M^-1 C^T)^-1 (b - C v*)
-delta_v = M^-1 C^T lambda
-v_half = v* + delta_v
+v_half = v* + M^-1 C^T lambda
+u_next = u + dt * v_half
 ```
 
-The demo computes the free drift first and corrects it by `dt * delta_v`.
-For constant `C` this is algebraically the same as projection before drift.
-The corrected core velocities are written back through
-`GetHalfStepVelocityDevicePtr()` so the next LDPM kick starts from the
-coupled state. Core rotational velocities are untouched. Coupling buffers
-are internal flat solver data; this is not a user-facing 3D collection API.
+The library advances all element groups through force evaluation and kick,
+projects their velocities jointly with rigid bodies, then drifts them. It does
+not drift and subsequently repair positions. Solver device buffers and split
+integration stages are private to the library coordinator.
 
-Independent constraint blocks touch disjoint DOFs (interface components,
-left/right supports, and loading directions). Each Gram block is diagonally
-scaled and factored once on the host. The inverse residual is checked; CUDA
-kernels apply the block inverses and transpose-scatter impulses each step.
-There is no penalty parameter, iterative coupling tolerance, or artificial
-constraint stiffness. The constraint force is `lambda/dt`; CSV loading force
-negates the sum of driven-z constraint forces, and support reactions use the
-support-center z rows directly.
+Interface rows use reference surface interpolation and leave LDPM particle
+rotations free. Support rows are `u_node-u_body+[r]x theta_body=0`, with only
+the body center z restrained. The loading strip constrains x and prescribes z;
+y and particle rotations remain free. Reaction rows return `lambda/dt`.
 
-The small-displacement arm stiffness and linearized rigid-body ties preserve
-small-deflection bending compliance but do not implement Chrono's finite
-corotational arm kinematics. See the demo README for mass, gravity, reaction
-sampling, and time-step differences from the CPU model.
+Constraint components are discovered from shared DOFs rather than hardcoded
+TPB groups. Each component is factored once after masses are known. Sparse
+factorization is retained for large components. The common time step remains
+user-controlled; TPB selects the same conservative estimate as its initial
+implementation. See `docs/ARCHITECTURE.md` for ownership and scope, and the demo
+README for numerical differences from the CPU reference.

@@ -6,6 +6,8 @@
  *          interfaces for 10-node quadratic tetrahedral (TET10) elements.
  *          Stores mesh connectivity, quadrature data, CSR mass matrices,
  *          and element-level force and constraint data used by solvers.
+ *          Provides linearized SVK, mesh setup, tangent assembly, and
+ *          explicit lumped-mass interfaces shared by dynamic/static solvers.
  *==============================================================
  *==============================================================*/
 
@@ -22,6 +24,7 @@
 #include "../utils/quadrature_utils.h"
 #include "../materials/MaterialModel.cuh"
 #include "ElementBase.h"
+#include "../utils/SparseMatrix.h"
 #include "../types.h"
 #include <MoPhiEssentials.h>
 
@@ -313,6 +316,8 @@ struct GPU_FEAT10_Data : public ElementBase {
     }
 
     void CalcDnDuPre();
+    void SetupFromMesh(const VectorReal3& positions, const MatrixXi& connectivity);
+    void RetrieveLumpedMassToCPU(VectorXR& mass);
 
     void CalcMassMatrix() override;
 
@@ -558,7 +563,26 @@ struct GPU_FEAT10_Data : public ElementBase {
     /**
      * Select Saint Venant-Kirchhoff (SVK) material model using current E/nu.
      */
+    // Reference small-strain SVK response; existing finite-strain default is unchanged.
+    bool linearized_svk = false;
+    __host__ __device__ bool UsesLinearizedSVK() const {
+        return linearized_svk;
+    }
+    HostCsrMatrix AssembleTangentStiffnessCSR();
+    // Device assembly overload for solvers; avoids a host matrix round trip.
+    void AssembleTangentStiffnessCSR(mophi::DualArray<int>& offsets,
+                                     mophi::DualArray<int>& columns,
+                                     mophi::DualArray<Real>& values);
+    void SetLinearizedSVK(Real E, Real nu) {
+        SetSVK(E, nu);
+        linearized_svk = true;
+        MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(*this), cudaMemcpyHostToDevice));
+    }
+
     void SetSVK() {
+        linearized_svk = false;
+        if (is_setup)
+            MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(*this), cudaMemcpyHostToDevice));
         if (!is_setup) {
             MOPHI_ERROR("GPU_FEAT10_Data must be set up before setting material.");
             return;
@@ -602,6 +626,9 @@ struct GPU_FEAT10_Data : public ElementBase {
      * kappa: volumetric penalty (bulk-modulus-like) coefficient
      */
     void SetMooneyRivlin(Real mu10, Real mu01, Real kappa) {
+        linearized_svk = false;
+        if (is_setup)
+            MOPHI_GPU_CALL(cudaMemcpy(d_data, this, sizeof(*this), cudaMemcpyHostToDevice));
         if (!is_setup) {
             MOPHI_ERROR("GPU_FEAT10_Data must be set up before setting material.");
             return;

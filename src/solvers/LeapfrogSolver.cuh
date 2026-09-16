@@ -7,11 +7,12 @@
  * Brief:   Declares the LeapfrogSolver, a second-order explicit
  *          central-difference (leapfrog) time integrator for solid
  *          mechanics simulations. Owns GPU buffers for half-step nodal
- *          velocities and a lumped (row-summed) mass vector. Supports
+ *          velocities and a lumped mass vector (positive diagonal scaling
+ *          for T10, row sums otherwise). Supports
  *          ANCF3243, ANCF3443, FEAT10, FEAT4, and LDPM_TET4 element
  *          types, with primary focus on LDPM_TET4 for
  *          particle-scale simulations with 6 DOFs per particle.
- *          Exposes solver-side device buffers for external constraint coupling.
+ *          Shares private kick/drift stages with CoupledLeapfrogSolver.
  *
  *          Supported element types: TYPE_3243, TYPE_3443, TYPE_T10,
  *          TYPE_T4, TYPE_LDPM_TET4.
@@ -54,7 +55,7 @@ struct LeapfrogParams {
 //        set prescribed velocity at driven nodes (SetPrescribedVelocityBC)
 //     6. x_{n+1} = x_n + dt * v_{n+1/2}
 //
-// The lumped (row-sum) mass matrix is computed once in Setup() from the
+// The lumped mass matrix is computed once in Setup() from the
 // consistent CSR mass matrix that the element has already assembled.
 // Each call to Solve() advances the simulation by one time step.
 class LeapfrogSolver : public SolverBase {
@@ -73,6 +74,7 @@ class LeapfrogSolver : public SolverBase {
                 return;  // unreachable; MOPHI_ERROR is fatal
         }
 
+        host_data_ = data;
         type_ = data->type;
         data->PrepareSolverData();       // no-op for FEAT/LDPM; calls CalcDsDuPre for ANCF
         d_data_ = data->GetDevicePtr();  // device-side copy pointer
@@ -104,7 +106,7 @@ class LeapfrogSolver : public SolverBase {
         da_mass_lump_.BindDevicePointer(&d_mass_lump_);
     }
 
-    ~LeapfrogSolver() {
+    ~LeapfrogSolver() override {
         da_v_.free();
         da_mass_lump_.free();
         da_pvel_nodes_.free();
@@ -421,11 +423,13 @@ class LeapfrogSolver : public SolverBase {
     // with the current position is required (e.g. kinetic-energy reporting).
     void FinalHalfKick();
 
-    // Solver-side coupling buffers, valid after Setup() until destruction.
-    // A constraint projection after Solve() may correct translational v_{n+1/2}
-    // here, provided it also corrects positions by dt * delta_v. LDPM rotational
-    // velocities follow the first 3*n_coef entries; mass/inertia each have n_coef
-    // entries. These pointers are device memory, not host collection APIs.
+  private:
+    friend class DynamicsSystem;
+    friend class CoupledLeapfrogSolver;
+    // Internal stages and buffers: only the common-step coordinator may
+    // project half-step velocities before drift.
+    void Kick();
+    void Drift();
     Real* GetHalfStepVelocityDevicePtr() {
         return d_v_;
     }
@@ -433,8 +437,8 @@ class LeapfrogSolver : public SolverBase {
         return d_mass_lump_;
     }
 
-  private:
     ElementType type_;
+    ElementBase* host_data_ = nullptr;
     // Device pointer to the element data struct (GPU_FEAT4_Data, etc.).
     // Owned by the ElementBase object; not freed here.
     ElementBase* d_data_;

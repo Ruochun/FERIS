@@ -82,7 +82,6 @@ class LinearStaticSolver : public SolverBase {
 
   private:
     /* ---- internal stages ---- */
-    void BuildStiffnessCSRPattern();
     void AssembleLinearStiffness();
     void ApplyDirichletBCs();
     void SolveLinearSystemCG();
@@ -102,7 +101,6 @@ class LinearStaticSolver : public SolverBase {
     int* d_K_columns_ = nullptr;
     Real* d_K_values_ = nullptr;
     int K_nnz_ = 0;
-    bool pattern_built_ = false;
 
     /* CG workspace (length n_dof each) -- raw device pointers bound to DualArrays */
     Real* d_u_ = nullptr;   // displacement solution

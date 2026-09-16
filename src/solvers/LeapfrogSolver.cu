@@ -379,6 +379,13 @@ void LeapfrogSolver::Setup() {
     }
 
     MOPHI_GPU_CALL(cudaDeviceSynchronize());
+    if (type_ == TYPE_T10) {
+        // T10 row sums can be negative: use the element's positive diagonal scaling.
+        VectorXR mass;
+        // Keep a host element pointer for the setup-time mass policy.
+        static_cast<GPU_FEAT10_Data*>(host_data_)->RetrieveLumpedMassToCPU(mass);
+        MOPHI_GPU_CALL(cudaMemcpy(d_mass_lump_, mass.data(), mass.size() * sizeof(Real), cudaMemcpyHostToDevice));
+    }
     is_setup_ = true;
 }
 
@@ -393,6 +400,41 @@ void LeapfrogSolver::Setup() {
 //   5. Advance nodal positions.
 // ---------------------------------------------------------------------------
 void LeapfrogSolver::OneStepLeapfrog() {
+    Kick();
+    Drift();
+    MOPHI_GPU_CALL(cudaDeviceSynchronize());
+}
+void LeapfrogSolver::Drift() {
+    constexpr int threads = 256;
+    const int blocks = (n_coef_ + threads - 1) / threads;
+    switch (type_) {
+        case TYPE_T4:
+            leapfrog_update_position_kernel<<<blocks, threads>>>(static_cast<GPU_FEAT4_Data*>(d_data_),
+                                                                 d_leapfrog_solver_);
+            break;
+        case TYPE_T10:
+            leapfrog_update_position_kernel<<<blocks, threads>>>(static_cast<GPU_FEAT10_Data*>(d_data_),
+                                                                 d_leapfrog_solver_);
+            break;
+        case TYPE_3243:
+            leapfrog_update_position_kernel<<<blocks, threads>>>(static_cast<GPU_ANCF3243_Data*>(d_data_),
+                                                                 d_leapfrog_solver_);
+            break;
+        case TYPE_3443:
+            leapfrog_update_position_kernel<<<blocks, threads>>>(static_cast<GPU_ANCF3443_Data*>(d_data_),
+                                                                 d_leapfrog_solver_);
+            break;
+        case TYPE_LDPM_TET4:
+            leapfrog_update_position_kernel<<<blocks, threads>>>(static_cast<GPU_LDPMTet4_Data*>(d_data_),
+                                                                 d_leapfrog_solver_);
+            leapfrog_update_rotation_kernel<<<blocks, threads>>>(static_cast<GPU_LDPMTet4_Data*>(d_data_),
+                                                                 d_leapfrog_solver_);
+            break;
+    }
+    MOPHI_GPU_CALL(cudaGetLastError());
+}
+
+void LeapfrogSolver::Kick() {
     cudaEvent_t start, stop;
     MOPHI_GPU_CALL(cudaEventCreate(&start));
     MOPHI_GPU_CALL(cudaEventCreate(&stop));
@@ -432,9 +474,6 @@ void LeapfrogSolver::OneStepLeapfrog() {
             leapfrog_apply_prescribed_vel_kernel<<<blocks_pv, threadsPerBlock>>>(d_v_, d_pvel_nodes_, d_pvel_values_,
                                                                                  n_prescribed_vel_);
         }
-
-        // Step 5: Advance positions: x += dt * v.
-        leapfrog_update_position_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
     };
 
     MOPHI_GPU_CALL(cudaEventRecord(start));
@@ -485,12 +524,6 @@ void LeapfrogSolver::OneStepLeapfrog() {
             leapfrog_apply_prescribed_vel_kernel<<<blocks_prv, threadsPerBlock>>>(
                 d_v_ + n_coef_ * 3, d_prot_vel_nodes_, d_prot_vel_values_, n_prescribed_rot_vel_);
         }
-
-        // Step 5a: Advance translational positions.
-        leapfrog_update_position_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
-
-        // Step 5b: Advance rotational positions.
-        leapfrog_update_rotation_kernel<<<blocks_coef, threadsPerBlock>>>(typed_data, d_leapfrog_solver_);
     }
 
     MOPHI_GPU_CALL(cudaEventRecord(stop));

@@ -38,6 +38,8 @@ add_library(feris_lib STATIC
     ${ELEMENT_SOURCES}
     ${SOLVER_SOURCES}
     ${UTILS_SOURCES}
+    src/dynamics/DynamicsSystem.cu
+    src/constraints/LinearConstraints.cc
 )
 
 target_link_libraries(feris_lib

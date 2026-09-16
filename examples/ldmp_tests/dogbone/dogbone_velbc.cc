@@ -1,99 +1,59 @@
 /**
- * dogbone_forcebc.cc
+ * dogbone_velbc.cc
  *
- * Dogbone — LDPM-TET4 Tensile Demo with Externally Applied Force (Force-BC)
+ * Dogbone — LDPM-TET4 Leapfrog Simulation with Velocity-Driven (Kinematic) BC
  *
  * Author: Ruochun Zhang
  * Email:  ruochunz@gmail.com
  *
- * Demonstrates the full Cusatis LDPM physics on a dogbone tensile specimen
- * driven by an applied nodal force on the top face.  This is the force-BC
- * counterpart of dogbone_velbc.cc (velocity/kinematic-BC version).
+ * GPU velocity-driven (kinematic-BC) dogbone tensile demo.
  *
- *   1. Read all six Chrono Workbench LDPM mesh data files (nodes, particles,
- *      tets, facets, faceFacets, facetsVertices).
- *   2. Initialise GPU_LDPMTet4_Data via SetupFromMesh(), which overrides the
- *      tet4-derived facet areas and tangent frame vectors (m, l) with the
- *      richer, precomputed values from the facets.dat file.
- *   3. Set elastic moduli (E_N, E_T, rotational) AND the Cusatis tensile
- *      damage parameters (σ_t, H_t).
- *   4. Fix particles on the z = z_min face (one end of the dogbone).
- *   5. Apply a constant tensile force on the z = z_max face equal to
- *      LOAD_FAC × σ_t × A_cross.  With LOAD_FAC = 0.3 the average stress
- *      is half the mesoscale tensile strength, keeping the specimen below
- *      the static failure load.  Dynamic wave amplification (overshoot ≈ 2×
- *      the static displacement) drives local strains towards the damage
- *      threshold at stress concentrators.
- *   6. Time-march with LeapfrogSolver for T_SIM seconds (default 0.1 s).
- *      The step count and output intervals are computed automatically from
- *      the CFL time step so that the simulation always runs for T_SIM
- *      regardless of mesh refinement.
+ * The top plate is driven by a prescribed velocity rather than an applied load,
+ * matching the ChLinkMotorLinearPosition approach used in Chrono-based LDPM
+ * reference implementations.  This is the kinematic-BC counterpart of
+ * dogbone_forcebc.cc (which applies an external nodal force instead).
  *
- * Physics: Cusatis LDPM (2011)
- * ────────────────────────────
- * The constitutive model is NOT classical FEA elasticity but the full
- * mesoscale LDPM damage model:
+ *   1. Read all six Chrono Workbench LDPM mesh data files.
+ *   2. Initialise GPU_LDPMTet4_Data via SetupFromMesh().
+ *   3. Set elastic moduli and Cusatis tensile damage parameters.
+ *   4. Fix particles on the z = z_min face (clamped bottom end).
+ *   5. Mark particles on the z = z_max face as velocity-driven:
+ *      — SetPrescribedVelocityBC registers a constant z-velocity = V_PLATE.
+ *      — SetNodalVelocity seeds the initial velocity in the leapfrog array.
+ *      — InitialHalfKick staggers v_0 → v_{-1/2} (trivial here since f_0 = 0,
+ *        but this is the correct pattern whenever v_0 ≠ 0).
+ *   6. Prescribed velocity: constant V_PLATE from t = 0.
+ *   7. Time-march with LeapfrogSolver; at each output interval write VTK.
+ *      The leapfrog naturally advances driven-node z-positions by V_PLATE*dt
+ *      each step — no explicit position-update call needed.
  *
- *   • Each unique Voronoi edge (particle i ↔ particle j) is one interaction
- *     strut with its own facet area, normal, and tangent frame.
- *   • Strains (e_N, e_M, e_L) are resolved on the facet frame from the
- *     relative translational displacement between i and j.
- *   • A characteristic damage strain:
- *       e_D = sqrt( max(e_N, 0)²  +  (E_T/E_N) * (e_M² + e_L²) )
- *     drives tensile-shear coupled damage.
- *   • History variable κ = max(κ_old, e_D) records the maximum e_D
- *     ever reached (irreversible damage).
- *   • Exponential softening:  ω = 1 - (e_t0/κ) * exp(-H_t*(κ - e_t0))
- *     where e_t0 = σ_t / E_N is the damage threshold strain.
- *   • Tractions: t_N = E_N * e_N * (1-ω)  [tension only],
- *                t_M = E_T * e_M * (1-ω),  t_L = E_T * e_L * (1-ω).
- *   • Rotational moments remain linear-elastic (standard first-order LDPM).
+ * Differences from dogbone_forcebc.cc (force-BC GPU demo)
+ * ───────────────────────────────────────────────────────────────
+ *  dogbone_forcebc.cc       │ this file
+ *  ──────────────────────────┼────────────────────────────────────
+ *  External force on top     │ No external forces
+ *  Bottom nodes: fixed       │ Bottom nodes: fixed (same)
+ *  Top nodes: loaded (free)  │ Top nodes: velocity-driven
+ *  Physics drives top motion │ Prescribed velocity drives top motion
  *
- * VTK output
- * ──────────
- * Two sets of VTK files are written per output frame, plus a single stress-displacement CSV:
+ * Physics: Cusatis LDPM (2011) — same constitutive model as the load demo.
  *
- * dogbone_forcebc_tet4_<frame>.vtk
- *   Written every vtk_interval steps (frame 0 = initial undeformed state):
- *   - POINTS  : current (deformed) particle positions
- *   - CELLS   : VTK_TETRA from tets.dat (connectivity unchanged)
- *   - POINT_DATA "diameter"     : aggregate diameter
- *   - POINT_DATA "displacement" : Euclidean displacement magnitude |u|
- *
- * dogbone_forcebc_subfacets_<frame>.vtk   ← KEY OUTPUT FOR LDPM CRACK VISUALIZATION
- *   Written every vtk_interval steps (frame 0 = initial, all zeros):
- *   - POINTS  : exact sub-facet vertex positions (fixed reference geometry)
- *   - CELLS   : VTK_TRIANGLE, one per Voronoi sub-facet
- *   - CELL_DATA "crack_distance" : per-subfacet crack opening displacement [mm]
- *                                  = ω × κ × l₀  (inelastic facet opening)
- *                                  0 → undamaged / elastic
- *                                  ~0.1 mm → fully opened crack at 0.1 s simulation
- *               Each sub-facet's value is projected from its owning LDPM edge via
- *               GPU_LDPMTet4_Data::ProjectEdgeCrackDistanceToSubfacets().
- *
- * dogbone_forcebc_stress_disp.csv
- *   Stress [N/mm² = MPa] vs displacement [mm] at every print interval.
- *   Stress = reaction force at fixed (bottom) nodes / cross-section area.
- *   Displacement = mean z-displacement of loaded (top) nodes.
- *
- * ParaView workflow
- * ─────────────────
- *   1. dogbone_forcebc_tet4_*.vtk        → load as series, color by "displacement"
- *   2. dogbone_forcebc_subfacets_*.vtk   → load as series, color by "crack_distance"
- *                                          use threshold filter (crack_distance > 0) to
- *                                          show only fractured sub-facets
- *   3. dogbone_forcebc_stress_disp.csv   → import in any spreadsheet for the
- *                                          stress-displacement curve
+ * VTK output (same format as dogbone_forcebc.cc)
+ * ────────────────────────────────────────────────
+ *   dogbone_velbc_tet4_NNNNN.vtk      — deformed TET4 mesh (displacement)
+ *   dogbone_velbc_subfacets_NNNNN.vtk — sub-facet mesh with crack_distance [mm]
+ *                                       (= ω × κ × l₀, the inelastic facet opening)
+ *   dogbone_velbc_stress_disp.csv     — stress [MPa] vs displacement [mm] table
  *
  * Building
  * ────────
  *   mkdir -p build && cd build
  *   cmake ..
- *   make dogbone_forcebc
+ *   make dogbone_velbc
  *
  * Running (from the build directory)
  * ───────────────────────────────────
- *   ./bin/dogbone_forcebc
+ *   ./bin/dogbone_velbc
  */
 
 #include <cuda_runtime.h>
@@ -111,24 +71,18 @@
 
 #include <MoPhiEssentials.h>
 
-#include "../src/elements/LDPMTet4Data.cuh"
-#include "../src/materials/LDPM.cuh"
-#include "../src/solvers/LeapfrogSolver.cuh"
-#include "../src/types.h"
-#include "../src/utils/ldpm_mesh_utils.h"
+#include "elements/LDPMTet4Data.cuh"
+#include "materials/LDPM.cuh"
+#include "solvers/LeapfrogSolver.cuh"
+#include "types.h"
+#include "utils/ldpm_mesh_utils.h"
 
 using namespace feris;
 
 // ── Simulation parameters ─────────────────────────────────────────────────────
 
 // Full LDPM material parameters (Cusatis et al., 2011).
-//
-// Unit system: mm-tonne-s (consistent set used by Cusatis):
-//   length [mm], force [N], mass [tonne], time [s], stress [N/mm² = MPa].
-//   Dimensional check: 1 N = 1 kg·m/s² = (1e-3 tonne)·(1e3 mm)/s² = 1 tonne·mm/s²  ✓
-//   Therefore density must be in tonne/mm³, not kg/mm³.
-//   (Using kg/mm³ would make force units kg·mm/s² = milliNewtons, not Newtons.)
-
+// Unit system: mm-tonne-s (stress in N/mm² = MPa).
 static constexpr Real E_N_VAL = Real(60273.0);     // N/mm²  normal modulus (E₀)
 static constexpr Real ALPHA_VAL = Real(0.25);      // E_T / E_N  shear-to-normal ratio
 static constexpr Real RHO_VAL = Real(2.338e-9);    // tonne/mm³  (= 2338 kg/m³)
@@ -152,34 +106,25 @@ static constexpr Real R_S_VAL = Real(0.0);         // shear softening modulus ra
 static constexpr Real HC1_RATIO = Real(0.1);       // final hardening modulus ratio (H_c1/E_0)
 static constexpr bool ELASTIC_FLAG = false;        // elastic analysis flag
 static constexpr Real BETA_K = Real(0.25);         // rotational coupling
-// Applied load and simulation time
-//   LOAD_FAC sets the total applied force as a fraction of the nominal
-//   quasi-static failure load F_fail = sigma_t * A_cross_approx.
-//   With LOAD_FAC = 0.3 the average cross-section stress is 0.3 × sigma_t,
-//   which is below the static failure limit.  The dynamic wave amplification
-//   (overshoot ≈ 2× the quasi-static equilibrium displacement) drives local
-//   strains towards the damage threshold at geometric stress concentrators,
-//   activating the Cusatis softening response in the most stressed facets.
-//
-//   T_SIM  = total physical simulation time [s].
-//   T_VTK  = interval between VTK snapshots [s].
-//   T_CSV  = interval between stress-displacement CSV rows [s].
-//   The step count and output intervals are derived from the CFL time step
-//   computed at runtime, so the simulation always covers exactly T_SIM
-//   regardless of mesh refinement.
 
-static constexpr Real LOAD_FAC = Real(0.3);  // fraction of static failure load (0.3 = 30% of σ_t × A_cross)
+// Prescribed velocity of the top (driven) plate in mm/s.
+// A 1 mm/s loading rate is quasi-static relative to the elastic wave speed:
+// with specimen length ~150 mm and c_N ≈ 5e6 mm/s, V/c_N ≈ 2e-7 << 1.
+static constexpr Real V_PLATE = Real(1.0);  // mm/s
+
+// Total simulation time, VTK output interval, and CSV output interval.
+// The step count and output intervals are computed from the CFL time step
+// at runtime so the simulation always covers T_SIM regardless of mesh size.
 static constexpr Real T_SIM = Real(0.1);     // s — total simulation time
 static constexpr Real T_VTK = Real(0.005);   // s — VTK + console output interval (~20 frames)
 static constexpr Real T_CSV = Real(0.0005);  // s — CSV stress-displacement output (~200 points)
 
-// Fraction of bounding-box extent used as tolerance when identifying boundary
-// particles (nodes on the min/max face of the specimen).
+// Fraction of bounding-box extent used as tolerance for boundary detection.
 static constexpr Real BC_TOL_FRAC = Real(1e-3);
 
 int main() {
     mophi::Logger::GetInstance().SetVerbosity(mophi::VERBOSITY_INFO);
-    const std::string output_dir = "dogbone_forcebc";
+    const std::string output_dir = "dogbone_velbc";
     std::filesystem::remove_all(output_dir);
     if (!std::filesystem::create_directories(output_dir)) {
         std::cerr << "Failed to create output directory: " << output_dir << "\n";
@@ -205,7 +150,7 @@ int main() {
     std::cout << "  Sub-facets: " << mesh.n_subfacets << "\n";
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 2. Compute coordinate bounding box and minimum edge length
+    // 2. Bounding box and minimum edge length
     // ──────────────────────────────────────────────────────────────────────────
     Real x_min = std::numeric_limits<Real>::max();
     Real x_max = -std::numeric_limits<Real>::max();
@@ -225,7 +170,10 @@ int main() {
               << "  y=[" << y_min << ", " << y_max << "]"
               << "  z=[" << z_min << ", " << z_max << "]\n";
 
-    // Minimum edge length across the entire mesh (needed for CFL and E_k*).
+    // Approximate cross-sectional area (bounding-box XY face).
+    const Real A_cross_approx = (x_max - x_min) * (y_max - y_min);
+
+    // Minimum edge length (for CFL and rotational moduli).
     Real l_min = std::numeric_limits<Real>::max();
     for (int e = 0; e < mesh.n_tets; ++e) {
         for (int a = 0; a < 4; ++a) {
@@ -251,67 +199,61 @@ int main() {
     std::cout << "  Damage threshold strain e_t0 = " << SIGMA_T_VAL / E_N_VAL << "\n";
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 3. Identify fixed and loaded particles
-    //    Fixed  : z ≈ z_min  (clamped end)
-    //    Loaded : z ≈ z_max  (pulled end — uniform tensile load)
+    // 3. Identify fixed (bottom) and driven (top) particles
+    //    Fixed  : z ≈ z_min  (clamped end — same as load-controlled demo)
+    //    Driven : z ≈ z_max  (prescribed-velocity end — replaces applied force)
     // ──────────────────────────────────────────────────────────────────────────
     const Real z_range = z_max - z_min;
     const Real tol_z = BC_TOL_FRAC * z_range;
 
-    std::vector<int> fixed_idx, load_idx;
+    std::vector<int> fixed_idx, driven_idx;
     for (int i = 0; i < mesh.n_particles; ++i) {
         const Real z = mesh.particle_z(i);
         if (std::abs(z - z_min) < tol_z)
             fixed_idx.push_back(i);
         if (std::abs(z - z_max) < tol_z)
-            load_idx.push_back(i);
+            driven_idx.push_back(i);
     }
 
     if (fixed_idx.empty()) {
         std::cerr << "Could not find any particle at z = z_min for fixed BC.\n";
         return 1;
     }
-    if (load_idx.empty()) {
-        std::cerr << "Could not find any particle at z = z_max for load application.\n";
+    if (driven_idx.empty()) {
+        std::cerr << "Could not find any particle at z = z_max for driven BC.\n";
         return 1;
     }
 
-    std::cout << "  Fixed particles (z ≈ " << z_min << "): " << fixed_idx.size() << "\n";
-    std::cout << "  Loaded particles (z ≈ " << z_max << "): " << load_idx.size() << "\n";
+    std::cout << "  Fixed particles (z ≈ " << z_min << "):  " << fixed_idx.size() << "\n";
+    std::cout << "  Driven particles (z ≈ " << z_max << "): " << driven_idx.size() << "\n";
 
-    VectorXi h_fixed(static_cast<int>(fixed_idx.size()));
-    for (int i = 0; i < static_cast<int>(fixed_idx.size()); ++i)
+    const int n_fixed = static_cast<int>(fixed_idx.size());
+    const int n_driven = static_cast<int>(driven_idx.size());
+
+    // Fixed nodes are passed to SetNodalFixed so the leapfrog zeros their
+    // velocity every step.  Driven (top-plate) nodes are NOT fixed; instead
+    // their z-velocity is prescribed via SetPrescribedVelocityBC so the
+    // leapfrog naturally advances their z-position by V_PLATE * dt each step.
+    VectorXi h_fixed(n_fixed);
+    for (int i = 0; i < n_fixed; ++i)
         h_fixed(i) = fixed_idx[i];
 
-    // Scale applied load: F_fail = sigma_t × A_cross (quasi-static elastic limit).
-    //   F_TOTAL = LOAD_FAC × F_fail  (below static limit; overshoot from dynamic
-    //                                  wave amplification activates local damage)
-    const Real A_cross_approx = (x_max - x_min) * (y_max - y_min);
-    const Real F_fail = SIGMA_T_VAL * A_cross_approx;
-    const Real F_TOTAL = LOAD_FAC * F_fail;
-
-    std::cout << "  Approx cross-section area: " << A_cross_approx << " mm²\n";
-    std::cout << "  Static elastic limit:  F_fail = " << F_fail << " N\n";
-    std::cout << "  Applied tensile force: F_TOTAL = " << F_TOTAL << " N  (" << LOAD_FAC << "× elastic limit)\n";
-
-    // External force: F_TOTAL distributed equally as tensile (+z) load.
-    const Real F_per_node = F_TOTAL / static_cast<Real>(load_idx.size());
-    VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles));
-    for (auto& f : h_f_ext)
-        f = Real3::Zero();
-    for (int i : load_idx)
-        h_f_ext[static_cast<size_t>(i)](2) = F_per_node;  // +z direction
+    // Prescribed z-velocity for driven nodes: one Real3 = [0, 0, V_PLATE] per node.
+    VectorXi h_driven(n_driven);
+    VectorReal3 h_driven_vel(static_cast<size_t>(n_driven));
+    for (int i = 0; i < n_driven; ++i) {
+        h_driven(i) = driven_idx[i];
+        h_driven_vel[static_cast<size_t>(i)] = Vector3R::Zero();
+        h_driven_vel[static_cast<size_t>(i)](2) = V_PLATE;  // z-velocity only
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 4. Create and configure GPU_LDPMTet4_Data via SetupFromMesh
-    //    This uses the file-based sub-facet info for facet areas and tangent
-    //    frame vectors (m, l) instead of the tet4-derived approximation.
+    // 4. Create and configure GPU_LDPMTet4_Data
     // ──────────────────────────────────────────────────────────────────────────
     GPU_LDPMTet4_Data element_data;
-
     element_data.SetupFromMesh(mesh);
 
-    std::cout << "  Unique edges: " << element_data.n_edge << "\n";
+    std::cout << "  LDPM interactions: " << element_data.n_edge << "\n";
 
     // Full LDPM parameter set.
     LDPMParams ldpm_params{};
@@ -342,7 +284,15 @@ int main() {
     ldpm_params.elastic_flag = ELASTIC_FLAG;
     element_data.SetLDPMParams(ldpm_params);
 
+    // No external forces — the top plate is driven kinematically.
+    VectorReal3 h_f_ext(static_cast<size_t>(mesh.n_particles));
+    for (auto& f : h_f_ext)
+        f = Real3::Zero();
     element_data.SetExternalForce(h_f_ext);
+
+    // Only the fixed (bottom) nodes are registered with SetNodalFixed.
+    // Driven (top-plate) nodes will have their velocity prescribed via
+    // SetPrescribedVelocityBC on the solver after Setup().
     element_data.SetNodalFixed(h_fixed);
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -351,15 +301,14 @@ int main() {
     element_data.CalcMassMatrix();
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 6. CFL time step estimate
-    //   c_N = sqrt(E_N / rho)  [mm/s]
-    //   dt  = safety * l_min / c_N
+    // 6. CFL time step:  dt = 0.5 * l_min / c_N
     // ──────────────────────────────────────────────────────────────────────────
-    const Real c_N = std::sqrt(E_N_VAL / RHO_VAL);  // mm/s
+    const Real c_N = std::sqrt(E_N_VAL / RHO_VAL);  // mm/s  longitudinal wave speed
     const Real dt_crit = l_min / c_N;
     const Real dt = Real(0.5) * dt_crit;
 
     std::cout << "  c_N = " << c_N << " mm/s,  dt_crit = " << dt_crit << " s,  dt = " << dt << " s\n";
+    std::cout << "  Prescribed plate velocity V_PLATE = " << V_PLATE << " mm/s\n";
 
     // ──────────────────────────────────────────────────────────────────────────
     // 7. Set up and run LeapfrogSolver
@@ -369,6 +318,19 @@ int main() {
     LeapfrogParams params{dt};
     solver.SetParameters(&params);
     solver.Setup();
+
+    // Register driven nodes' prescribed z-velocity with the solver.
+    // After every velocity update the solver re-imposes v_z = V_PLATE at these
+    // nodes, so their z-position advances naturally by V_PLATE * dt each step.
+    solver.SetPrescribedVelocityBC(h_driven, h_driven_vel);
+
+    // Seed the initial translational velocity (v_0 = V_PLATE in z) for driven
+    // nodes, then stagger it to the half-step value required by the leapfrog.
+    // At the undeformed reference configuration f_int = 0 and f_ext = 0, so the
+    // backward half-kick is a no-op — but calling it is the correct pattern for
+    // any simulation that starts with non-zero nodal velocities.
+    solver.SetNodalVelocity(h_driven, h_driven_vel);
+    solver.InitialHalfKick();
 
     // Step count and output intervals derived from CFL dt so the simulation
     // always runs for T_SIM seconds regardless of mesh refinement.
@@ -383,31 +345,30 @@ int main() {
     std::cout << "  CSV output every      : " << csv_interval << " steps (" << T_CSV << " s)\n";
     std::cout << std::fixed << std::setprecision(6);
 
-    // Helpers: build numbered VTK filenames for TET4 and sub-facet outputs.
+    // Helpers: build numbered VTK filenames.
     auto tet4_vtk_name = [&output_dir](int f) {
         std::ostringstream s;
-        s << output_dir << "/dogbone_forcebc_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << output_dir << "/dogbone_velbc_tet4_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
     auto subfacet_vtk_name = [&output_dir](int f) {
         std::ostringstream s;
-        s << output_dir << "/dogbone_forcebc_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
+        s << output_dir << "/dogbone_velbc_subfacets_" << std::setfill('0') << std::setw(5) << f << ".vtk";
         return s.str();
     };
 
     // Open stress-displacement CSV for writing.
     // Each row: displacement_mm,stress_MPa
-    std::ofstream stress_disp_csv(output_dir + "/dogbone_forcebc_stress_disp.csv");
+    std::ofstream stress_disp_csv(output_dir + "/dogbone_velbc_stress_disp.csv");
     if (!stress_disp_csv.is_open()) {
-        std::cerr << "Warning: could not open dogbone_forcebc_stress_disp.csv for writing.\n";
+        std::cerr << "Warning: could not open dogbone_velbc_stress_disp.csv for writing.\n";
     } else {
         stress_disp_csv << "displacement_mm,stress_MPa\n";
     }
 
-    // ── Write frame 0: initial (undeformed) TET4 and sub-facet (all zeros) ───
+    // ── Write frame 0: initial (undeformed) state ─────────────────────────────
     int frame = 0;
     {
-        // TET4 mesh
         const std::string fname_t4 = tet4_vtk_name(frame);
         if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh, mesh.particle_x, mesh.particle_y, mesh.particle_z)) {
             std::cerr << "Warning: failed to write initial TET4 VTK.\n";
@@ -415,7 +376,6 @@ int main() {
             std::cout << "Wrote: " << fname_t4 << "  (initial configuration)\n";
         }
 
-        // Sub-facet mesh with all-zero crack distance (initial, undamaged state).
         VectorXR sf_crack0(mesh.n_subfacets);
         sf_crack0.setZero();
         const std::string fname_sf = subfacet_vtk_name(frame);
@@ -424,18 +384,26 @@ int main() {
         } else {
             std::cout << "Wrote: " << fname_sf << "  (initial, all crack_distance=0)\n";
         }
-
         ++frame;
     }
 
     // Print column header.
     const int n_edge = element_data.n_edge;
     std::cout << "\n"
-              << std::setw(8) << "Step" << std::setw(22) << "mean dz (loaded) [mm]" << std::setw(18) << "stress [MPa]"
+              << std::setw(8) << "Step" << std::setw(20) << "prescribed dz [mm]" << std::setw(20)
+              << "mean dz (driven) [mm]" << std::setw(18) << "stress [MPa]"
               << "\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << std::string(68, '-') << "\n";
+
+    Real prescribed_z_total = Real(0);  // cumulative prescribed displacement
 
     for (int step = 0; step < n_steps; ++step) {
+        // Accumulate the nominal prescribed displacement for console output.
+        prescribed_z_total += V_PLATE * dt;
+
+        // One leapfrog step: computes tractions, updates velocities, re-imposes
+        // prescribed v_z = V_PLATE at driven nodes, then advances all positions.
+        // Driven-node z-positions advance by V_PLATE * dt naturally via x += dt * v.
         solver.Solve();
 
         if ((step + 1) % csv_interval == 0 || (step + 1) % vtk_interval == 0) {
@@ -446,13 +414,16 @@ int main() {
             VectorReal3 f_int;
             element_data.RetrieveInternalForceToCPU(f_int);
 
-            // Mean z-displacement of loaded nodes.
+            // Mean actual z-displacement of driven nodes.
             Real dz_sum = Real(0);
-            for (int i : load_idx)
+            for (int i : driven_idx)
                 dz_sum += z_cur(i) - mesh.particle_z(i);
-            const Real dz_mean = dz_sum / static_cast<Real>(load_idx.size());
+            const Real dz_mean_driven = dz_sum / static_cast<Real>(driven_idx.size());
 
-            // Reaction stress at the fixed (bottom) face.
+            // Reaction stress: sum z-component of internal forces at fixed
+            // (bottom) nodes, divide by cross-sectional area.  The internal
+            // force at a fixed node points in the direction the material
+            // pulls it; negate to get the compressive reaction (tensile = positive).
             Real f_reaction_z = Real(0);
             for (int i : fixed_idx)
                 f_reaction_z += f_int[static_cast<size_t>(i)](2);
@@ -460,15 +431,16 @@ int main() {
 
             // Write to stress-displacement CSV at high frequency.
             if ((step + 1) % csv_interval == 0 && stress_disp_csv.is_open()) {
-                stress_disp_csv << dz_mean << "," << stress << "\n";
+                stress_disp_csv << dz_mean_driven << "," << stress << "\n";
             }
 
             // Console progress at VTK (lower) frequency.
             if ((step + 1) % print_interval == 0) {
-                std::cout << std::setw(8) << (step + 1) << std::setw(22) << dz_mean << std::setw(18) << stress << "\n";
+                std::cout << std::setw(8) << (step + 1) << std::setw(20) << prescribed_z_total << std::setw(20)
+                          << dz_mean_driven << std::setw(18) << stress << "\n";
             }
 
-            // VTK snapshot: TET4 displacement + sub-facet crack distance.
+            // VTK snapshot.
             if ((step + 1) % vtk_interval == 0) {
                 const std::string fname_t4 = tet4_vtk_name(frame);
                 if (!WriteLDPMTet4TetMeshToVTK(fname_t4, mesh, x_cur, y_cur, z_cur)) {
@@ -485,7 +457,6 @@ int main() {
                 } else {
                     std::cout << "Wrote: " << fname_sf << "\n";
                 }
-
                 ++frame;
             }
         }
@@ -494,7 +465,7 @@ int main() {
     stress_disp_csv.close();
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 8. Final fracture statistics and analytic displacement estimate
+    // 8. Final fracture statistics
     // ──────────────────────────────────────────────────────────────────────────
     {
         VectorXR x_final, y_final, z_final;
@@ -504,12 +475,13 @@ int main() {
         element_data.RetrieveFacetDamageToCPU(omega_final);
         element_data.RetrieveFacetKappaToCPU(kappa_final);
 
+        // Host-side edge data for per-edge crack distance.
         const std::vector<int>& edge_nodes = element_data.GetEdgeNodes();
 
         Real dz_sum = Real(0);
-        for (int i : load_idx)
+        for (int i : driven_idx)
             dz_sum += z_final(i) - mesh.particle_z(i);
-        const Real dz_final = dz_sum / static_cast<Real>(load_idx.size());
+        const Real dz_final_mean = dz_sum / static_cast<Real>(driven_idx.size());
 
         Real omega_max = Real(0);
         Real crack_dist_max = Real(0);
@@ -530,31 +502,34 @@ int main() {
                 ++n_damaged;
         }
 
-        const Real L = z_max - z_min;
-        const Real delta_analytic = F_TOTAL * L / (E_N_VAL * A_cross_approx);
         const Real t_final = n_steps * dt;
+        const Real L = z_max - z_min;
+        const Real strain_final = prescribed_z_total / L;
+        const Real e_t0 = SIGMA_T_VAL / E_N_VAL;
 
         std::cout << "\n── Final state at t=" << t_final << " s ───\n";
-        std::cout << "  Analytic quasi-static tip displacement: " << delta_analytic << " mm\n";
-        std::cout << "  Simulated mean tip displacement: " << dz_final << " mm\n";
-        std::cout << "  Maximum edge damage omega_max  : " << omega_max << "\n";
-        std::cout << "  Max crack opening (ω×κ×l₀)    : " << crack_dist_max << " mm\n";
-        std::cout << "  Edges with omega > 0.5         : " << n_damaged << " / " << n_edge << "\n";
+        std::cout << "  Prescribed top-plate displacement: " << prescribed_z_total << " mm\n";
+        std::cout << "  Mean actual driven-node dz       : " << dz_final_mean << " mm\n";
+        std::cout << "  Nominal axial strain             : " << strain_final << " (= " << strain_final / e_t0
+                  << " × e_t0)\n";
+        std::cout << "  Maximum edge damage omega_max    : " << omega_max << "\n";
+        std::cout << "  Max crack opening (ω×κ×l₀)      : " << crack_dist_max << " mm\n";
+        std::cout << "  Edges with omega > 0.5           : " << n_damaged << " / " << n_edge << "\n";
         std::cout << "(Non-zero damage indicates Cusatis LDPM fracture is active.)\n";
     }
 
+    // Cleanup.
     element_data.Destroy();
 
     std::cout << "\nDone.  " << frame << " VTK frame(s) written.\n";
     std::cout << "Output directory: " << output_dir << "\n";
     std::cout << "\nOutput files (two sets per frame + stress-displacement CSV):\n";
-    std::cout << "  " << output_dir << "/dogbone_forcebc_tet4_NNNNN.vtk          — deformed TET4 mesh\n";
+    std::cout << "  " << output_dir << "/dogbone_velbc_tet4_NNNNN.vtk         — deformed TET4 mesh\n";
     std::cout << "    → Color by 'displacement' to visualise particle motion.\n";
-    std::cout << "  " << output_dir << "/dogbone_forcebc_subfacets_NNNNN.vtk     — Voronoi sub-facet mesh\n";
+    std::cout << "  " << output_dir << "/dogbone_velbc_subfacets_NNNNN.vtk    — Voronoi sub-facet mesh\n";
     std::cout << "    → Color by 'crack_distance' [mm] (ω×κ×l₀) to visualise fracture.\n";
     std::cout << "    → Use Threshold filter (crack_distance > 0) to show cracked facets.\n";
-    std::cout << "  " << output_dir << "/dogbone_forcebc_stress_disp.csv         — stress [MPa] vs displacement [mm]\n";
+    std::cout << "  " << output_dir << "/dogbone_velbc_stress_disp.csv        — stress [MPa] vs displacement [mm]\n";
     std::cout << "    → Plot displacement_mm vs stress_MPa for the load-displacement curve.\n";
-    std::cout << "  Load each series: File → Open → select group → Apply → Animation View.\n";
     return 0;
 }
