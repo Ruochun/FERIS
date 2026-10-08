@@ -410,8 +410,9 @@ class LeapfrogSolver : public SolverBase {
     //
     //   v_{-1/2} = v_0 - (dt/2) * M_lump^{-1} * (f_ext - f_int(x_0))
     //
-    // Call after Setup() when da_v_ has been seeded with non-zero physical
-    // initial velocities.  For rest-start simulations this is a no-op.
+    // Call after Setup() and seeding physical initial velocities, before Solve().
+    // The correction is zero only when the initial net force is zero;
+    // zero initial velocity alone does not make it a no-op.
     void InitialHalfKick();
 
     // Forward half-kick to recover a synchronized full-step velocity
@@ -421,6 +422,8 @@ class LeapfrogSolver : public SolverBase {
     //
     // Call after the final Solve() when a velocity output synchronized
     // with the current position is required (e.g. kinetic-energy reporting).
+    // Optional: never called automatically by Solve() or output routines.
+    // Modifies stored velocities; do not use for output during ongoing stepping.
     void FinalHalfKick();
 
   private:

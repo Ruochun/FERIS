@@ -99,9 +99,12 @@ vectors (AdamW) and supports an optional pre-computed constraint Jacobian pointe
 
 ### `LeapfrogSolver`
 
-**Physics**: Explicit central-difference (leapfrog / velocity-Verlet) time
+**Physics**: Explicit staggered central-difference (leapfrog) time
 integration for nonlinear solid mechanics and LDPM particle dynamics.
-Advances the simulation by one time step per `Solve()` call.
+Advances the simulation by one time step per `Solve()` call, storing positions
+at full steps and velocities at half steps. The optional `FinalHalfKick()`
+synchronizes final velocities only when explicitly called; ordinary stepping
+and output do not call it automatically.
 
 For `TYPE_LDPM_TET4` both translational and rotational DOFs are integrated;
 the velocity buffer is `6·n_nodes` and the mass buffer is `2·n_nodes`.

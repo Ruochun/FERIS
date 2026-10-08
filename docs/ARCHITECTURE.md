@@ -140,12 +140,22 @@ loaded sub-facets onto area-averaged unique-edge interactions. The default
 ### `LeapfrogSolver` — Explicit Central-Difference Integrator
 
 The preferred solver for dynamic LDPM simulations, and also usable for explicit dynamic continuum FEA.
-Advances the state by one time step using the velocity-Verlet (leapfrog) scheme:
+Advances the state by one time step using staggered central-difference (leapfrog)
+integration, with positions at full steps and velocities stored at half steps:
 
 ```
 v_{n+½} = v_{n−½} + dt · M_lump⁻¹ · (f_ext − f_int)
 x_{n+1} = x_n    + dt · v_{n+½}
 ```
+
+Each `Solve()` performs a full kick followed by a drift, leaving the state at
+`x_{n+1}, v_{n+½}`. It does not synchronize velocities at every step as the
+velocity-Verlet form does. `InitialHalfKick()` converts physical initial
+velocities `v_0` to `v_{−½}`; this correction is zero when the initial net force
+is zero. The optional `FinalHalfKick()` converts `v_{N−½}` to `v_N` for
+synchronized final velocity output. It is not called automatically, and current
+examples do not call it. It modifies the stored velocity, so it must not be
+inserted into an ongoing time-stepping loop merely to produce output.
 
 For `TYPE_LDPM_TET4` the rotational DOFs are integrated with the same scheme
 using the per-node rotational inertia `I_lump` in place of `m_lump`.
@@ -219,7 +229,7 @@ All element and solver kernels run on the GPU via CUDA:
 - LDPM: Cusatis, G., Pelessone, D., Mencarelli, A. (2011). "Lattice Discrete
   Particle Model (LDPM) for failure behaviour of concrete." *Cement and Concrete
   Composites*, 33(9), 881–890.
-- LeapFrog / velocity-Verlet: Verlet, L. (1967). "Computer 'Experiments' on
+- Related Verlet integration reference: Verlet, L. (1967). "Computer 'Experiments' on
   Classical Fluids." *Physical Review*, 159(1), 98–103.
 - St. Venant-Kirchhoff: standard nonlinear elasticity reference
 - Nesterov acceleration: Nesterov, Y. (1983). "A method for solving the convex

@@ -602,6 +602,13 @@ one time step Δt:
 
 ### Implementation
 
+Positions and rotations are stored at full steps; translational and angular
+velocities are stored at half steps. `InitialHalfKick()` initializes the
+staggered velocities from physical initial velocities. `FinalHalfKick()` is an
+optional, explicit conversion to full-step velocities after the last step,
+not a required part of stepping or output. Current examples do not call it;
+the coupled TPB example reports kinetic energy using half-step velocities.
+
 `LeapfrogSolver::OneStepLeapfrog()` for `TYPE_LDPM_TET4` launches seven sequenced
 CUDA kernel groups:
 
